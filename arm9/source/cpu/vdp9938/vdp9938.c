@@ -24,7 +24,6 @@ u8 XBuf[256*212] ALIGN(32) = {0}; // VDP9938 screen is 256x212
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
-u16 vdp_int_source      __attribute__((section(".dtcm"))) = 0;
 u16 my_config_clear_int __attribute__((section(".dtcm"))) = 0;
 u16 ALatch              __attribute__((section(".dtcm"))) = 0;
 
@@ -55,6 +54,15 @@ void BuildNibbleLUT(void)
     {
         nibbleLUT16[i] = ((i >> 4) & 0x0F) | ((i & 0x0F) << 8);
     }
+}
+
+u8 msx_irq_pending = 0;   // new: bitmask, one bit per VDP interrupt source
+
+void SetVDPIRQ(u8 bit, u8 set) //TODO: move this to... Z80_Interface?
+{
+    if (set) msx_irq_pending |= bit;
+    else     msx_irq_pending &= ~bit;
+    CPU.IRequest = msx_irq_pending ? INT_RST38 : INT_NONE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -908,20 +916,25 @@ void CheckNewMode(void)
 }
 
 
-ITCM_CODE byte Write9938(u8 iReg, u8 value)
+ITCM_CODE void Write9938(u8 iReg, u8 value)
 {
-  byte bIRQ = 0;
-
   /* There are VDP registers - map down to these and mask off irrelevant bits */
   iReg &= 0x3f;
   value &= VDP_RegisterMasks[iReg];
 
-  /* Enabling IRQs may cause an IRQ here */
-  bIRQ  = (iReg==1) && ((VDP[1]^value)&value&VDP9938_REG1_IRQ) && (VDPStatus[0]&VDP9938_STAT_VBLANK);
-  if (!bIRQ)
+  // Clearing the VDP Line interrupt can drop the IRQ
+  if ((iReg == 0) && ((VDPStatus[1]&0x01)&&!(value&0x10)))
   {
-      if (iReg == 0) bIRQ = (VDP9938_LineSync && VDPStatus[1] & 1);
+      VDPStatus[1]&=0xFE;
+      SetVDPIRQ(VDP_IRQ_LINE, 0);
+  }    
+  
+  /* Enabling IRQs may cause an IRQ here */
+  if ((iReg==1) && ((VDP[1]^value)&value&VDP9938_REG1_IRQ) && (VDPStatus[0]&VDP9938_STAT_VBLANK))
+  {
+      SetVDPIRQ(VDP_IRQ_VBLANK, 1);
   }
+  
   /* There are VDP registers - map down to these and mask off irrelevant bits */
   value &= VDP_RegisterMasks[iReg]; 
 
@@ -956,9 +969,6 @@ ITCM_CODE byte Write9938(u8 iReg, u8 value)
   }
 
   if (iReg < 7) CheckNewMode();
-
-  /* Return IRQ, if generated */
-  return(bIRQ);
 }
 
 
@@ -986,10 +996,8 @@ ITCM_CODE byte RdData9938(void)
 /** DirectRegWrite9938() *************************************/
 /** VDP9938 direct register write via port 0x9B             **/
 /*************************************************************/
-ITCM_CODE u8 DirectRegWrite9938(u8 Value)
+ITCM_CODE void DirectRegWrite9938(u8 Value)
 {
-    u8 bIRQ = 0;
-
     u8 reg = VDP[17] & 0x3F;
 
     // Port 0x9B is the indirect register-write port: the value is written
@@ -998,7 +1006,7 @@ ITCM_CODE u8 DirectRegWrite9938(u8 Value)
     // Bit 6 is always 0.  Register R#17 is never overwritten via this.
     if (reg != 17)
     {
-        bIRQ = Write9938(reg, Value);
+        Write9938(reg, Value);
     }
 
     // Allow auto-increment?
@@ -1007,16 +1015,13 @@ ITCM_CODE u8 DirectRegWrite9938(u8 Value)
         reg = (reg+1) & 0x3F;
         VDP[17] = (VDP[17] & 0x80) | reg;
     }
-
-    return bIRQ;
 }
 
 /** WrCtrl9938() *********************************************/
 /** Write a value V to the VDP Control Port. Enabling IRQs  **/
-/** in this function may cause an IRQ to be generated. In   **/
-/** this case, WrCtrl9938() returns 1. Returns 0 otherwise. **/
+/** in this function may cause an IRQ to be generated.      **/
 /*************************************************************/
-ITCM_CODE byte WrCtrl9938(byte value)
+ITCM_CODE void WrCtrl9938(byte value)
 {
   if(VDPCtrlLatch)  // Write the high byte of the video address
   {
@@ -1026,7 +1031,7 @@ ITCM_CODE byte WrCtrl9938(byte value)
     {
       case 0x80:
       case 0xC0:
-        return(Write9938(value&0x3F,ALatch)); // Write VDP9938: registers 0-63
+        Write9938(value&0x3F,ALatch); // Write VDP9938: registers 0-63
         break;
 
       case 0x00:
@@ -1051,35 +1056,31 @@ ITCM_CODE byte WrCtrl9938(byte value)
       VDPCtrlLatch=1;   // Set the VDP flip-flow so we do the high byte next
       ALatch=value;
   }
-
-  /* No interrupts */
-  return(0);
 }
 
 
-/** RdCtrl9938() *********************************************/
-/** Read a value from the VDP Control Port.                 **/
-/*************************************************************/
+/** RdCtrl9938() ************************************************/
+/** Read a value from the VDP Control Port (Read Status Bytes) **/
+/****************************************************************/
 ITCM_CODE byte RdCtrl9938(void)
 {
   byte data = VDPStatus[VDP[15]];
   VDPCtrlLatch = 0;
 
-  if (VDP[15] == 0)
+  if (VDP[15] == 0) // Status register 0
   {
-      VDPStatus[0] &= 0x1F; // Top bits are cleared on a read...
-
-      if ((CPU.IRequest == vdp_int_source)) CPU.IRequest=INT_NONE;
+      VDPStatus[0] &= 0x1F; // Top bits are cleared on a read... This clears the VBLANK interrupt.
+      SetVDPIRQ(VDP_IRQ_VBLANK, 0);
   }
-  else if (VDP[15] == 1)
+  else if (VDP[15] == 1) // Status register 1
   {
-      VDPStatus[1] &= ~0x01;
-      //if ((CPU.IRequest == vdp_int_source)) CPU.IRequest=INT_NONE; 
+      VDPStatus[1] &= 0xFE;  // Clear the LINE interrupt.
+      SetVDPIRQ(VDP_IRQ_LINE, 0);
   }
-  else if (VDP[15] == 2)
+  else if (VDP[15] == 2) // Status register 2
   {
       // Check if we are in the visible screen area
-      if (CurLine < tms_start_line || CurLine > tms_end_line) data |= 0x40;
+      if (CurLine < VDP9938_START_LINE || CurLine > VDP9938_END_LINE) data |= 0x40;
 
       // A standard scanline has 228 Z80 cycles. H-Blank typically kicks in 
       // roughly around cycle 170-174 depending on display widths.
@@ -1102,41 +1103,41 @@ ITCM_CODE byte RdCtrl9938(void)
 /** screen buffer. Loop9938() returns 1 if an interrupt is  **/
 /** to be generated, 0 otherwise.                           **/
 /*************************************************************/
-u16 tms_num_lines  __attribute__((section(".dtcm"))) = VDP9938_LINES;
-u16 tms_start_line __attribute__((section(".dtcm"))) = VDP9938_START_LINE;
-u16 tms_end_line   __attribute__((section(".dtcm"))) = VDP9938_END_LINE;
-u16 tms_cpu_line   __attribute__((section(".dtcm"))) = VDP9938_LINE;
 u8  Internal_LineCounter = 0;
-byte Loop9938(void)
-{
-  register byte bIRQ = 0;  // No IRQ yet
 
+void Loop9938(void)
+{
   // 1. Get the 0-indexed display scanline relative to the active display area
-  int scanline = CurLine - tms_start_line;
+  int scanline = CurLine - VDP9938_START_LINE;
 
   // 2. Perform the absolute V9938 match check (accounts for vertical scroll R#23)
   // VDP[23] is the Vertical Scroll Offset, VDP[19] is the Line Interrupt Register
   if (((scanline + VDP[23]) & 255) == VDP[19])
   {
       VDPStatus[1] |= 0x01; // Set FH flag in S#1
+      if (VDP9938_LineSync)
+      {
+         SetVDPIRQ(VDP_IRQ_LINE, 1);
+      }
+  }
+  else
+  {
+      /* Reset flag immediately if IE1 interrupt disabled */
+      if(!(VDP[0]&0x10)) VDPStatus[1]&=0xFE;
   }
   
-  // FIX: Only clear the FH flag if IE1 is explicitly lowered by the CPU.
-  // Do NOT let non-matching scanlines fall through and clear the flag.
-  if (!(VDP[0] & 0x10))
+  if (++CurLine >= VDP9938_LINES)
   {
-      VDPStatus[1] &= 0xFE; // If IE1 (R#0 bit 4) is lowered, FH flag is forced low
+      CurLine=0;
+      /* When reaching end of screen, reset line coincidence */
+      VDPStatus[1]&=0xFE;
+      SetVDPIRQ(VDP_IRQ_LINE, 0);
   }
-
-  // 3. Evaluate the IRQ line state
-  bIRQ = ((VDP[0] & 0x10) && (VDPStatus[1] & 0x01));
-
-  if (++CurLine >= tms_num_lines) CurLine=0;
   else
   /* If refreshing display area, call scanline handler */
-  if ((CurLine >= tms_start_line) && (CurLine < tms_end_line))
+  if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE))
   {
-      RefreshLine(CurLine - tms_start_line);
+      RefreshLine(CurLine - VDP9938_START_LINE);
 
       // ---------------------------------------------------------------------
       // Some programs require that we handle collisions more frequently
@@ -1153,7 +1154,7 @@ byte Loop9938(void)
       }
   }
   /* If time for emulated VBlank... */
-  else if (CurLine == tms_end_line)
+  else if (CurLine == VDP9938_END_LINE)
   {
       // -------------------------------------
       // !!!Into the Vertical Blank!!!
@@ -1161,23 +1162,20 @@ byte Loop9938(void)
       frame_number++;
 
       /* Generate IRQ when enabled and when VBlank flag goes up */
-      if (!bIRQ)
+      if (VDP9938_VBlankON && !(VDPStatus[0]&VDP9938_STAT_VBLANK))
       {
-        bIRQ = (VDP9938_VBlankON && !(VDPStatus[0]&VDP9938_STAT_VBLANK));
+          SetVDPIRQ(VDP_IRQ_VBLANK, 1);
       }
 
       /* Set VBlank status flag */
-      VDPStatus[0]|=VDP9938_STAT_VBLANK;
+      VDPStatus[0] |= VDP9938_STAT_VBLANK;
 
       /* Set Sprite Collision status flag */
       if(!(VDPStatus[0]&VDP9938_STAT_OVRLAP))
       {
-          if(CheckSprites()) VDPStatus[0]|=VDP9938_STAT_OVRLAP;
+          if(CheckSprites()) VDPStatus[0] |= VDP9938_STAT_OVRLAP;
       }
   }
-
-  /* Done */
-  return(bIRQ);
 }
 
 ITCM_CODE void RefreshLine5(register u8 uY) 
@@ -1331,6 +1329,7 @@ void Reset9938(void)
     VDPDlatch = 0;
     VPAGE=pVDPVidMem;                           /* VRAM page        */
     frame_number = 0;
+    msx_irq_pending = 0;
 
     ChrTabM = 0x3FFF;
     ColTabM = 0x3FFF;
@@ -1345,13 +1344,6 @@ void Reset9938(void)
 
     OH = IH = 0;
 
-    // VDP9938 uses same timing as VDP9938A for now
-    tms_start_line = VDP9938_START_LINE;
-    tms_end_line   = VDP9938_END_LINE;
-    tms_num_lines  = VDP9938_LINES;
-    tms_cpu_line   = VDP9938_LINE;
-
-    vdp_int_source = INT_RST38;
     my_config_clear_int = myConfig.clearInt;
 
     // ---------------------------------------------------------------

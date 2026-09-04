@@ -77,7 +77,7 @@ extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
 
-extern byte WrCtrl9938(byte value);
+extern void WrCtrl9938(byte value);
 
 extern byte RdData9938(void);
 extern byte RdCtrl9938(void);
@@ -108,10 +108,6 @@ static inline __attribute__((always_inline)) void WrData9938(byte V)  // This on
     VDPCtrlLatch = 0;
 }
 
-extern u16 tms_num_lines;
-extern u16 tms_start_line;
-extern u16 tms_end_line;
-extern u16 tms_cpu_line;
 extern u32 frame_number;
 
 #endif

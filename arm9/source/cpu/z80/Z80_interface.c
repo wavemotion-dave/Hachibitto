@@ -25,12 +25,12 @@
 
 u8  msx_sram_at_8000   __attribute__((section(".dtcm"))) = 0;
 u8  msx_scc_enable     __attribute__((section(".dtcm"))) = 0;
-u8  msx_last_block[4]  __attribute__((section(".dtcm"))) = {99,99,99,99};
 
 extern u8 msx_subslot;
 
 // ----------------------------------------------------------------
-// All memory fetches run through this...
+// All memory fetches run through this except OP codes which are 
+// read directly from memory. 
 // ----------------------------------------------------------------
 ITCM_CODE u8 cpu_readmem16(u16 address) 
 {
@@ -80,43 +80,27 @@ void HandleZemina8K(u32* src, u8 block, u16 address)
 {
     if (bCartInSegment[1] && (address >= 0x4000) && (address < 0x6000))
     {
-        if (msx_last_block[0] != block)
-        {
-            MSXCartPtr[2] = (u8*)src;  // Main ROM
-            MSXCartPtr[6] = (u8*)src;  // Mirror
-            MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            msx_last_block[0] = block;
-        }
+        MSXCartPtr[2] = (u8*)src;  // Main ROM
+        MSXCartPtr[6] = (u8*)src;  // Mirror
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
     }
     else if (bCartInSegment[1] && (address >= 0x6000) && (address < 0x8000))
     {
-        if (msx_last_block[1] != block)
-        {
-            MSXCartPtr[3] = (u8*)src;  // Main ROM
-            MSXCartPtr[7] = (u8*)src;  // Mirror
-            MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
-            msx_last_block[1] = block;
-        }
+        MSXCartPtr[3] = (u8*)src;  // Main ROM
+        MSXCartPtr[7] = (u8*)src;  // Mirror
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
     }
     else if (bCartInSegment[2] && (address >= 0x8000) && (address < 0xA000))
     {
-        if (msx_last_block[2] != block)
-        {
-            MSXCartPtr[4] = (u8*)src;  // Main ROM
-            MSXCartPtr[0] = (u8*)src;  // Mirror                            
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            msx_last_block[2] = block;
-        }
+        MSXCartPtr[4] = (u8*)src;  // Main ROM
+        MSXCartPtr[0] = (u8*)src;  // Mirror                            
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
     }
     else if (bCartInSegment[2] && (address >= 0xA000) && (address < 0xC000))
     {
-        if (msx_last_block[3] != block)
-        {
-            MSXCartPtr[5] = (u8*)src;  // Main ROM
-            MSXCartPtr[1] = (u8*)src;  // Mirror                            
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
-            msx_last_block[3] = block;
-        }
+        MSXCartPtr[5] = (u8*)src;  // Main ROM
+        MSXCartPtr[1] = (u8*)src;  // Mirror                            
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
     }
 }    
 
@@ -129,100 +113,70 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
 {
     if (bCartInSegment[1] && (address >= 0x4000) && (address < 0x8000))
     {
-        if (msx_last_block[0] != block)
+        MSXCartPtr[2] = (u8*)src;
+        MSXCartPtr[3] = (u8*)src+0x2000;
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        // Mirrors
+        MSXCartPtr[6] = (u8*)src;
+        MSXCartPtr[7] = (u8*)src+0x2000;
+        if (bCartInSegment[3]) 
         {
-            MSXCartPtr[2] = (u8*)src;
-            MSXCartPtr[3] = (u8*)src+0x2000;
-            MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
-            // Mirrors
-            MSXCartPtr[6] = (u8*)src;
-            MSXCartPtr[7] = (u8*)src+0x2000;
-            if (bCartInSegment[3]) 
-            {
-                MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
-                MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
-            }
-            msx_last_block[0] = block;
+            MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
+            MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
         }
     }
     else if (bCartInSegment[1] && (address >= 0x8000) && (address < 0xC000))
     {
-        if (msx_last_block[1] != block)
+        MSXCartPtr[4] = (u8*)src;
+        MSXCartPtr[5] = (u8*)src+0x2000;
+        // Mirrors
+        MSXCartPtr[0] = (u8*)src;
+        MSXCartPtr[1] = (u8*)src+0x2000;
+        if (bCartInSegment[2])
         {
-            MSXCartPtr[4] = (u8*)src;
-            MSXCartPtr[5] = (u8*)src+0x2000;
-            // Mirrors
-            MSXCartPtr[0] = (u8*)src;
-            MSXCartPtr[1] = (u8*)src+0x2000;
-            if (bCartInSegment[2])
-            {
-                MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-                MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
-            }
-            if (bCartInSegment[0]) 
-            {
-                MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
-                MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
-            }            
-            msx_last_block[1] = block;
+            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
         }
+        if (bCartInSegment[0]) 
+        {
+            MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
+            MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+        }            
     }
 }    
-    
+
 ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 {
-    // --------------------------------------------------------
-    // Konami 8K mapper with SCC 
-    //  Bank 1: 4000h - 5FFFh - mapped via writes to 5000h
-    //  Bank 2: 6000h - 7FFFh - mapped via writes to 7000h
-    //  Bank 3: 8000h - 9FFFh - mapped via writes to 9000h
-    //  Bank 4: A000h - BFFFh - mapped via writes to B000h
-    // --------------------------------------------------------
-    if (bCartInSegment[1] && (address == 0x5000))
-    {
-        if (msx_last_block[0] != block)
-        {
-            MSXCartPtr[2] = (u8*)src;  // Main ROM
-            MSXCartPtr[6] = (u8*)src;  // Mirror
-            MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            msx_last_block[0] = block;
-        }
-    }
-    else if (bCartInSegment[1] && (address == 0x7000))
-    {
-        if (msx_last_block[1] != block)
-        {
-            MSXCartPtr[3] = (u8*)src;  // Main ROM
-            MSXCartPtr[7] = (u8*)src;  // Mirror
-            MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
-            msx_last_block[1] = block;
-        }
-    }
-    else if (bCartInSegment[2] && (address == 0x9000))
-    {
-        if ((value&0x3F) == 0x3F) {msx_scc_enable=true; return;}       // SCC sound - set a flag so we process this special sound chip
+    // Mask the address to cover the 2KB Konami mapper register windows
+    u16 reg_address = address & 0xF800;
 
-        if (msx_last_block[2] != block)
-        {
-            MSXCartPtr[4] = (u8*)src;  // Main ROM
-            MSXCartPtr[0] = (u8*)src;  // Mirror
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            msx_last_block[2] = block;
-        }
-    }
-    else if (bCartInSegment[2] && (address == 0xB000))
+    if (reg_address == 0x5000)
     {
-        if (msx_last_block[3] != block)
+        MSXCartPtr[2] = (u8*)src; 
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+    }
+    else if (reg_address == 0x7000)
+    {
+        MSXCartPtr[3] = (u8*)src; 
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+    }
+    else if (reg_address == 0x9000)
+    {
+        if ((value & 0x3F) == 0x3F) 
         {
-            MSXCartPtr[5] = (u8*)src;  // Main ROM
-            MSXCartPtr[1] = (u8*)src;  // Mirror
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
-            msx_last_block[3] = block;
+            msx_scc_enable = true;
         }
+
+        MSXCartPtr[4] = (u8*)src; 
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+    }
+    else if (reg_address == 0xB000)
+    {
+        MSXCartPtr[5] = (u8*)src; 
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
     }
 }
-
 
 // -------------------------------------------------------------------------
 // The ASCII 16K Mapper:
@@ -293,7 +247,6 @@ void HandleSuperLodeRunner(u32* src, u8 block, u16 address)
         MemoryMap[4] = MSXCartPtr[4];
         MemoryMap[5] = MSXCartPtr[5];
     }
-    msx_last_block[2] = block;
 }
 
 
@@ -374,43 +327,23 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             {
                 if (bCartInSegment[1] && (address == 0x4000))
                 {
-                    if (msx_last_block[0] != block)
-                    {
-                        MSXCartPtr[2] = (u8*)src;  // Main ROM
-                        MSXCartPtr[6] = (u8*)src;  // Mirror
-                        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-                        msx_last_block[0] = block;
-                    }
+                    MSXCartPtr[2] = (u8*)src;  // Main ROM
+                    MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
                 }
                 else if (bCartInSegment[1] && (address == 0x6000))
                 {
-                    if (msx_last_block[1] != block)
-                    {
-                        MSXCartPtr[3] = (u8*)src;  // Main ROM
-                        MSXCartPtr[7] = (u8*)src;  // Mirror
-                        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
-                        msx_last_block[1] = block;
-                    }
+                    MSXCartPtr[3] = (u8*)src;  // Main ROM
+                    MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
                 }
                 else if (bCartInSegment[2] && (address == 0x8000))
                 {
-                    if (msx_last_block[2] != block)
-                    {
-                        MSXCartPtr[4] = (u8*)src;  // Main ROM
-                        MSXCartPtr[0] = (u8*)src;  // Mirror                            
-                        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-                        msx_last_block[2] = block;
-                    }
+                    MSXCartPtr[4] = (u8*)src;  // Main ROM
+                    MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
                 }
                 else if (bCartInSegment[2] && (address == 0xA000))
                 {
-                    if (msx_last_block[3] != block)
-                    {
-                        MSXCartPtr[5] = (u8*)src;  // Main ROM
-                        MSXCartPtr[1] = (u8*)src;  // Mirror       
-                        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
-                        msx_last_block[3] = block;
-                    }
+                    MSXCartPtr[5] = (u8*)src;  // Main ROM
+                    MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
                 }
             }
             else if (mapperType == ASC8)
@@ -424,96 +357,57 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 // -------------------------------------------------------------------------
                 if (bCartInSegment[1] && (address >= 0x6000) && (address < 0x6800))
                 {
-                    if (msx_last_block[0] != block)
-                    {
-                        MSXCartPtr[2] = (u8*)src;  // Main ROM
-                        MSXCartPtr[6] = (u8*)src;  // Mirror
-                        MemoryMap[2] = MSXCartPtr[2];
-                        if (bCartInSegment[3])
-                        {
-                            MemoryMap[6] = MSXCartPtr[6];
-                        }
-                        msx_last_block[0] = block;
-                    }
-                }
+                    MSXCartPtr[2] = (u8*)src;  // Main ROM
+                    MemoryMap[2] = MSXCartPtr[2];
+               }
                 else if (bCartInSegment[1] && (address >= 0x6800)  && (address < 0x7000))
                 {
-                    if (msx_last_block[1] != block)
-                    {
-                        MSXCartPtr[3] = (u8*)src;  // Main ROM
-                        MSXCartPtr[7] = (u8*)src;  // Mirror
-                        MemoryMap[3] = MSXCartPtr[3];
-                        if (bCartInSegment[3])
-                        {
-                            MemoryMap[7] = MSXCartPtr[7];
-                        }
-                        msx_last_block[1] = block;
-                    }
+                    MSXCartPtr[3] = (u8*)src;  // Main ROM
+                    MemoryMap[3] = MSXCartPtr[3];
                 }
                 else if (bCartInSegment[1] && (address >= 0x7000)  && (address < 0x7800))
                 {
-                    if (msx_last_block[2] != block)
+                    if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
-                        if (msx_sram_enabled && (block == msx_sram_enabled))
+                        msx_sram_at_8000 = true;
+                    }
+                    else
+                    {
+                        msx_sram_at_8000 = false;
+                        MSXCartPtr[4] = (u8*)src;  // Main ROM
+                        if (bCartInSegment[2])
                         {
-                            msx_sram_at_8000 = true;
+                            MemoryMap[4] = MSXCartPtr[4];
                         }
-                        else
-                        {
-                            msx_sram_at_8000 = false;
-                            MSXCartPtr[4] = (u8*)src;  // Main ROM
-                            MSXCartPtr[0] = (u8*)src;  // Mirror    
-                            if (bCartInSegment[2])
-                            {
-                                MemoryMap[4] = MSXCartPtr[4];
-                            }
-                            if (bCartInSegment[0])
-                            {
-                                MemoryMap[0] = MSXCartPtr[0];
-                            }                            
-                        }
-                        msx_last_block[2] = block;
                     }
                 }
                 else if (bCartInSegment[1] && (address >= 0x7800) && (address < 0x8000))
                 {
-                    if (msx_last_block[3] != block)
+                    if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
-                        if (msx_sram_enabled && (block == msx_sram_enabled))
+                        msx_sram_at_8000 = true;
+                    }
+                    else
+                    {
+                        msx_sram_at_8000 = false;
+                        MSXCartPtr[5] = (u8*)src;  // Main ROM
+                        if (bCartInSegment[2]) 
                         {
-                            msx_sram_at_8000 = true;
+                            MemoryMap[5] = MSXCartPtr[5];
                         }
-                        else
-                        {
-                            msx_sram_at_8000 = false;
-                            MSXCartPtr[5] = (u8*)src;  // Main ROM
-                            MSXCartPtr[1] = (u8*)src;  // Mirror                            
-                            if (bCartInSegment[2]) 
-                            {
-                                MemoryMap[5] = MSXCartPtr[5];
-                            }
-                            if (bCartInSegment[0])
-                            {
-                                MemoryMap[1] = MSXCartPtr[1];
-                            }                            
-                        }
-                        msx_last_block[3] = block;
                     }
                 }
             }
             else if (mapperType == SCC8)
             {
-                if ((address & 0x0FFF) != 0)
+                // ----------------------------------------------------
+                // Are we writing to the SCC chip memory mapped area?
+                // ----------------------------------------------------
+                if (msx_scc_enable && ((address & 0xF800) == 0x9800))
                 {
-                    // ----------------------------------------------------
-                    // Are we writing to the SCC chip memory mapped area?
-                    // ----------------------------------------------------
-                    if (msx_scc_enable && ((address & 0xFF00)==0x9800))
-                    {
-                         SCCWrite(value, address, &mySCC);
-                    }
-                    return;    // It has to be one of the mapped addresses below - this will also short-circuit any SCC writes which are not yet supported
+                     SCCWrite(value, address, &mySCC);
                 }
+                
                 HandleKonamiSCC8(src, block, address, value);
             }
             else if (mapperType == ASC16)
@@ -564,10 +458,6 @@ void Z80_Interface_Reset(void)
   CPU.CycleDeficit  = 0;
   msx_sram_at_8000  = 0;
   msx_scc_enable    = 0;
-  msx_last_block[0] = 
-  msx_last_block[1] =
-  msx_last_block[2] =
-  msx_last_block[3] = 199;
 }
 
 // -----------------------------------------------------------------

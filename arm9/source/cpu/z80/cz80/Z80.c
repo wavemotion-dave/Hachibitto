@@ -55,7 +55,6 @@ extern byte cpu_readmem16 (u16 address);
 extern void cpu_writeport_msx(unsigned bytePort, unsigned char Value);
 extern byte cpu_readport_msx(unsigned short Port);
 extern u8 my_config_clear_int;
-extern u16 vdp_int_source, keyboard_interrupt, joystick_interrupt;
 
 inline byte OpZ80(word A)   {return *(MemoryMap[A>>13] + (A&0x1FFF));}
 inline byte RdZ80(word A)   {return cpu_readmem16(A);}
@@ -559,19 +558,6 @@ ITCM_CODE void IntZ80(Z80 *R,word Vector)
   {
     /* Save PC on stack */
     M_PUSH(PC);
-
-    /* Automatically reset IRequest if needed */
-    if (CPU.IAutoReset && (Vector==CPU.IRequest))
-    {
-        if ((my_config_clear_int == 0) && (Vector == vdp_int_source))
-        {
-            // Don't clear it... this will be cleared in RdCtrl9938()
-        }
-        else
-        {
-            CPU.IRequest=INT_NONE;
-        }
-    }
 
     /* If it is NMI... */
     if(Vector==INT_NMI)

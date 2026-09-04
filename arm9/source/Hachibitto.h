@@ -224,6 +224,12 @@ extern void DisplayStatusLine(bool bForce);
 extern void ResetMSX(void);
 extern void msx_patch_bios(void);
 
+
+#define VDP_IRQ_VBLANK  0x01
+#define VDP_IRQ_LINE    0x02
+extern void SetVDPIRQ(u8 bit, u8 set);
+
+
 extern void debug_init();
 extern void debug_save();
 extern void debug_printf(const char * str, ...);

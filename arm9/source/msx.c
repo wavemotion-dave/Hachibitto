@@ -29,7 +29,7 @@
 // ---------------------------------------
 u8 mapperType           __attribute__((section(".dtcm"))) = 0;
 u8 mapperMask           __attribute__((section(".dtcm"))) = 0;
-u8 bCartInSegment[4]     __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bCartInSegment[4]    __attribute__((section(".dtcm"))) = {0,0,0,0};
 u8 bRAMInSegment[4]     __attribute__((section(".dtcm"))) = {0,0,0,0};
 
 u8 *MSXCartPtr[8]       __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
@@ -795,13 +795,13 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     Port &= 0x00FF;
 
     if      (Port == 0x98) {WrData9938(Value);}
-    else if (Port == 0x99) {palette_latch = false; if (WrCtrl9938(Value)) { CPU.IRequest=INT_RST38; }}
+    else if (Port == 0x99) {palette_latch = false; WrCtrl9938(Value);}
     else if (Port == 0x9A) {write_port_9A(Value);}
-    else if (Port == 0x9B) {if (DirectRegWrite9938(Value)) { CPU.IRequest=INT_RST38; }}
+    else if (Port == 0x9B) {DirectRegWrite9938(Value);}         // Indirect Register Area
     else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
-    else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}
-    else if (Port == 0xB4) {write_port_B4(Value);}
-    else if (Port == 0xB5) {write_port_B5(Value);}
+    else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}        // PSG Area
+    else if (Port == 0xB4) {write_port_B4(Value);}              // Palette Area
+    else if (Port == 0xB5) {write_port_B5(Value);}              // Palette Area
     else if (Port == 0xA8) // Slot system for MSX
     {
         // ---------------------------------------------------------------------
@@ -1276,14 +1276,14 @@ void MSX_InitialMemoryLayout(u32 romSize)
 
         if ((mapperType == KON8) || (mapperType == SCC8) || (mapperType == ZEN8))
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x6000;        // Segment 3 Mirror
+            MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[1] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 default
             MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2 default
             MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3 default
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
+            MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
         }
         else if (mapperType == ASC8)
         {

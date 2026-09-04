@@ -1952,17 +1952,14 @@ void PatchZ80(register Z80 *r)
 ITCM_CODE u32 LoopZ80()
 {
   // Execute 1 scanline worth of CPU instructions
-  u32 cycles_to_process = tms_cpu_line + CPU.CycleDeficit;
+  u32 cycles_to_process = VDP9938_LINE + CPU.CycleDeficit;
   CPU.CycleDeficit = ExecZ80(cycles_to_process);
 
   // Run the VDP engine
   LoopVDP();
 
   // Refresh VDP
-  if(Loop9938())
-  {
-      CPU.IRequest = vdp_int_source;    // Use the proper VDP interrupt souce (set in VDP9938 init)
-  }
+  Loop9938();
 
   // Generate an interrupt if called for...
   if(CPU.IRequest!=INT_NONE)
@@ -1972,7 +1969,7 @@ ITCM_CODE u32 LoopZ80()
   }
 
   // Drop out unless end of screen is reached
-  if (CurLine == tms_end_line)
+  if (CurLine == VDP9938_END_LINE)
   {
       return 0;
   }

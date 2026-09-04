@@ -201,8 +201,6 @@ extern u8 Port_PPI_A;
 extern u8 Port_PPI_B;
 extern u8 Port_PPI_C;
 
-extern u16 vdp_int_source;
-
 extern void ProcessBufferedKeys(void);
 extern u8 BufferedKeys[32];
 extern u8 BufferedKeysWriteIdx;
@@ -211,7 +209,7 @@ extern u8 BufferedKeysReadIdx;
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need
 // --------------------------------------------------
-extern byte Loop9938(void);
+extern void Loop9938(void);
 extern u8 lastBank;
 extern u8 key_shift;
 extern u8 key_ctrl;
