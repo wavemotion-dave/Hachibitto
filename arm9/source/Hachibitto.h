@@ -28,8 +28,8 @@ extern u32 DX, DY;
 #define MENU_CHOICE_GAME_OPTIONS 0x07
 #define MENU_CHOICE_MENU         0xFF        // Special brings up a menu of choices
 
-#define JST_NONE              0x0000
-#define JST_KEYPAD            0x000F
+#define JST_NONE                0x0000
+#define JST_KEYPAD              0x000F
 
 // ------------------------------------------------------------------------------
 // Joystick UP, RIGHT, LEFT, DOWN and the two FIRE buttons are independent...
@@ -38,24 +38,8 @@ extern u32 DX, DY;
 #define JST_RIGHT           0x0200
 #define JST_DOWN            0x0400
 #define JST_LEFT            0x0800
-#define JST_FIRER           0x0040
-#define JST_FIREL           0x4000
-#define JST_0               0x0005
-#define JST_1               0x0002
-#define JST_2               0x0008
-#define JST_3               0x0003
-#define JST_4               0x000D
-#define JST_5               0x000C
-#define JST_6               0x0001
-#define JST_7               0x000A
-#define JST_8               0x000E
-#define JST_9               0x0004
-#define JST_STAR            0x0006
-#define JST_POUND           0x0009
-#define JST_PURPLE          0x0007
-#define JST_BLUE            0x000B
-#define JST_RED             JST_FIRER
-#define JST_YELLOW          JST_FIREL
+#define JST_FIRE1           0x0040
+#define JST_FIRE2           0x4000
 
 // -----------------------------------------------------------------------------------
 // And these are meta keys for mapping NDS keys to keyboard keys (many of the computer
@@ -131,26 +115,17 @@ extern u32 DX, DY;
 #define META_KBD_INS        0xFFFF0041
 #define META_KBD_DEL        0xFFFF0042
 #define META_KBD_CLR        0xFFFF0043
-#define META_KBD_UNDO       0xFFFF0044
-#define META_KBD_MOVE       0xFFFF0045
-#define META_KBD_WILDCARD   0xFFFF0046
-#define META_KBD_STORE      0xFFFF0047
-#define META_KBD_PRINT      0xFFFF0048
-#define META_KBD_STOP_BRK   0xFFFF0049
-#define META_KBD_F1         0xFFFF004A
-#define META_KBD_F2         0xFFFF004B
-#define META_KBD_F3         0xFFFF004C
-#define META_KBD_F4         0xFFFF004D
-#define META_KBD_F5         0xFFFF004E
-#define META_KBD_F6         0xFFFF004F
-#define META_KBD_F7         0xFFFF0050
-#define META_KBD_F8         0xFFFF0051
+#define META_KBD_STOP_BRK   0xFFFF0044
+#define META_KBD_F1         0xFFFF0045
+#define META_KBD_F2         0xFFFF0046
+#define META_KBD_F3         0xFFFF0047
+#define META_KBD_F4         0xFFFF0048
+#define META_KBD_F5         0xFFFF0049
 
-#define MAX_KEY_OPTIONS     125
+#define MAX_KEY_OPTIONS     85
 
 
 #define JOYMODE_JOYSTICK    0
-#define JOYMODE_KEYPAD      1
 
 // -----------------------------
 // For the Full Keyboard...

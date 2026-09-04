@@ -132,43 +132,15 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     JST_DOWN,
     JST_LEFT,
     JST_RIGHT,
-    JST_FIREL,
-    JST_FIRER,
-    JST_PURPLE,
-    JST_BLUE,
-    JST_1,
-    JST_2,
-    JST_3,
-    JST_4,
-    JST_5,
-    JST_6,
-    JST_7,
-    JST_8,
-    JST_9,
-    JST_POUND,
-    JST_0,
-    JST_STAR,
+    JST_FIRE2,
+    JST_FIRE1,
 
     JST_UP      << 16,      // P2 versions of the above...
     JST_DOWN    << 16,
     JST_LEFT    << 16,
     JST_RIGHT   << 16,
-    JST_FIREL   << 16,
-    JST_FIRER   << 16,
-    JST_PURPLE  << 16,
-    JST_BLUE    << 16,
-    JST_1       << 16,
-    JST_2       << 16,
-    JST_3       << 16,
-    JST_4       << 16,
-    JST_5       << 16,
-    JST_6       << 16,
-    JST_7       << 16,
-    JST_8       << 16,
-    JST_9       << 16,
-    JST_POUND   << 16,
-    JST_0       << 16,
-    JST_STAR    << 16,
+    JST_FIRE2   << 16,
+    JST_FIRE1   << 16,
 
     META_KBD_A,
     META_KBD_B,
@@ -237,20 +209,12 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_INS,
     META_KBD_DEL,
     META_KBD_CLR,
-    META_KBD_UNDO,
-    META_KBD_MOVE,
-    META_KBD_WILDCARD,
-    META_KBD_STORE,
-    META_KBD_PRINT,
     META_KBD_STOP_BRK,
     META_KBD_F1,
     META_KBD_F2,
     META_KBD_F3,
     META_KBD_F4,
     META_KBD_F5,
-    META_KBD_F6,
-    META_KBD_F7,
-    META_KBD_F8
 };
 
 static char tmp[64];    // For various sprintf() calls
@@ -1346,20 +1310,12 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_INS)       kbd_key = KBD_KEY_INS;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_DEL)       kbd_key = KBD_KEY_DEL;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CLR)       kbd_key = KBD_KEY_CLEAR;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_UNDO)      kbd_key = KBD_KEY_UNDO;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_MOVE)      kbd_key = KBD_KEY_MOVE;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_WILDCARD)  kbd_key = KBD_KEY_WILDCARD;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_STORE)     kbd_key = KBD_KEY_STORE;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PRINT)     kbd_key = KBD_KEY_PRINT;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_STOP_BRK)  kbd_key = KBD_KEY_STOP;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F1)        kbd_key = KBD_KEY_F1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F2)        kbd_key = KBD_KEY_F2;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F3)        kbd_key = KBD_KEY_F3;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F4)        kbd_key = KBD_KEY_F4;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F5)        kbd_key = KBD_KEY_F5;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F6)        kbd_key = KBD_KEY_F6;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F7)        kbd_key = KBD_KEY_F7;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F8)        kbd_key = KBD_KEY_F8;
 
                       if (kbd_key != 0)
                       {
@@ -1393,13 +1349,13 @@ void Hachibitto_main(void)
       // Handle Auto-Fire if enabled in configuration...
       // --------------------------------------------------
       static u8 autoFireTimer[2]={0,0};
-      if ((myConfig.autoFire & 0x01) && (JoyState & JST_FIRER))  // Fire Button 1
+      if ((myConfig.autoFire & 0x01) && (JoyState & JST_FIRE1))  // Fire Button 1
       {
-         if ((++autoFireTimer[0] & 7) > 4)  JoyState &= ~JST_FIRER;
+         if ((++autoFireTimer[0] & 7) > 4)  JoyState &= ~JST_FIRE1;
       }
-      if ((myConfig.autoFire & 0x02) && (JoyState & JST_FIREL))  // Fire Button 2
+      if ((myConfig.autoFire & 0x02) && (JoyState & JST_FIRE2))  // Fire Button 2
       {
-          if ((++autoFireTimer[1] & 7) > 4) JoyState &= ~JST_FIREL;
+          if ((++autoFireTimer[1] & 7) > 4) JoyState &= ~JST_FIRE2;
       }
     }
   }

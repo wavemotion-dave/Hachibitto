@@ -48,45 +48,17 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "P1 JOY DOWN",
   "P1 JOY LEFT",
   "P1 JOY RIGHT",
-  "P1 BTN 1 (L/YLW)",
-  "P1 BTN 2 (R/RED)",
-  "P1 BTN 3 (PURP)",
-  "P1 BTN 4 (BLUE)",
-  "P1 KEYPAD #1",
-  "P1 KEYPAD #2",
-  "P1 KEYPAD #3",
-  "P1 KEYPAD #4",
-  "P1 KEYPAD #5",
-  "P1 KEYPAD #6",
-  "P1 KEYPAD #7",
-  "P1 KEYPAD #8",
-  "P1 KEYPAD #9",
-  "P1 KEYPAD ##",
-  "P1 KEYPAD #0",
-  "P1 KEYPAD #*",
+  "P1 BUTTON 1",
+  "P1 BUTTON 2", // 5
 
   "P2 JOY UP",
   "P2 JOY DOWN",
   "P2 JOY LEFT",
   "P2 JOY RIGHT",
-  "P2 BTN 1 (L/YLW)",
-  "P2 BTN 2 (R/RED)",
-  "P2 BTN 3 (PURP)",
-  "P2 BTN 4 (BLUE)",
-  "P2 KEYPAD #1",
-  "P2 KEYPAD #2",
-  "P2 KEYPAD #3",
-  "P2 KEYPAD #4",
-  "P2 KEYPAD #5",
-  "P2 KEYPAD #6",
-  "P2 KEYPAD #7",
-  "P2 KEYPAD #8",
-  "P2 KEYPAD #9",
-  "P2 KEYPAD ##",
-  "P2 KEYPAD #0",
-  "P2 KEYPAD #*",
-
-  "KEYBOARD A", //45
+  "P2 BUTTON 1", //10
+  "P2 BUTTON 2",
+  
+  "KEYBOARD A", //12
   "KEYBOARD B",
   "KEYBOARD C",
   "KEYBOARD D",
@@ -94,52 +66,52 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD F",
   "KEYBOARD G",
   "KEYBOARD H",
-  "KEYBOARD I",
+  "KEYBOARD I", //20
   "KEYBOARD J",
   "KEYBOARD K",
   "KEYBOARD L",
   "KEYBOARD M",
-  "KEYBOARD N",
+  "KEYBOARD N", //25
   "KEYBOARD O",
   "KEYBOARD P",
-  "KEYBOARD Q", // 60
+  "KEYBOARD Q",
   "KEYBOARD R",
-  "KEYBOARD S",
+  "KEYBOARD S", //30
   "KEYBOARD T",
   "KEYBOARD U",
   "KEYBOARD V",
   "KEYBOARD W",
-  "KEYBOARD X",
+  "KEYBOARD X", //35
   "KEYBOARD Y",
   "KEYBOARD Z",
 
-  "KEYBOARD 0", // 70
+  "KEYBOARD 0", //38
   "KEYBOARD 1",
-  "KEYBOARD 2",
+  "KEYBOARD 2", //40
   "KEYBOARD 3",
   "KEYBOARD 4",
   "KEYBOARD 5",
   "KEYBOARD 6",
-  "KEYBOARD 7",
+  "KEYBOARD 7", //45
   "KEYBOARD 8",
-  "KEYBOARD 9",
+  "KEYBOARD 9", //47
 
-  "KEYBOARD SHIFT",
+  "KEYBOARD SHIFT", //48
   "KEYBOARD CTRL",
-  "KEYBOARD CODE",
+  "KEYBOARD CODE",  //50
   "KEYBOARD GRAPH",
 
-  "KEYBOARD SPACE",
+  "KEYBOARD SPACE", //52
   "KEYBOARD RETURN",
   "KEYBOARD ESC",
 
-  "KEYBOARD HOME",
+  "KEYBOARD HOME", //55
   "KEYBOARD UP",
   "KEYBOARD DOWN",
   "KEYBOARD LEFT",
   "KEYBOARD RIGHT",
 
-  "KEYBOARD PERIOD",
+  "KEYBOARD PERIOD", //60
   "KEYBOARD COMMA",
   "KEYBOARD COLON",
   "KEYBOARD SEMI",
@@ -158,20 +130,12 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD INS",
   "KEYBOARD DEL",
   "KEYBOARD CLEAR",
-  "KEYBOARD UNDO",
-  "KEYBOARD MOVE",
-  "KEYBOARD WILDCARD",
-  "KEYBOARD STORE",
-  "KEYBOARD PRINT",
-  "KEYBOARD STOP/BRK",
-  "KEYBOARD F1 (I)",
-  "KEYBOARD F2 (II)",
-  "KEYBOARD F3 (III)",
-  "KEYBOARD F4 (IV)",
-  "KEYBOARD F5 (V)",
-  "KEYBOARD F6 (VI)",
-  "KEYBOARD F7",
-  "KEYBOARD F8",
+  "KEYBOARD STOP",
+  "KEYBOARD F1",
+  "KEYBOARD F2",
+  "KEYBOARD F3",
+  "KEYBOARD F4",
+  "KEYBOARD F5",
 };
 
 
@@ -770,116 +734,50 @@ void SaveConfig(bool bShow)
 
 void MapPlayer1(void)
 {
-    myConfig.keymap[0]   = 0;    // NDS D-Pad mapped to CV Joystick UP
-    myConfig.keymap[1]   = 1;    // NDS D-Pad mapped to CV Joystick DOWN
-    myConfig.keymap[2]   = 2;    // NDS D-Pad mapped to CV Joystick LEFT
-    myConfig.keymap[3]   = 3;    // NDS D-Pad mapped to CV Joystick RIGHT
-    myConfig.keymap[4]   = 4;    // NDS A Button mapped to CV Button 1 (Yellow / Left Button)
-    myConfig.keymap[5]   = 5;    // NDS B Button mapped to CV Button 2 (Red / Right Button)
-    myConfig.keymap[6]   = 6;    // NDS X Button mapped to CV Button 3 (Purple / Super Action)
-    myConfig.keymap[7]   = 7;    // NDS Y Button mapped to CV Button 4 (Blue / Super Action)
-    myConfig.keymap[8]   = 81;   // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;   // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 8;    // NDS Start  mapped to Keypad #1
-    myConfig.keymap[11]  = 9;    // NDS Select mapped to Keypad #2
+    myConfig.keymap[0]   = 0;    // NDS D-Pad mapped to MSX Joystick UP
+    myConfig.keymap[1]   = 1;    // NDS D-Pad mapped to MSX Joystick DOWN
+    myConfig.keymap[2]   = 2;    // NDS D-Pad mapped to MSX Joystick LEFT
+    myConfig.keymap[3]   = 3;    // NDS D-Pad mapped to MSX Joystick RIGHT
+    myConfig.keymap[4]   = 4;    // NDS A Button mapped to MSX Button 1
+    myConfig.keymap[5]   = 5;    // NDS B Button mapped to MSX Button 2
+    myConfig.keymap[6]   = 4;    // NDS X Button mapped to MSX Button 1
+    myConfig.keymap[7]   = 5;    // NDS Y Button mapped to MSX Button 2
+    myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
+    myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
+    myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
+    myConfig.keymap[11]  = 52;   // NDS Select mapped to SPACE
 }
 
 void MapPlayer2(void)
 {
-    myConfig.keymap[0]   = 20;    // NDS D-Pad mapped to CV Joystick UP
-    myConfig.keymap[1]   = 21;    // NDS D-Pad mapped to CV Joystick DOWN
-    myConfig.keymap[2]   = 22;    // NDS D-Pad mapped to CV Joystick LEFT
-    myConfig.keymap[3]   = 23;    // NDS D-Pad mapped to CV Joystick RIGHT
-    myConfig.keymap[4]   = 24;    // NDS A Button mapped to CV Button 1 (Yellow / Left Button)
-    myConfig.keymap[5]   = 25;    // NDS B Button mapped to CV Button 2 (Red / Right Button)
-    myConfig.keymap[6]   = 26;    // NDS X Button mapped to CV Button 3 (Purple / Super Action)
-    myConfig.keymap[7]   = 27;    // NDS Y Button mapped to CV Button 4 (Blue / Super Action)
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 28;    // NDS Start  mapped to Keypad #1
-    myConfig.keymap[11]  = 29;    // NDS Select mapped to Keypad #2
+    myConfig.keymap[0]   = 6;    // NDS D-Pad mapped to MSX Joystick UP
+    myConfig.keymap[1]   = 7;    // NDS D-Pad mapped to MSX Joystick DOWN
+    myConfig.keymap[2]   = 8;    // NDS D-Pad mapped to MSX Joystick LEFT
+    myConfig.keymap[3]   = 9;    // NDS D-Pad mapped to MSX Joystick RIGHT
+    myConfig.keymap[4]   = 10;   // NDS A Button mapped to MSX Button 1
+    myConfig.keymap[5]   = 11;   // NDS B Button mapped to MSX Button 2
+    myConfig.keymap[6]   = 10;   // NDS X Button mapped to MSX Button 1
+    myConfig.keymap[7]   = 11;   // NDS Y Button mapped to MSX Button 2
+    myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
+    myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
+    myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
+    myConfig.keymap[11]  = 52;   // NDS Select mapped to SPACE
 }
 
-void MapQAOP(void)
+void MapCursors(void)
 {
-    myConfig.keymap[0]   = 60;    // Q
-    myConfig.keymap[1]   = 44;    // A
-    myConfig.keymap[2]   = 58;    // O
-    myConfig.keymap[3]   = 59;    // P
-    myConfig.keymap[4]   = 84;    // Space
-    myConfig.keymap[5]   = 84;    // Space
-    myConfig.keymap[6]   = 92;    // Period
-    myConfig.keymap[7]   = 92;    // Period
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 71;    // 1
-    myConfig.keymap[11]  = 72;    // 2
-}
-
-void MapWASD(void)
-{
-    myConfig.keymap[0]   = 66;    // W
-    myConfig.keymap[1]   = 44;    // A
-    myConfig.keymap[2]   = 62;    // S
-    myConfig.keymap[3]   = 47;    // D
-    myConfig.keymap[4]   = 84;    // Space
-    myConfig.keymap[5]   = 84;    // Space
-    myConfig.keymap[6]   = 84;    // Space
-    myConfig.keymap[7]   = 84;    // Space
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 71;    // 1
-    myConfig.keymap[11]  = 72;    // 2
-}
-
-void MapZCPeriod(void)
-{
-    myConfig.keymap[0]   = 60;    // Q
-    myConfig.keymap[1]   = 44;    // A
-    myConfig.keymap[2]   = 69;    // Z
-    myConfig.keymap[3]   = 46;    // C
-    myConfig.keymap[4]   = 92;    // Period
-    myConfig.keymap[5]   = 92;    // Period
-    myConfig.keymap[6]   = 84;    // Space
-    myConfig.keymap[7]   = 84;    // Space
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 71;    // 1
-    myConfig.keymap[11]  = 72;    // 2
-}
-
-void MapZXSpace(void)
-{
-    myConfig.keymap[0]   = 84;    // Space
-    myConfig.keymap[1]   = 92;    // Period
-    myConfig.keymap[2]   = 69;    // Z
-    myConfig.keymap[3]   = 67;    // X
-    myConfig.keymap[4]   = 84;    // Space
-    myConfig.keymap[5]   = 84;    // Space
-    myConfig.keymap[6]   = 85;    // Return
-    myConfig.keymap[7]   = 85;    // Return
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 71;    // 1
-    myConfig.keymap[11]  = 72;    // 2
-}
-
-
-
-void MapArrows(void)
-{
-    myConfig.keymap[0]   = 88;    // UP Arrow
-    myConfig.keymap[1]   = 89;    // Down Arrow
-    myConfig.keymap[2]   = 90;    // Left Arrow
-    myConfig.keymap[3]   = 91;    // Right Arrow
-    myConfig.keymap[4]   = 84;    // Space
-    myConfig.keymap[5]   = 84;    // Space
-    myConfig.keymap[6]   = 84;    // Space
-    myConfig.keymap[7]   = 84;    // Space
-    myConfig.keymap[8]   = 81;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 80;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 71;    // 1
-    myConfig.keymap[11]  = 72;    // 2
+    myConfig.keymap[0]   = 56;    // UP Arrow
+    myConfig.keymap[1]   = 57;    // Down Arrow
+    myConfig.keymap[2]   = 58;    // Left Arrow
+    myConfig.keymap[3]   = 59;    // Right Arrow
+    myConfig.keymap[4]   = 52;    // Space
+    myConfig.keymap[5]   = 52;    // Space
+    myConfig.keymap[6]   = 52;    // Space
+    myConfig.keymap[7]   = 52;    // Space
+    myConfig.keymap[8]   = 49;    // NDS R      mapped to CTRL
+    myConfig.keymap[9]   = 48;    // NDS L      mapped to SHIFT
+    myConfig.keymap[10]  = 39;    // 1
+    myConfig.keymap[11]  = 40;    // 2
 }
 
 
@@ -1177,16 +1075,12 @@ void DisplayKeymapName(u32 uY)
 u8 keyMapType = 0;
 void SwapKeymap(void)
 {
-    keyMapType = (keyMapType+1) % 7;
+    keyMapType = (keyMapType+1) % 3;
     switch (keyMapType)
     {
         case 0: MapPlayer1();  break;
         case 1: MapPlayer2();  break;
-        case 2: MapQAOP();     break;
-        case 3: MapWASD();     break;
-        case 4: MapZCPeriod(); break;
-        case 5: MapZXSpace();  break;
-        case 6: MapArrows();   break;
+        case 2: MapCursors();  break;
     }
 }
 

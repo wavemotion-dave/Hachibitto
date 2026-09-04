@@ -141,8 +141,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (JoyState & JST_LEFT)  joy1 |= 0x04;
                   if (JoyState & JST_RIGHT) joy1 |= 0x08;
 
-                  if (JoyState & JST_FIREL) joy1 |= 0x10;
-                  if (JoyState & JST_FIRER) joy1 |= 0x20;
+                  if (JoyState & JST_FIRE2) joy1 |= 0x10;
+                  if (JoyState & JST_FIRE1) joy1 |= 0x20;
               }
               else if (myConfig.dpad == DPAD_DIAGONALS)
               {
@@ -151,8 +151,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
                   if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
 
-                  if (JoyState & JST_FIREL) joy1 |= 0x10;
-                  if (JoyState & JST_FIRER) joy1 |= 0x20;
+                  if (JoyState & JST_FIRE2) joy1 |= 0x10;
+                  if (JoyState & JST_FIRE1) joy1 |= 0x20;
               }
           }
 
@@ -232,11 +232,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 
           if ((Port_PPI_C & 0x0F) == 0)      // Row 0
           {
-              if (JoyState == JST_0)   key1 |= 0x01;  // '0'
-              if (JoyState == JST_1)   key1 |= 0x02;  // '1'
-              if (JoyState == JST_2)   key1 |= 0x04;  // '2'
-              if (JoyState == JST_3)   key1 |= 0x08;  // '3'
-              if (JoyState == JST_4)   key1 |= 0x10;  // '4'
               if (kbd_key)
               {
                   if (kbd_key == '0')           key1  |= 0x01;
@@ -322,9 +317,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
           }      
           else if ((Port_PPI_C & 0x0F) == 6) // Row 6
           {
-              if (JoyState == JST_7) key1 |= 0x20;    // F1
-              if (JoyState == JST_8) key1 |= 0x40;    // F2
-              if (JoyState == JST_9) key1 |= 0x80;    // F3
               if (kbd_key)
               {
                   if (kbd_key == KBD_KEY_SHIFT) key1 |= 0x01;
@@ -343,8 +335,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
           }
           else if ((Port_PPI_C & 0x0F) == 7) // Row 7
           {
-              if (JoyState == JST_6)     key1 |= 0x10;  // STOP
-              if (JoyState == JST_POUND) key1 |= 0x80;  // RETURN
               if (kbd_key)
               {
                   if (kbd_key == KBD_KEY_F4)    key1 |= 0x01;
@@ -360,8 +350,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
           }
           else if ((Port_PPI_C & 0x0F) == 8) // Row 8  RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE          
           {
-              if (JoyState == JST_STAR) key1 |= 0x01;  // SPACE
-
               if (kbd_key)
               {
                   if (kbd_key == ' ')           key1 |= 0x01;
