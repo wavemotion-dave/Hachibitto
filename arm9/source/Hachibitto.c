@@ -616,7 +616,7 @@ void DisplayStatusLine(bool bForce)
             }
         }
 
-        if (myConfig.overlay == 1) // Is full keyboard showing?
+        if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
         {
             // Caps Lock
             DSPrint(1,23,0, (msx_caps_lock ? "@":" "));
@@ -1192,12 +1192,6 @@ void Hachibitto_main(void)
                           }
                           break;
       
-                      case MENU_CHOICE_SWAP_KBD:
-                          if (myConfig.overlay == 0) myConfig.overlay = 1; else myConfig.overlay = 0;
-                          BottomScreenKeypad();
-                          WAITVBL;WAITVBL;WAITVBL;
-                          break;
-      
                       default:
                           SaveNow = 0;
                           LoadNow = 0;
@@ -1488,14 +1482,14 @@ void BottomScreenKeypad(void)
       dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
       dmaCopy((void*) debug_ovlPal,(void*) BG_PALETTE_SUB,256*2);
     }
-    else if (myConfig.overlay == OVL_FULLKBD) // Full Keyboard (based on machine)
+    else if (myConfig.keyboard == OVL_FULLKBD) // Full Keyboard (based on machine)
     {
       decompress(msx_kbdTiles, bgGetGfxPtr(bg0b),  LZ77Vram);
       decompress(msx_kbdMap, (void*) bgGetMapPtr(bg0b),  LZ77Vram);
       dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
       dmaCopy((void*) msx_kbdPal,(void*) BG_PALETTE_SUB,256*2);
     }
-    else if (myConfig.overlay == OVL_ALPHAKBD) // Alpha Simplified Keyboard
+    else if (myConfig.keyboard == OVL_ALPHAKBD) // Alpha Simplified Keyboard
     {
       //  Init bottom screen
       decompress(alpha_kbdTiles, bgGetGfxPtr(bg0b),  LZ77Vram);

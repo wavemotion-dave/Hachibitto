@@ -21,7 +21,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0000
+#define CONFIG_VER                  0x0001
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -36,8 +36,8 @@
 
 #define CPU_CLEAR_INT_ON_VDP_READ   0
 
-#define OVL_FULLKBD                 1
-#define OVL_ALPHAKBD                2
+#define OVL_FULLKBD                 0
+#define OVL_ALPHAKBD                1
 
 #define SND_DRV_NORMAL              0
 #define SND_DRV_WAVE                1
@@ -60,12 +60,11 @@ struct __attribute__((__packed__)) GlobalConfig_t
     u8  showFPS;
     u8  emuText;
     u8  diskSfxMute;
-    u8  biosDelay;
-    u8  global_09;
-    u8  global_10;
-    u8  global_11;
-    u8  global_12;
-    u8  global_13;
+    u8  global_0;
+    u8  global_1;
+    u8  global_2;
+    u8  global_3;
+    u8  global_4;
     u8  compressed;
     u8  debugger;
     u32 config_checksum;
@@ -78,7 +77,7 @@ struct __attribute__((__packed__)) Config_t
     u8  msxMapper;
     u8  slotType;
     u8  autoFire;
-    u8  overlay;
+    u8  keyboard;
     u8  maxSprites;
     u8  dpad;
     u8  memWipe;

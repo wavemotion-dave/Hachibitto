@@ -901,13 +901,12 @@ void SetDefaultGameConfig(void)
     myConfig.msxMapper   = GUESS;                       // MSX mapper takes its best guess
     myConfig.slotType    = 0;                           // Type A
     myConfig.autoFire    = 0;                           // Default to no auto-fire on either button
-    myConfig.overlay     = 0;                           // Default to normal CV overlay
+    myConfig.keyboard    = OVL_FULLKBD;                 // Default to normal full MSX keyboard
     myConfig.maxSprites  = 0;                           // 0 means allow 32 sprites... 1 means limit to the original 4/8 sprites of the VDP
     myConfig.dpad        = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.memWipe     = 0;                           // Default to RANDOM memory
     myConfig.yOffset     = 0;
     myConfig.soundDriver = SND_DRV_NORMAL;              // Default is normal sound driver (not Wave Direct)
-    myConfig.overlay      = 1;                          // MSX defaults to full keyboard
     myConfig.reserved1   = 0;
     myConfig.reserved2   = 0;
     myConfig.reserved3   = 0;
@@ -1017,19 +1016,19 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
-        {"OVERLAY",        {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.overlay,    2},
-        {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites, 2},
-        {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,   4},
-        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,       3},
-        {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,    2},
         {"MSX MAPPER",     {"GUESS","KONAMI 8K [4]","ASCII 8K","KONAMI SCC [5]","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS", "RESERVED","RESERVED",
-                            "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                                                     &myConfig.msxMapper,  16},
-        {"SLOT TYPE",      {"TYPE A", "TYPE B"},                                                                                                                                &myConfig.slotType,    2},
-        {"CLEAR INTS",     {"STATUS READ", "AUTOMATICALLY"},                                                                                                                    &myConfig.clearInt,    2},
-        {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,    21},
+                            "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                                                     &myConfig.msxMapper,      16},
+        {"SLOT TYPE",      {"TYPE A", "TYPE B"},                                                                                                                                &myConfig.slotType,       2},
+        {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
+        {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites,     2},
+        {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
+        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
+        {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
+        {"CLEAR INTS",     {"STATUS READ", "AUTOMATICALLY"},                                                                                                                    &myConfig.clearInt,       2},
+        {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "BAD OPS", "DEBUG", "FULL DEBUG"},                                                                                                           &myGlobalConfig.debugger, 4},
-        {NULL,             {"",      ""},                                                                                                                                       NULL,                 1},
+        {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},
     }
 };
 
