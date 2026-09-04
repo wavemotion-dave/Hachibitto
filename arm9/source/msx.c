@@ -860,8 +860,9 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
 u8 MSX_GuessROMType(u32 size)
 {
     u8 type = KON8;  // Default to Konami 8K mapper
-    u16 guess[MAX_MAPPERS] = {0,0,0,0};
+    u32 guess[MAX_GUESS_MAPPER];
     
+    memset(guess, 0x00, sizeof(guess));
     for (int i=0; i<size - 3; i++)
     {
         if (ROM_Memory[i] == 0x32)   // LD,A instruction
@@ -1262,7 +1263,11 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         if (myConfig.msxMapper == GUESS)
         {
-            mapperType = MSX_GuessROMType(romSize);
+            mapperType = RomDB_Lookup(romSize);
+            if (mapperType == 0xFF) // Not found... let's do our best to guess it...
+            {
+                mapperType = MSX_GuessROMType(romSize);
+            }
         }
         else
         {

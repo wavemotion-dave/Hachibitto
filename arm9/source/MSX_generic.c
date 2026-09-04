@@ -914,9 +914,9 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
-        {"MSX MAPPER",     {"GUESS","KONAMI 8K [4]","ASCII 8K","KONAMI SCC [5]","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS", "RESERVED","RESERVED",
-                            "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                                                     &myConfig.msxMapper,      16},
-        {"SLOT TYPE",      {"TYPE A", "TYPE B"},                                                                                                                                &myConfig.slotType,       2},
+        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K [4]","ASCII 8K","KONAMI SCC [5]","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS",
+                            "RESERVED","RESERVED", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                              &myConfig.msxMapper,      17},
+        {"SLOT TYPE",      {"TYPE A (S3 EX)", "TYPE B (S0 EX)"},                                                                                                                &myConfig.slotType,       2},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
         {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},

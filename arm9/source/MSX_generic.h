@@ -17,11 +17,11 @@
 #include "cpu/ay38910/AY38910.h"
 #include "cpu/scc/SCC.h"
 
-#define MAX_ROMS                    1500
+#define MAX_ROMS                    1024
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0001
+#define CONFIG_VER                  0x0002
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -136,23 +136,24 @@ extern u8 msx_caps_lock;
 extern u8 msx_kana_lock;
 
 #define GUESS       0
-#define KON8        1
-#define ASC8        2
-#define SCC8        3
-#define ASC16       4
-#define ZEN8        5
-#define ZEN16       6
-#define XBLAM       7
-#define SUPERLR     8
-#define XEVIOUS     9
-#define RES1        10
-#define RES2        11
-#define AT0K        12
-#define AT4K        13
-#define AT8K        14
-#define LIN64       15
+#define MIRRORED    1
+#define KON8        2
+#define ASC8        3
+#define SCC8        4
+#define ASC16       5
+#define ZEN8        6
+#define ZEN16       7
+#define XBLAM       8
+#define SUPERLR     9
+#define XEVIOUS     10
+#define RES1        11
+#define RES2        12
+#define AT0K        13
+#define AT4K        14
+#define AT8K        15
+#define LIN64       16
 
-#define MAX_MAPPERS 7   // The most we can guess when examining ROM data
+#define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
 extern u32 MAX_CART_SIZE;
 
@@ -249,5 +250,6 @@ extern void BeeperON(u16 beeper_freq);
 extern void BeeperOFF(void);
 
 extern void Z80_Interface_Reset(void);
+extern u8 RomDB_Lookup(u32 size);
 
 #endif
