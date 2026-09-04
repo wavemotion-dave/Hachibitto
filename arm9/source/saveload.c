@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define COLECODS_SAVE_VER   0x0001  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0001  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -66,7 +66,7 @@ void restoreCompressedMem(void)
     memcpy(COMPRESS_BUFFER, (u8*)0x6820000, 128*1024);
 }
 
-void colecoSaveState(void)
+void msxSaveState(void)
 {
     //TODO
 }
@@ -75,19 +75,9 @@ void colecoSaveState(void)
 /*********************************************************************************
  * Load the current state - read everything back from the .sav file.
  ********************************************************************************/
-void colecoLoadState(void)
+void msxLoadState(void)
 {
     //TODO
-}
-
-
-void colecoSaveEEPROM(void)
-{
-}
-
-void colecoLoadEEPROM(void)
-{
-
 }
 
 // End of file

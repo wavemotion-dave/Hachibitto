@@ -35,9 +35,6 @@ extern u32 DX, DY;
 
 // ------------------------------------------------------------------------------
 // Joystick UP, RIGHT, LEFT, DOWN and the two FIRE buttons are independent...
-// but all other keypad buttons (including the PURPLE and BLUE butotns on
-// the super action controller) are shared on the bottom of this 16-bit word.
-// This is how a real Colecovision deals with it.
 // ------------------------------------------------------------------------------
 #define JST_UP              0x0100
 #define JST_RIGHT           0x0200
@@ -225,8 +222,6 @@ extern char disk_last_path[3][256];
 extern u32  disk_last_size[3];
 extern u8   disk_unsaved_data[3];
 
-extern u32 tape_pos, tape_len;
-
 #define MODE_MSX            0x0100
 
 #define WAITVBL swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank();
@@ -253,8 +248,6 @@ extern void PauseSound(void);
 extern void UnPauseSound(void);
 extern void ReadFileCRCAndConfig(void);
 extern void DisplayStatusLine(bool bForce);
-extern void colecoSaveEEPROM(void);
-extern void colecoLoadEEPROM(void);
 extern void ResetMSX(void);
 extern void msx_patch_bios(void);
 

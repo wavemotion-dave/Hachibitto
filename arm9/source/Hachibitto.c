@@ -60,9 +60,7 @@ u16 slide_dampen  __attribute__((section(".dtcm"))) = 0;
 // smaller memory model of the original DS/DS-LITE.
 //
 // These memory buffers will be pointed to by the MemoryMap[] array. This array contains 8
-// pointers that can break down the Z80 memory into 8k chunks.  For the few games that have
-// a smaller than 8k boundary (e.g. Creativision uses a 2k BIOS) we can just stage/build
-// up the memory into the RAM_Memory[] buffer and point into that as a single 64k layout.
+// pointers that can break down the Z80 memory into 8k chunks.  
 // -------------------------------------------------------------------------------------------
 
 u32 MAX_CART_SIZE = 1024;                                     // 1MB of ROM Cart... for DSi we will bump this up to 4MB
@@ -80,7 +78,6 @@ char initial_path[MAX_ROM_NAME] = "";
 u8 msx_caps_lock        = 0;
 u8 msx_kana_lock        = 0;
 u8 write_NV_counter     = 0;
-u32 last_tape_pos       = 9999;
 
 u8   disk_unsaved_data[3]      = {0,0,0};
 u32  disk_last_size[3]         = {0,0,0};
@@ -104,16 +101,11 @@ u16 emuFps          __attribute__((section(".dtcm"))) = 0;
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;
 
-// -----------------------------------------------------------------------------------------------
-// For the various BIOS files ... only the coleco.rom is required - everything else is optional.
-// -----------------------------------------------------------------------------------------------
-u8 bMSXBiosFound            = false;
-
 u8 soundEmuPause     __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
 
-// -----------------------------------------------------------------------------------------------
-// This set of critical vars is what determines the machine type - Coleco vs MSX vs SVI, etc.
-// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// This set of critical vars is what determines the game type is... ROM vs DSK
+// -----------------------------------------------------------------------------
 u8 msx_mode          __attribute__((section(".dtcm"))) = 0;       // Set to 1 when a .msx game is loaded for basic MSX support
 
 u8 kbd_key           __attribute__((section(".dtcm"))) = 0;       // 0 if no key pressed, othewise the ASCII key (e.g. 'A', 'B', '3', etc)
@@ -133,7 +125,7 @@ u8 playingSFX = 0;             // To prevent sound effects like disk/tape loadin
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
 
 // --------------------------------------------------------------------
-// The key map for the Colecovision... mapped into the NDS controller
+// The key map for the MSX... mapped into the NDS controller
 // --------------------------------------------------------------------
 u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     JST_UP,
@@ -347,7 +339,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 
 // -------------------------------------------------------------------------------------------
 // Setup the maxmod audio stream - this will be a 16-bit Stereo PCM output at 55KHz which
-// sounds about right for the Colecovision.
+// sounds about right for the MSX audio data stream.
 // -------------------------------------------------------------------------------------------
 void setupStream(void)
 {
@@ -583,7 +575,6 @@ void DisplayStatusLine(bool bForce)
 {
     if (myGlobalConfig.emuText == 0) return;
 
-    if (bForce) last_tape_pos = 999999;
     if (msx_mode)
     {
         if ((last_msx_mode != msx_mode) || bForce)
@@ -1180,7 +1171,7 @@ void Hachibitto_main(void)
                               if  (showMessage("DO YOU REALLY WANT TO","SAVE GAME STATE ?") == ID_SHM_YES)
                               {
                                 SaveNow = 1;
-                                colecoSaveState();
+                                msxSaveState();
                               }
                               BottomScreenKeypad();
                               SoundUnPause();
@@ -1194,7 +1185,7 @@ void Hachibitto_main(void)
                               if (showMessage("DO YOU REALLY WANT TO","LOAD GAME STATE ?") == ID_SHM_YES)
                               {
                                 LoadNow = 1;
-                                colecoLoadState();
+                                msxLoadState();
                               }
                               BottomScreenKeypad();
                               SoundUnPause();
@@ -1233,7 +1224,7 @@ void Hachibitto_main(void)
       }
 
       // ------------------------------------------------------------------------
-      //  Test DS keypresses (ABXY, L/R) and map to corresponding Coleco keys
+      //  Test DS keypresses (ABXY, L/R) and map to corresponding MSX keys
       // ------------------------------------------------------------------------
       key_shift = false;
       key_ctrl = false;
@@ -1575,16 +1566,6 @@ void irqVBlank(void)
 
 }
 
-// ----------------------------------------------------------------
-// Look for the coleco.rom bios in several possible locations...
-// ----------------------------------------------------------------
-void LoadBIOSFiles(void)
-{
-    memset(BIOS_Memory, 0xFF, 0x10000); // All of BIOS area is FF until loaded up
-    
-    bMSXBiosFound = true;
-}
-
 /*********************************************************************************
  * Program entry point - check if an argument has been passed in probably from TWL++
  ********************************************************************************/
@@ -1633,7 +1614,11 @@ int main(int argc, char **argv)
   // Grab the BIOS before we try to switch any directories around...
   // -----------------------------------------------------------------
   useVRAM();
-  LoadBIOSFiles();
+  
+  // ----------------------------------------------------------------------
+  // Start with the BIOS Memory clear... we will copy BIOS data into here.
+  // ----------------------------------------------------------------------
+  memset(BIOS_Memory, 0xFF, 0x10000); // All of BIOS area is FF until loaded up
 
   // -----------------------------------------------------------------
   // And do an initial load of configuration... We'll match it up
@@ -1665,8 +1650,7 @@ int main(int argc, char **argv)
   {
       cmd_line_file[0]=0; // No file passed on command line...
       chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
-      chdir("msx");       // And try to start in the subdir /coleco... doesn't matter if it fails.
-      chdir("msx2");      // TBD
+      chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
   }
 
   SoundPause();
@@ -1679,19 +1663,6 @@ int main(int argc, char **argv)
   while(1)
   {
     HachibittoInit();
-
-    // ---------------------------------------------------------------
-    // Let the user know what BIOS files were found - the only BIOS
-    // that must exist is coleco.rom or else the show is off...
-    // ---------------------------------------------------------------
-    if (!bMSXBiosFound)
-    {
-        DSPrint(1,10,0,"ERROR: MSX2.ROM or MSX2EXT.ROM");
-        DSPrint(1,12,0,"       WERE NOT FOUND!!       ");
-        DSPrint(1,14,0,"PUT ROM FILES IN THE SAME DIR ");
-        DSPrint(1,15,0,"AS EMULATOR OR /ROMS/BIOS     ");
-        while(1) ;
-    }
 
     while(1)
     {
@@ -1726,10 +1697,11 @@ u8 *MemoryMap[8]        __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 // -------------------------------------
 // Some IO Port and Memory Map vars...
 // -------------------------------------
-u32 tape_pos            __attribute__((section(".dtcm"))) = 0;
-u32 tape_len            __attribute__((section(".dtcm"))) = 0;
 u8 key_shift_hold       __attribute__((section(".dtcm"))) = 0;
 
+// -------------------------------------
+// Our venerable Z80 CPU structure!
+// -------------------------------------
 Z80 CPU __attribute__((section(".dtcm")));      // Put the entire CPU state into fast memory for speed!
 
 // --------------------------------------------------
@@ -1803,7 +1775,7 @@ void ProcessBufferedKeys(void)
 
 
 /*********************************************************************************
- * Init coleco Engine for that game
+ * Init MSX Emulation Engine for that game
  ********************************************************************************/
 u8 msxInit(char *szGame)
 {
@@ -1870,7 +1842,7 @@ void msxRun(void)
 }
 
 /*********************************************************************************
- * Set coleco Palette
+ * Set MSX legacy Palette (MSX2 can override)
  ********************************************************************************/
 void msxSetPal(void)
 {
@@ -1878,7 +1850,7 @@ void msxSetPal(void)
   u8 r,g,b;
 
   // -----------------------------------------------------------------------
-  // The Colecovision has a 16 color pallette... we set that up here.
+  // The MSX has a 16 color pallette... we set that up. MSX2 expands this.
   // We always use the standard NTSC color palette which is fine for now
   // but maybe in the future we add the PAL color palette for a bit more
   // authenticity.
@@ -1993,9 +1965,6 @@ u8 loadrom(const char *filename, u8 * ptr)
         // ------------------------------------------------------------------------------
         if (msx_mode)
         {
-            tape_len = romSize;  // For MSX, the tape size is saved for showing tape load progress
-            tape_pos = 0;
-            last_tape_pos = 9999;
             MSX_InitialMemoryLayout(romSize);
         }
         bOK = 1;

@@ -1074,6 +1074,7 @@ ITCM_CODE byte RdCtrl9938(void)
   else if (VDP[15] == 1)
   {
       VDPStatus[1] &= ~0x01;
+      //if ((CPU.IRequest == vdp_int_source)) CPU.IRequest=INT_NONE; 
   }
   else if (VDP[15] == 2)
   {

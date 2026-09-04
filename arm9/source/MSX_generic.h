@@ -186,8 +186,6 @@ extern u32 file_crc;
 
 extern u8 romBankMask;
 
-extern u8 bMSXBiosFound;
-
 extern u8 SGC_Bank[4];
 extern u8 SGC_SST_State;
 extern u8 SGC_SST_CmdPos;
@@ -197,8 +195,6 @@ extern u8 SGC_SST_CmdPos;
 // -------------------------------
 extern u8 msx_sram_at_8000;
 
-extern u32 tape_pos;
-extern u32 tape_len;
 extern u8 key_shift_hold;
 
 extern u8 Port_PPI_A;
@@ -222,7 +218,6 @@ extern u8 key_ctrl;
 extern u8 key_code;
 extern u8 key_graph;
 extern u8 key_dia;
-extern u32 last_tape_pos;
 extern u32 msx_last_rom_size;
 
 extern u8 msxInit(char *szGame);
@@ -232,8 +227,8 @@ extern void msxKeyProc(void);
 extern void msxRun(void);
 extern void getfile_crc(const char *path);
 
-extern void colecoLoadState();
-extern void colecoSaveState();
+extern void msxLoadState();
+extern void msxSaveState();
 
 extern void msxWipeRAM(void);
 extern void msx_reset(void);

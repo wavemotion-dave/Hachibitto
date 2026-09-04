@@ -1458,11 +1458,10 @@ void msx_reset(void)
     msx_sram_at_8000 = false;
     if (msx_mode)
     {
-        tape_pos = 0;
         MSX_InitialMemoryLayout(msx_last_rom_size);
         if (msx_mode == 3) // .dsk based MSX 
         {
-            fdc_init(WD2793, 1, (tape_len/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+            fdc_init(WD2793, 1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
             fdc_reset(true);
         }
     }

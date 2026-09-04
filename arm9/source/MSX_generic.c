@@ -41,7 +41,7 @@ struct Config_t myConfig __attribute((aligned(4))) __attribute__((section(".dtcm
 struct GlobalConfig_t myGlobalConfig;
 extern u32 file_crc;
 
-u8 option_table=0;
+u8 option_table_idx=0;
 
 const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "P1 JOY UP",
@@ -376,10 +376,10 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
 
 
 // -------------------------------------------------------------------------
-// Standard qsort routine for the coleco games - we sort all directory
+// Standard qsort routine for the MSX game list - we sort all directory
 // listings first and then a case-insenstive sort of all games.
 // -------------------------------------------------------------------------
-int colecoFilescmp (const void *c1, const void *c2)
+int msxFilescmp (const void *c1, const void *c2)
 {
   FI_MSX *p1 = (FI_MSX *) c1;
   FI_MSX *p2 = (FI_MSX *) c2;
@@ -457,7 +457,7 @@ void HachibittoFindFiles(void)
   // ----------------------------------------------
   if (countCV)
   {
-    qsort (gpFic, countCV, sizeof(FI_MSX), colecoFilescmp);
+    qsort (gpFic, countCV, sizeof(FI_MSX), msxFilescmp);
   }
 }
 
@@ -1013,7 +1013,7 @@ struct options_t
     u8           option_max;
 };
 
-const struct options_t Option_Table[3][20] =
+const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
@@ -1022,18 +1022,14 @@ const struct options_t Option_Table[3][20] =
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,   4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,       3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,    2},
-        {"MSX MAPPER",     {"GUESS","KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS", "RESERVED","RESERVED",
+        {"MSX MAPPER",     {"GUESS","KONAMI 8K [4]","ASCII 8K","KONAMI SCC [5]","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS", "RESERVED","RESERVED",
                             "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                                                     &myConfig.msxMapper,  16},
         {"SLOT TYPE",      {"TYPE A", "TYPE B"},                                                                                                                                &myConfig.slotType,    2},
+        {"CLEAR INTS",     {"STATUS READ", "AUTOMATICALLY"},                                                                                                                    &myConfig.clearInt,    2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,    21},
-        {NULL,             {"",      ""},                                                                                                                                       NULL,                 1},
-    },
-    // Global Options
-    {
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "BAD OPS", "DEBUG", "FULL DEBUG"},                                                                                                           &myGlobalConfig.debugger, 4},
-
-        {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},
+        {NULL,             {"",      ""},                                                                                                                                       NULL,                 1},
     }
 };
 
@@ -1050,9 +1046,9 @@ u8 display_options_list(bool bFullDisplay)
     {
         while (true)
         {
-            sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][len].label, Option_Table[option_table][len].option[*(Option_Table[option_table][len].option_val)]);
+            sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][len].label, Option_Table[option_table_idx][len].option[*(Option_Table[option_table_idx][len].option_val)]);
             DSPrint(1,5+len, (len==0 ? 2:0), strBuf); len++;
-            if (Option_Table[option_table][len].label == NULL) break;
+            if (Option_Table[option_table_idx][len].label == NULL) break;
         }
 
         // Blank out rest of the screen... option menus are of different lengths...
@@ -1062,7 +1058,7 @@ u8 display_options_list(bool bFullDisplay)
         }
     }
 
-    DSPrint(1,22, 0, (char *)"  B=EXIT, X=MORE, START=SAVE  ");
+    DSPrint(6,22, 0, (char *)"  B=EXIT,  START=SAVE  ");
     return len;
 }
 
@@ -1078,7 +1074,7 @@ void HachibittoGameOptions(bool bIsGlobal)
     int keys_pressed;
     int last_keys_pressed = 999;
 
-    option_table = (bIsGlobal ? 1:0);
+    option_table_idx = 0;
 
     idx=display_options_list(true);
     optionHighlighted = 0;
@@ -1094,53 +1090,43 @@ void HachibittoGameOptions(bool bIsGlobal)
             last_keys_pressed = keys_pressed;
             if (keysCurrent() & KEY_UP) // Previous option
             {
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,0, strBuf);
                 if (optionHighlighted > 0) optionHighlighted--; else optionHighlighted=(idx-1);
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,2, strBuf);
             }
             if (keysCurrent() & KEY_DOWN) // Next option
             {
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,0, strBuf);
                 if (optionHighlighted < (idx-1)) optionHighlighted++;  else optionHighlighted=0;
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,2, strBuf);
             }
 
             if (keysCurrent() & KEY_RIGHT)  // Toggle option clockwise
             {
-                *(Option_Table[option_table][optionHighlighted].option_val) = (*(Option_Table[option_table][optionHighlighted].option_val) + 1) % Option_Table[option_table][optionHighlighted].option_max;
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                *(Option_Table[option_table_idx][optionHighlighted].option_val) = (*(Option_Table[option_table_idx][optionHighlighted].option_val) + 1) % Option_Table[option_table_idx][optionHighlighted].option_max;
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,2, strBuf);
             }
             if (keysCurrent() & KEY_LEFT)  // Toggle option counterclockwise
             {
-                if ((*(Option_Table[option_table][optionHighlighted].option_val)) == 0)
-                    *(Option_Table[option_table][optionHighlighted].option_val) = Option_Table[option_table][optionHighlighted].option_max -1;
+                if ((*(Option_Table[option_table_idx][optionHighlighted].option_val)) == 0)
+                    *(Option_Table[option_table_idx][optionHighlighted].option_val) = Option_Table[option_table_idx][optionHighlighted].option_max -1;
                 else
-                    *(Option_Table[option_table][optionHighlighted].option_val) = (*(Option_Table[option_table][optionHighlighted].option_val) - 1) % Option_Table[option_table][optionHighlighted].option_max;
-                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table][optionHighlighted].label, Option_Table[option_table][optionHighlighted].option[*(Option_Table[option_table][optionHighlighted].option_val)]);
+                    *(Option_Table[option_table_idx][optionHighlighted].option_val) = (*(Option_Table[option_table_idx][optionHighlighted].option_val) - 1) % Option_Table[option_table_idx][optionHighlighted].option_max;
+                sprintf(strBuf, " %-12s : %-14s", Option_Table[option_table_idx][optionHighlighted].label, Option_Table[option_table_idx][optionHighlighted].option[*(Option_Table[option_table_idx][optionHighlighted].option_val)]);
                 DSPrint(1,5+optionHighlighted,2, strBuf);
             }
             if (keysCurrent() & KEY_START)  // Save Options
             {
                 SaveConfig(TRUE);
             }
-            if (keysCurrent() & (KEY_X)) // Toggle Table
-            {
-                option_table ^= 1;
-                idx=display_options_list(true);
-                optionHighlighted = 0;
-                while (keysCurrent() != 0)
-                {
-                    WAITVBL;
-                }
-            }
             if ((keysCurrent() & KEY_B) || (keysCurrent() & KEY_A))  // Exit options
             {
-                option_table = 0;   // Reset for next time
+                option_table_idx = 0;   // Reset for next time
                 break;
             }
         }
@@ -1344,7 +1330,7 @@ void HachibittoChangeKeymap(void)
 // -----------------------------------------------------------------------------------------
 void DisplayFileName(void)
 {
-    sprintf(szName, "[%d K] [CRC: %08X]", file_size/1024, file_crc);
+    sprintf(szName, "[%d K] [CRC: %08X] [%d]", file_size/1024, file_crc, mapperType);
     DSPrint((16 - (strlen(szName)/2)),19,0,szName);
 
     sprintf(szName,"%s",gpFic[ucGameChoice].szName);
@@ -1369,8 +1355,7 @@ void dispInfoOptions(u32 uY)
     DSPrint(2, 9,(uY== 9 ? 2 : 0),("         PLAY  GAME         "));
     DSPrint(2,11,(uY==11 ? 2 : 0),("     REDEFINE  KEYS         "));
     DSPrint(2,13,(uY==13 ? 2 : 0),("         GAME  OPTIONS      "));
-    DSPrint(2,15,(uY==15 ? 2 : 0),("       GLOBAL  OPTIONS      "));
-    DSPrint(2,17,(uY==17 ? 2 : 0),("         QUIT  EMULATOR     "));
+    DSPrint(2,15,(uY==15 ? 2 : 0),("         QUIT  EMULATOR     "));
 }
 
 // --------------------------------------------------------------------
@@ -1391,54 +1376,9 @@ void NoGameSelected(u32 ucY)
     dispInfoOptions(ucY);
 }
 
-/*********************************************************************************
- * Look for MSX 'AB' header in the ROM file or possibly 0xF331 for SVI ROMs
- ********************************************************************************/
-void CheckRomHeaders(char *szGame)
-{
-    // ------------------------------------------------------------------------------------------
-    // MSX Header Bytes:
-    //  0 DEFB "AB" ; expansion ROM header
-    //  2 DEFW initcode ; start of the init code, 0 if no initcode
-    //  4 DEFW callstat; pointer to CALL statement handler, 0 if no such handler
-    //  6 DEFW device; pointer to expansion device handler, 0 if no such handler
-    //  8 DEFW basic ; pointer to the start of a tokenized basicprogram, 0 if no basicprogram
-    // ------------------------------------------------------------------------------------------
-
-    // ---------------------------------------------------------------------
-    // Do some auto-detection for game ROM. MSX games have 'AB' in their
-    // header and we also want to track the INIT address for those ROMs
-    // so we can take a better guess at mapping them into our Slot1 memory
-    // ---------------------------------------------------------------------
-    msx_init = 0x4000;
-    msx_basic = 0x0000;
-    if ((ROM_Memory[0] == 'A') && (ROM_Memory[1] == 'B'))
-    {
-        msx_mode = 1;      // MSX roms start with AB (might be in bank 0)
-        msx_init = ROM_Memory[2] | (ROM_Memory[3]<<8);
-        if (msx_init == 0x0000) msx_basic = ROM_Memory[8] | (ROM_Memory[8]<<8);
-        if (msx_init == 0x0000)   // If 0, check for 2nd header... this might be a dummy
-        {
-            if ((ROM_Memory[0x4000] == 'A') && (ROM_Memory[0x4001] == 'B'))
-            {
-                msx_init = ROM_Memory[0x4002] | (ROM_Memory[0x4003]<<8);
-                if (msx_init == 0x0000) msx_basic = ROM_Memory[0x4008] | (ROM_Memory[0x4009]<<8);
-            }
-        }
-    }
-    else if ((ROM_Memory[0x4000] == 'A') && (ROM_Memory[0x4001] == 'B'))
-    {
-        msx_mode = 1;      // MSX roms start with AB (might be in bank 1)
-        msx_init = ROM_Memory[0x4002] | (ROM_Memory[0x4003]<<8);
-        if (msx_init == 0x0000) msx_basic = ROM_Memory[0x4008] | (ROM_Memory[0x4009]<<8);
-    }
-}
-
 
 void ReadFileCRCAndConfig(void)
 {
-    u8 checkROM = 0;
-
     // Reset the mode related vars...
     msx_mode = 0;
     keyMapType = 0;
@@ -1455,10 +1395,8 @@ void ReadFileCRCAndConfig(void)
     if (strstr(gpFic[ucGameChoice].szName, ".MSX") != 0) msx_mode = 1;
     if (strstr(gpFic[ucGameChoice].szName, ".dsk") != 0) msx_mode = 3;
     if (strstr(gpFic[ucGameChoice].szName, ".DSK") != 0) msx_mode = 3;
-    if (strstr(gpFic[ucGameChoice].szName, ".rom") != 0) checkROM = 1;
-    if (strstr(gpFic[ucGameChoice].szName, ".ROM") != 0) checkROM = 1;
-
-    if (checkROM) CheckRomHeaders(gpFic[ucGameChoice].szName);   // See if we've got an MSX or SVI cart - this may set msx_mode=1 or svi_mode=2
+    if (strstr(gpFic[ucGameChoice].szName, ".rom") != 0) msx_mode = 1;
+    if (strstr(gpFic[ucGameChoice].szName, ".ROM") != 0) msx_mode = 1;
 
     FindConfig();    // Try to find keymap and config for this file...
 }
@@ -1542,7 +1480,7 @@ void HachibittoChangeOptions(void)
     if (keysCurrent()  & KEY_UP) {
       if (!ucHaut) {
         dispInfoOptions(32);
-        ucY = (ucY == 7 ? 17 : ucY -2);
+        ucY = (ucY == 7 ? 15 : ucY -2);
         ucHaut=0x01;
         dispInfoOptions(ucY);
       }
@@ -1557,7 +1495,7 @@ void HachibittoChangeOptions(void)
     if (keysCurrent()  & KEY_DOWN) {
       if (!ucBas) {
         dispInfoOptions(32);
-        ucY = (ucY == 17 ? 7 : ucY +2);
+        ucY = (ucY == 15 ? 7 : ucY +2);
         ucBas=0x01;
         dispInfoOptions(ucY);
       }
@@ -1621,14 +1559,7 @@ void HachibittoChangeOptions(void)
             }
             break;
 
-          case 15 :     // GLOBAL OPTIONS
-            HachibittoGameOptions(true);
-            dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
-            dispInfoOptions(ucY);
-            DisplayFileName();
-            break;
-
-          case 17 :     // QUIT EMULATOR
+          case 15 :     // QUIT EMULATOR
             exit(1);
             break;
         }
