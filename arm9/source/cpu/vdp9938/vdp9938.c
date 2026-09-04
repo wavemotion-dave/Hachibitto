@@ -19,7 +19,9 @@ u8 MaxSprites[2] __attribute__((section(".dtcm"))) = {32, 4};     // Normally th
 
 u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // Video flipping buffer
 
-u8 XBuf[256*212] ALIGN(32) = {0}; // VDP9938 screen is 256x212
+volatile u8 bufferZone1[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
+u8 XBuf[256*212] ALIGN(32) = {0};   // VDP9938 screen is 256x212
+volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
@@ -97,7 +99,7 @@ u8 VDP9938A_palette[16*3] = {
   0x20,0x80,0x20,   0xC0,0x40,0xA0,   0xA0,0xA0,0xA0,   0xE0,0xE0,0xE0,
 };
 
-u8 pVDPVidMem[0x20000] ALIGN(32) ={0};                      // VDP video memory... 128K for VDP9938 support
+u8 VDP_Memory[0x20000] ALIGN(32) ={0};                      // VDP video memory... 128K for VDP9938 support
 
 u16 CurLine         __attribute__((section(".dtcm")));      // Current scanline
 u8 VDP[64]          __attribute__((section(".dtcm")));      // VDP Registers
@@ -852,7 +854,7 @@ ITCM_CODE void RefreshLine4(u8 uY)
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'
  ********************************************************************************/
 u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x1f,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                                                             0xff,0xff,0xff,0xff,0xff,0xff,0x07,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
@@ -903,11 +905,11 @@ void CheckNewMode(void)
   IH = SprHeights[VDP[1]&0x02];
 
   u32 I=(ScrMode>6) ? 11:10;
-  ChrTab=pVDPVidMem+(((int)(VDP[2]&SCR[ScrMode].R2)<<I));
-  ChrGen=pVDPVidMem+(((int)(VDP[4]&SCR[ScrMode].R4)<<11));
-  ColTab=pVDPVidMem+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
-  SprTab=pVDPVidMem+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
-  SprGen=pVDPVidMem+((int)(VDP[6]<<11));
+  ChrTab=VDP_Memory+(((int)(VDP[2]&SCR[ScrMode].R2)<<I));
+  ChrGen=VDP_Memory+(((int)(VDP[4]&SCR[ScrMode].R4)<<11));
+  ColTab=VDP_Memory+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
+  SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
+  SprGen=VDP_Memory+((int)(VDP[6]<<11));
 
   ChrTabM = ((int)(VDP[2]|(u8)~SCR[ScrMode].M2)<<I)|((1<<I)-1);
   ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
@@ -958,11 +960,11 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
 
     case 10:
     case 11:
-      ColTab=pVDPVidMem+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
-      SprTab=pVDPVidMem+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
+      ColTab=VDP_Memory+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
+      SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
       break;
 
-    case 14: VPAGE=pVDPVidMem+((int)VDP[14]<<14); break;
+    case 14: VPAGE=VDP_Memory+((int)VDP[14]<<14); break;
     
     case 44: VDPWrite(value); break;
     case 46: VDPDraw(value);break;
@@ -984,7 +986,7 @@ ITCM_CODE byte RdData9938(void)
   if(!VAddr&&(ScrMode>3))
   {
     VDP[14]=(VDP[14]+1)&7;
-    VPAGE=pVDPVidMem+((int)VDP[14]<<14);
+    VPAGE=VDP_Memory+((int)VDP[14]<<14);
   }
 
   VDPCtrlLatch = 0;
@@ -1045,7 +1047,7 @@ ITCM_CODE void WrCtrl9938(byte value)
             if(!VAddr&&(ScrMode>3))
             {
                 VDP[14]=(VDP[14]+1)&7;
-                VPAGE=pVDPVidMem+((int)VDP[14]<<14);
+                VPAGE=VDP_Memory+((int)VDP[14]<<14);
             }
         }
         break;
@@ -1120,10 +1122,12 @@ void Loop9938(void)
          SetVDPIRQ(VDP_IRQ_LINE, 1);
       }
   }
-  else
+
+  // Clear the FH flag if IE1 is explicitly lowered by the CPU.
+  if (!(VDP[0] & 0x10))
   {
-      /* Reset flag immediately if IE1 interrupt disabled */
-      if(!(VDP[0]&0x10)) VDPStatus[1]&=0xFE;
+      VDPStatus[1] &= 0xFE;         // If IE1 (R#0 bit 4) is lowered, FH flag is forced low
+      SetVDPIRQ(VDP_IRQ_LINE, 0);   // And ensure the IRQ is not set for the Line Interrupt
   }
   
   if (++CurLine >= VDP9938_LINES)
@@ -1198,7 +1202,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
     u32 *dst32 = (u32*)((u8*)XBuf + ((u32)uY << 8));
 
     const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
-    if (FlipEvenOdd && OddPage && pVDPVidMem <= src - 0x8000) src -= 0x8000;
+    if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
 
     for (int i = 0; i < 128; i += 8) 
     {
@@ -1301,9 +1305,9 @@ ITCM_CODE void RefreshLine8(register u8 uY)
 
 void Reset9938(void)
 {
-    memset(pVDPVidMem, 0x00, 0x20000);   // Reset Video memory (128K for VDP9938)
-    memset(VDP, 0x00, sizeof(VDP));
-    memset(VDPStatus, 0x00, sizeof(VDPStatus));
+    memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
+    memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
+    memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
     
     BuildNibbleLUT();
     BuildScreen7LUT();
@@ -1324,10 +1328,10 @@ void Reset9938(void)
     FGColor=BGColor=0;
     ScrMode=0;                          // Default to Screen 0 for VDP9938
     CurLine=0;
-    ChrTab=ColTab=ChrGen=pVDPVidMem;
-    SprTab=SprGen=pVDPVidMem;
+    ChrTab=ColTab=ChrGen=VDP_Memory;
+    SprTab=SprGen=VDP_Memory;
     VDPDlatch = 0;
-    VPAGE=pVDPVidMem;                           /* VRAM page        */
+    VPAGE=VDP_Memory;                           /* VRAM page        */
     frame_number = 0;
     msx_irq_pending = 0;
 

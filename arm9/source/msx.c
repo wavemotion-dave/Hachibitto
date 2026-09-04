@@ -1003,14 +1003,15 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // ---------------------------------------------
     // Start with reset memory - fill in MSX slots
     // ---------------------------------------------
-    memset(RAM_Memory,  0x00, 0x10000);
-    memset(SRAM_Memory, 0xFF, 0x4000);
+    memset(RAM_Memory,  0x00, sizeof(RAM_Memory));
+    memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
     
     // -----------------------------------------
     // Setup RAM/ROM pointers back to defaults
     // -----------------------------------------
-    memset(bRAMInSegment, 0, 4);   // Default to no RAM in slot until told so
-    memset(bCartInSegment, 0, 4);   // Default to no ROM in slot until told so
+    memset(bRAMInSegment,  0, sizeof(bRAMInSegment));   // Default to no RAM in slot until told so
+    memset(bCartInSegment, 0, sizeof(bCartInSegment));  // Default to no ROM in slot until told so
+    
     for (u8 i=0; i<8; i++)
     {
         MSXCartPtr[i] = 0;     // All pages normal until told otherwise by A8 writes
@@ -1411,7 +1412,7 @@ void MSX_HandleBeeper(void)
 // ---------------------------------------------------------
 void msx_restore_bios(void)
 {
-    memset(BIOS_Memory, 0xFF, 0x10000);
+    memset(BIOS_Memory, 0xFF, sizeof(BIOS_Memory));
 
     msx_japanese_matrix = 1;
     memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
@@ -1499,7 +1500,7 @@ void msxSaveEEPROM(void)
     FILE *handle = fopen(szName, "wb+");  
     if (handle != NULL) 
     {
-      fwrite(SRAM_Memory, 0x4000, 1, handle);
+      fwrite(SRAM_Memory, sizeof(SRAM_Memory), 1, handle);
       fclose(handle);
     }
 }
@@ -1521,9 +1522,9 @@ void msxLoadEEPROM(void)
     szName[len-1] = 'm';
     szName[len-0] = 0;
     
-    if (ReadFileCarefully(szName, SRAM_Memory, 0x4000, 0) == 0)
+    if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0) == 0)
     {
-      memset(SRAM_Memory, 0xFF, 0x4000);
+      memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
     }
 }
 

@@ -48,7 +48,7 @@
 #define FlipEvenOdd   (VDP[9]&0x04)   /* Flip even/odd pages */
 #define OddPage       (frame_number&1)
 
-extern byte pVDPVidMem[];
+extern byte VDP_Memory[0x20000];
 extern u8 VDP[64];
 extern u16 VAddr;
 
@@ -103,7 +103,7 @@ static inline __attribute__((always_inline)) void WrData9938(byte V)  // This on
     if(!VAddr&&(ScrMode>3))
     {
       VDP[14]=(VDP[14]+1)&7;
-      VPAGE=pVDPVidMem+((int)VDP[14]<<14);
+      VPAGE=VDP_Memory+((int)VDP[14]<<14);
     }
     VDPCtrlLatch = 0;
 }

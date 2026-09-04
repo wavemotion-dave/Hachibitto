@@ -50,6 +50,7 @@ volatile u32 dsVSyncCount = 0;
 u32 last_vsync_count = 0xFEEDBEEF;
 s16 temp_offset   __attribute__((section(".dtcm"))) = 0;
 u16 slide_dampen  __attribute__((section(".dtcm"))) = 0;
+u16 DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // All emulated systems have ROM, RAM and possibly BIOS or SRAM. So we create generic buffers
@@ -949,6 +950,8 @@ void Hachibitto_main(void)
 
   // Force the sound engine to turn on when we start emulation
   bStartSoundEngine = true;
+  
+  DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
 
   // -------------------------------------------------------------------
   // Stay in this loop running the MSX game until the user exits...
@@ -1084,6 +1087,7 @@ void Hachibitto_main(void)
                           // Ask for verification
                           if (showMessage("DO YOU REALLY WANT TO", "RESET THE CURRENT GAME ?") == ID_SHM_YES)
                           {
+                              DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
                               ResetMSX();
                           }
                           BottomScreenKeypad();
@@ -1474,7 +1478,7 @@ void HachibittoInitCPU(void)
   //  Init Main Memory and VDP Video Memory
   //  -----------------------------------------
   memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
-  memset(pVDPVidMem, 0x00, 0x4000);
+  memset(VDP_Memory, 0x00, sizeof(VDP_Memory));
 
   // -----------------------------------------------
   // Init bottom screen do display correct overlay
@@ -1565,11 +1569,6 @@ int main(int argc, char **argv)
   // -----------------------------------------------------------------
   useVRAM();
   
-  // ----------------------------------------------------------------------
-  // Start with the BIOS Memory clear... we will copy BIOS data into here.
-  // ----------------------------------------------------------------------
-  memset(BIOS_Memory, 0xFF, 0x10000); // All of BIOS area is FF until loaded up
-
   // -----------------------------------------------------------------
   // And do an initial load of configuration... We'll match it up
   // with the game that was selected later...
@@ -1757,9 +1756,9 @@ u8 msxInit(char *szGame)
   REG_BG3Y = 0;
 
   // Init the page flipping buffer...
-  for (uBcl=0;uBcl<212;uBcl++)
+  for (uBcl=0;uBcl<255;uBcl++)
   {
-     uVide=(uBcl/12);
+     uVide=0;
      dmaFillWords(uVide | (uVide<<16),pVidFlipBuf+uBcl*128,256);
   }
 
@@ -1836,9 +1835,11 @@ void msxSetPal(void)
 u8 skip_render = 0;
 ITCM_CODE void msxUpdateScreen(void)
 {
-    // -----------------------------------------------------------------
-    // Not blend mode... just blast it out via DMA as fast as we can...
-    // -----------------------------------------------------------------
+    if (DelayFirstOutput)
+    {
+        DelayFirstOutput--;
+        return;
+    }
     
     if (!skip_render)
     {

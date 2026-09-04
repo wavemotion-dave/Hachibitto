@@ -14,7 +14,7 @@
 /**  - VDP Command execution 'in parallel' with CPU         **/
 /**  - Corrected behaviour of VDP commands                  **/
 /**  - Made it easier to implement correct S7/8 mapping     **/
-/**    by concentrating pVDPVidMem access in one single place     **/
+/**    by concentrating VDP_Memory access in one single place     **/
 /**  - Made use of the 'in parallel' VDP command exec       **/
 /**    and correct timing. You must call the function       **/
 /**    LoopVDP() from LoopZ80 in MSX.c. You must call it    **/
@@ -37,10 +37,10 @@
 /*************************************************************/
 /** Other useful defines                                    **/
 /*************************************************************/
-#define VDP_VRMP5(X, Y) (pVDPVidMem + ((Y&1023)<<7) + ((X&255)>>1))
-#define VDP_VRMP6(X, Y) (pVDPVidMem + ((Y&1023)<<7) + ((X&511)>>2))
-#define VDP_VRMP7(X, Y) (pVDPVidMem + ((Y&511)<<8) + ((X&511)>>1))
-#define VDP_VRMP8(X, Y) (pVDPVidMem + ((Y&511)<<8) + (X&255))
+#define VDP_VRMP5(X, Y) (VDP_Memory + ((Y&1023)<<7) + ((X&255)>>1))
+#define VDP_VRMP6(X, Y) (VDP_Memory + ((Y&1023)<<7) + ((X&511)>>2))
+#define VDP_VRMP7(X, Y) (VDP_Memory + ((Y&511)<<8) + ((X&511)>>1))
+#define VDP_VRMP8(X, Y) (VDP_Memory + ((Y&511)<<8) + (X&255))
 
 #define VDP_VRMP(M, X, Y) VDPVRMP(M, X, Y)
 #define VDP_POINT(M, X, Y) VDPpoint(M, X, Y)
@@ -201,7 +201,7 @@ INLINE uint8_t *VDPVRMP(uint8_t M,int X,int Y)
     case 3: return VDP_VRMP8(X,Y);
   }
 
-  return(pVDPVidMem);
+  return(VDP_Memory);
 }
 
 /** VDPpoint5() ***********************************************/
