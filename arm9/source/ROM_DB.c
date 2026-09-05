@@ -9600,7 +9600,7 @@ const ROM_DB_t ROM_DB[] =
   {"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", MIRRORED},
 };
 
-ITCM_CODE u8 RomDB_Lookup(u32 size)
+u8 RomDB_Lookup(u32 size)
 {    
     char digest_string[41];
     

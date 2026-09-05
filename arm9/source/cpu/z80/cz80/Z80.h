@@ -98,13 +98,13 @@ typedef struct
   int  CycleDeficit;                /* Cycle deficit from last scanline     */
   int  IBackup;                     /* Private, don't touch                 */
   word IRequest;                    /* Set to address of pending IRQ        */
-  byte IAutoReset;                  /* Set to 1 to autom. reset IRequest    */
+  byte reserved;                    /* Rserved for future use               */
   byte TrapBadOps;                  /* Set to 1 to warn of illegal opcodes  */
   byte Trace;                       /* Set Trace=1 to start tracing         */
   byte R_HighBit;                   /* Used to preserve the high bit for R  */
   u32  R;                           /* Refresh register - masked on read    */
   u32  TStates;                     /* Total CPU cycles                     */
-  word User;                        /* Arbitrary user data (ID,RAM*,etc.)   */
+  word NumInts;                     /* Number of Interrupts Processed       */
 } Z80;
 
 

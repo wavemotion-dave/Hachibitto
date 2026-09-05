@@ -53,8 +53,6 @@ u32 msx_last_rom_size   = 0;
 u8  msx_japanese_matrix = 1;        // Default to International keyboard layout. Set to '1' to enable Japanese layout.
 
 
-extern u8 MSXBios_MSX2[0x8000];
-extern u8 MSXBios_MSX2EXT[0x4000];
 extern u8 DirectRegWrite9938(u8 Value);
 
 static uint8_t rtc_reg = 0;       // Selected register index (0-15)
@@ -374,7 +372,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
       return fdc_read(Port & 0x07);
   }
 
-  debug[14]++;
   // No such port
   return(NORAM);
 }
@@ -781,7 +778,7 @@ void write_port_9A(uint8_t data)
 
         uint8_t index = VDP[16] & 0x0F;
         BG_PALETTE[index] = RGB15(red<<2,green<<2,blue<<2);
-        if (index == 0) BG_PALETTE[16] = RGB15(red<<2,green<<2,blue<<2);  // For MSX2 it's possible index 0 pixel is a solid color
+        BG_PALETTE[16] = BG_PALETTE[BGColor];   // border always follows whatever BGColor currently selects        
 
         // Auto-increment Palette Register index R#16
         VDP[16] = (VDP[16] + 1) & 0x0F;

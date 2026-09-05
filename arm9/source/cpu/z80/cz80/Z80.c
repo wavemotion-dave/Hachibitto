@@ -26,6 +26,7 @@
 #include "Z80.h"
 #include "Tables.h"
 #include <stdio.h>
+#include "../Z80_interface.h"
 #include "../../../printf.h"
 
 extern u32 JoyState;;
@@ -52,9 +53,6 @@ extern u8 RAM_Memory[];
 // ------------------------------------------------------
 extern void cpu_writemem16 (u8 value,u16 address);
 extern byte cpu_readmem16 (u16 address);
-extern void cpu_writeport_msx(unsigned bytePort, unsigned char Value);
-extern byte cpu_readport_msx(unsigned short Port);
-extern u8 my_config_clear_int;
 
 inline byte OpZ80(word A)   {return *(MemoryMap[A>>13] + (A&0x1FFF));}
 inline byte RdZ80(word A)   {return cpu_readmem16(A);}
@@ -489,10 +487,9 @@ void ResetZ80(Z80 *R)
   CPU.IBackup  = 0;
   CPU.ICount   = CPU.IPeriod = 0;
   CPU.IRequest = INT_NONE;
-  CPU.User     = 0;
+  CPU.NumInts     = 0;
   CPU.Trace    = 0;
   CPU.TrapBadOps = 1;
-  CPU.IAutoReset = 1;
 
   JumpZ80(CPU.PC.W);
 }

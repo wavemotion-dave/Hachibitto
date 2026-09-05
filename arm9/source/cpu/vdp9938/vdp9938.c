@@ -26,7 +26,6 @@ volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we r
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
-u16 my_config_clear_int __attribute__((section(".dtcm"))) = 0;
 u16 ALatch              __attribute__((section(".dtcm"))) = 0;
 
 u8 OH                   __attribute__((section(".dtcm"))) = 0;
@@ -296,7 +295,7 @@ ITCM_CODE void RefreshSprites(register byte Y)
   register byte *P,*T,C;
   register int L,K,N;
   unsigned int M;
-  
+
   /* Find sprites to show, update 5th sprite status */
   N = ScanSprites(Y,&M);
   if((N<0) || !M) return;
@@ -409,7 +408,7 @@ ITCM_CODE void RefreshSprites(register byte Y)
 /** color sprites in SCREENs 4-8. The result is returned in **/
 /** ZBuf, whose size must be 320 bytes (32+256+32).         **/
 /*************************************************************/
-ITCM_CODE void ColorSprites(uint8_t Y)
+ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 {
   static const uint8_t SprHeights[4] = { 8,16,16,32 };
   uint8_t C,IH,OH,J,OrThem;
@@ -417,7 +416,6 @@ ITCM_CODE void ColorSprites(uint8_t Y)
   int L,K;
   unsigned int M;
 
-  uint8_t *ZBuf = (XBuf+256*Y) - 32;
   CurrentEpoch++;
 
   /* SPR_SET: unconditional overwrite (background OR earlier-sprite pixel),
@@ -487,8 +485,8 @@ ITCM_CODE void ColorSprites(uint8_t Y)
       if((C&0x0F) || zeroNotTransparent)
       {
         PT = SprGen+((int)(IH>8? AT[2]&0xFC:AT[2])<<3)+J;
-        P=ZBuf+AT[1]+(C&0x80? 0:32) - (VDP[18] & 0x07);
-        O=OccBuf+AT[1]+(C&0x80? 0:32)- (VDP[18] & 0x07);
+        P=ZBuf+AT[1]+(C&0x80? 0:32);
+        O=OccBuf+AT[1]+(C&0x80? 0:32);
         C&=0x0F;
         J=PT[0];
 
@@ -610,9 +608,9 @@ ITCM_CODE void RefreshLine0(u8 Y)
   register byte *T,K,Offset;
   register byte *P,FC,BC;
   u16 word1=0, word2=0, word3=0;
-
-  BG_PALETTE[0] = BG_PALETTE[17]; // Legacy Handling
   
+  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
+
   P=XBuf+(Y<<8);
   BC = BGColor;
   FC = FGColor;
@@ -671,7 +669,7 @@ ITCM_CODE void RefreshLine1(u8 uY)
   register u32 *P;
   u8 lastT;
   
-  BG_PALETTE[0] = BG_PALETTE[17]; // Legacy Handling
+  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
 
   P=(u32*) (XBuf+(uY<<8));
   u32 ptLow = 0; u32 ptHigh = 0;
@@ -716,12 +714,14 @@ ITCM_CODE void RefreshLine2(u8 uY) {
   register byte K,*T;
   u16 J,I;
 
-  BG_PALETTE[0] = BG_PALETTE[17]; // Legacy Handling
+  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
   
   P=(u32*)(XBuf+(uY<<8));
 
   if (!ScreenON)
-    memset(P,BGColor,256);
+  {
+    memset(XBuf + (uY<<8), BGColor, 256);
+  }
   else
   {
     u32 ptLow = 0; u32 ptHigh = 0;
@@ -762,15 +762,17 @@ ITCM_CODE void RefreshLine3(u8 uY)
   byte X,K,Offset;
   byte *P,*T;
   u8 lastT;
+  
+  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
+
   P=XBuf+(uY<<8);
 
-  BG_PALETTE[0] = BG_PALETTE[17]; // Legacy Handling
-  
-  if(!VDP9938_ScreenON)
+  if (!ScreenON)
   {
-    memset(P,BGColor,256);
+    memset(XBuf + (uY<<8), BGColor, 256);
   }
-  else {
+  else 
+  {
     u8 ptLow = 0; u8 ptHigh = 0;
     T=ChrTab+((int)(uY&0xF8)<<2);
     lastT = ~(*T);
@@ -801,57 +803,304 @@ ITCM_CODE void RefreshLine3(u8 uY)
   }
 }
 
+#define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
+u8 LineScratch[400] __attribute__((section(".dtcm")));
+
+uint8_t *RefreshBorder(uint8_t Y)
+{
+    int shift = HAdjust & ~1;   // keep your even-only clamp
+
+    // Pre-fill the small revealed border strip at its FINAL position in LineScratch
+    if (ScrMode == 6)
+    {
+        if (shift > 0)      for (int i=0;i<shift;i++)  LineScratch[LS_BASE+i] = (i&1) ? 18:16;
+        else if (shift < 0) for (int i=0;i<-shift;i++)  LineScratch[LS_BASE+256+shift+i] = (i&1) ? 18:16;
+    }
+    else
+    {
+        if (shift > 0)      memset(LineScratch+LS_BASE, 16, shift);
+        else if (shift < 0) memset(LineScratch+LS_BASE+256+shift, 16, -shift);
+    }
+
+    return LineScratch + LS_BASE + shift;   // content renders here -- lands correctly by construction
+}
+
+ITCM_CODE void CommitLine(u8 Y)
+{
+    // Always exactly 256 bytes, always 4-aligned on both ends (XBuf rows and
+    // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
+    u32 *dst = (u32*)(XBuf + ((u16)Y << 8));
+    u32 *src = (u32*)(LineScratch + LS_BASE);
+    for (int i = 0; i < 64; i += 8)
+    {
+        dst[i+0]=src[i+0]; dst[i+1]=src[i+1]; dst[i+2]=src[i+2]; dst[i+3]=src[i+3];
+        dst[i+4]=src[i+4]; dst[i+5]=src[i+5]; dst[i+6]=src[i+6]; dst[i+7]=src[i+7];
+    }
+}
+
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
   uint32_t K, *T;
   int I, J;
-  uint8_t *P = XBuf + (Y << 8);
-  BG_PALETTE[0] = BG_PALETTE[16];
+  uint8_t *P = RefreshBorder(Y);
 
-  if (!ScreenON) 
+  if (!ScreenON)
   {
-    memset(P, BGColor, 256);
+    memset(XBuf + (Y<<8), BGColor, 256);
   }
   else
   {
-    // R is completely unused in your loop body, removed entirely.
-    uint32_t srcY = Y + VScroll;   
+    uint32_t srcY = Y + VScroll;
     T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
     I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
-    // Cast destination to 32-bit pointer for faster 4-byte writes
-    uint32_t *P32 = (uint32_t*)P; 
-    
-    // Count down to zero to allow the ARM9 to use SUBS (eliminating CMP)
-    int X = 32;
-    do 
+    if (!isDSiMode())
     {
-      // Load 8-bit character table value, explicitly casting to 32-bit register
-      uint32_t t_val = *(uint8_t*)T;
-      T = (uint32_t*)((uint8_t*)T + 1); // Safely advance 1 byte
+        extern u8 skip_render;
+        extern u16 timingFrames;
+        if (timingFrames & 1) {skip_render=1; return;}
+    }
 
-      J = (int)t_val << 3;
-      uint32_t idx = (I + J);
-      
-      uint32_t K_col = ColTab[idx & ColTabM];
-      uint32_t FC    = K_col >> 4;
-      uint32_t BC    = K_col & 0x0F;
-      
-      K = ChrGen[idx & ChrGenM];
+    // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
+    // doesn't change mid-line), so check it once rather than per-pixel.
+    int misaligned = ((uintptr_t)P & 3) != 0;
 
-      // Expand 8 pixels into two 32-bit words (4 pixels each) to utilize full bus width
-      // This eliminates 8 individual byte writes and uses ARM barrel shifter efficiently
-      uint32_t p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-      uint32_t p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+    uint32_t *P32 = (uint32_t*)P;
+    uint16_t *P16 = (uint16_t*)P;
 
-      P32[0] = p0;
-      P32[1] = p1;
-      P32 += 2; // Advance by 8 bytes (two 32-bit words)
-      
-    } while (--X);
+    uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
+    uint32_t p0 = 0, p1 = 0;
 
-    ColorSprites(Y);   
+    int X = 32;
+
+    if (!misaligned)
+    {
+        do
+        {
+          uint32_t t_val = *(uint8_t*)T;
+          T = (uint32_t*)((uint8_t*)T + 1);
+
+          if (t_val != lastT)
+          {
+              lastT = t_val;
+              J = (int)t_val << 3;
+              uint32_t idx = (I + J);
+
+              uint32_t K_col = ColTab[idx & ColTabM];
+              uint32_t FC    = K_col >> 4;
+              uint32_t BC    = K_col & 0x0F;
+
+              K = ChrGen[idx & ChrGenM];
+
+              p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+              p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+          }
+
+          P32[0] = p0;
+          P32[1] = p1;
+          P32 += 2;
+
+        } while (--X);
+    }
+    else
+    {
+        do
+        {
+          uint32_t t_val = *(uint8_t*)T;
+          T = (uint32_t*)((uint8_t*)T + 1);
+
+          if (t_val != lastT)
+          {
+              lastT = t_val;
+              J = (int)t_val << 3;
+              uint32_t idx = (I + J);
+
+              uint32_t K_col = ColTab[idx & ColTabM];
+              uint32_t FC    = K_col >> 4;
+              uint32_t BC    = K_col & 0x0F;
+
+              K = ChrGen[idx & ChrGenM];
+
+              p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+              p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+          }
+
+          P16[0] = (uint16_t)p0;
+          P16[1] = (uint16_t)(p0 >> 16);
+          P16[2] = (uint16_t)p1;
+          P16[3] = (uint16_t)(p1 >> 16);
+          P16 += 4;
+
+        } while (--X);
+    }
+
+    ColorSprites(Y, P-32);
+    CommitLine(Y);
   }
+}
+
+ITCM_CODE void RefreshLine5(register u8 uY)
+{
+    uint8_t *P = RefreshBorder(uY);
+
+    if (!ScreenON)
+    {
+      memset(XBuf + (uY<<8), BGColor, 256);
+    }
+    else
+    {
+        // Sadly, the DS-Lite/Phat need some help...
+        if (!isDSiMode())
+        {
+            extern u8 skip_render;
+            extern u16 timingFrames;
+            if (timingFrames & 1) {skip_render=1; return;}
+        }
+
+        const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
+        if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
+
+        // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
+        // doesn't change mid-line), so check it once rather than per-pixel.
+        int misaligned = ((uintptr_t)P & 3) != 0;
+
+        if (!misaligned)
+        {
+            u32 *dst32 = (u32*)P;
+
+            for (int i = 0; i < 128; i += 8)
+            {
+                u32 s0 = *(u32*)(src + i);
+                u32 s1 = *(u32*)(src + i + 4);
+
+                u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                dst32[0] = r0; dst32[1] = r1; dst32[2] = r2; dst32[3] = r3;
+                dst32 += 4;
+            }
+        }
+        else
+        {
+            u16 *dst16 = (u16*)P;
+
+            for (int i = 0; i < 128; i += 8)
+            {
+                u32 s0 = *(u32*)(src + i);
+                u32 s1 = *(u32*)(src + i + 4);
+
+                u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                dst16[0]=(u16)r0; dst16[1]=(u16)(r0>>16);
+                dst16[2]=(u16)r1; dst16[3]=(u16)(r1>>16);
+                dst16[4]=(u16)r2; dst16[5]=(u16)(r2>>16);
+                dst16[6]=(u16)r3; dst16[7]=(u16)(r3>>16);
+                dst16 += 8;
+            }
+        }
+
+        ColorSprites(uY, P-32);
+        CommitLine(uY);
+    }
+}
+/** RefreshLine6() ********************************************/
+/** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
+/*************************************************************/
+ITCM_CODE void RefreshLine6(register u8 uY)
+{
+    uint8_t *P = RefreshBorder(uY);
+
+    if (!ScreenON)
+    {
+      memset(XBuf + (uY<<8), BGColor, 256);
+    }
+    else
+    {
+        u32 *destPtr32 = (u32*) P;
+        u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
+        u8 *srcPtr = &ChrTab[addr];
+
+        // Loops 64 times. Processes exactly 128 source bytes.
+        // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
+        for (int i = 0; i < 128; i += 2) {
+            u32 b0 = srcPtr[i];
+            u32 b1 = srcPtr[i+1];
+
+            // This extracts two distinct 2-bit pixels per source byte.
+            // It produces 4 continuous horizontal pixels, mapping perfectly
+            // to a 256-pixel wide screen without skipping half the line or overrunning.
+             u32 word = ((b0 >> 6) & 0x03) |
+                        (((b0 >> 2) & 0x03) << 8) |
+                        (((b1 >> 6) & 0x03) << 16) |
+                        (((b1 >> 2) & 0x03) << 24);
+
+            *destPtr32++ = word;
+        }
+
+        ColorSprites(uY, P-32);
+        CommitLine(uY);
+    }
+}
+
+
+/** RefreshLine7() ********************************************/
+/** Refresh VDP9938 Screen 7: 512x212, 16 colors bitmap    **/
+/*************************************************************/
+ITCM_CODE void RefreshLine7(register u8 uY)
+{
+    uint8_t *P = RefreshBorder(uY);
+
+    if (!ScreenON)
+    {
+       memset(XBuf + (uY<<8), BGColor, 256);
+    }
+    else
+    {
+        u32 *dst32 = (u32*)P;
+        const u8 *src = ChrTab + (((u32)((uY + VScroll) & 511)) << 8);
+
+        for (int i = 0; i < 256; i += 8) {
+            u32 b0 = screen7LUT[src[i+0]];
+            u32 b1 = screen7LUT[src[i+1]];
+            u32 b2 = screen7LUT[src[i+2]];
+            u32 b3 = screen7LUT[src[i+3]];
+            u32 b4 = screen7LUT[src[i+4]];
+            u32 b5 = screen7LUT[src[i+5]];
+            u32 b6 = screen7LUT[src[i+6]];
+            u32 b7 = screen7LUT[src[i+7]];
+
+            dst32[0] = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+            dst32[1] = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
+            dst32 += 2;
+        }
+
+        ColorSprites(uY, P-32);
+        CommitLine(uY);
+    }
+}
+
+/** RefreshLine8() ********************************************/
+/** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
+/*************************************************************/
+ITCM_CODE void RefreshLine8(register u8 uY)
+{
+    if (!ScreenON)
+    {
+      memset(XBuf + (uY<<8), BGColor, 256);
+    }
+    else
+    {
+        uint8_t *P = XBuf + (uY << 8);
+
+        memcpy(XBuf + (uY << 8), ChrTab + ((uY+VScroll) << 8), 256);
+
+        ColorSprites(uY, P-32);
+    }
 }
 
 /*********************************************************************************
@@ -901,6 +1150,39 @@ void CheckNewMode(void)
     case 0x12: newMode=0;break; // Really 80 columns but ...
     default:   newMode=ScrMode;break;
   }
+
+  // -----------------------------------------------------------------
+  // When switching in and out of Mode 8 we need to do some magic
+  // with the palette. Screen 8 uses the colors as direct RGB values
+  // and so we need to wipe out the main 16 (plus spare) colors and
+  // put in proper RGB colors into the DS color palette. When we move
+  // back out of Screen 8 we need to restore any saved palette info.
+  // -----------------------------------------------------------------
+#if 0  
+  static u16 saved_palette[20] = {0};
+
+  if ((newMode == 8) && (ScrMode != 8))
+  {
+      // Save Palette when switching into Mode 8
+      for (int i=0; i<20; i++)
+      {
+          saved_palette[i] = BG_PALETTE[i];
+          u8 b = i & 3;
+          u8 r = (i >> 2) & 7;
+          u8 g = (i >> 5) & 7;
+          BG_PALETTE[i] = RGB15(r<<3,g<<3,b<<3);
+      }
+  }
+
+  if ((newMode != 8) && (ScrMode == 8))
+  {
+      // Restore Palette when switching out of Mode 8
+      for (int i=0; i<20; i++)
+      {
+          BG_PALETTE[i] = saved_palette[i];
+      }
+  }
+#endif
   
   ScrMode=newMode;
 
@@ -919,6 +1201,21 @@ void CheckNewMode(void)
   ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
   ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
   SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
+  
+    if (ScrMode == 6)
+    {
+        BG_PALETTE[16] = BG_PALETTE[(BGColor>>2)&0x03];  // BD3-BD2: even columns
+        BG_PALETTE[18] = BG_PALETTE[BGColor&0x03];       // BD1-BD0: odd columns
+    }
+    else
+    {
+        BG_PALETTE[16] = BG_PALETTE[BGColor];
+    }
+    
+    if (!(VDP[8] & 0x20))          // TP=0 (default): color 0 is transparent, shows backdrop
+        BG_PALETTE[0] = BG_PALETTE[16];
+    // else (TP=1): leave BG_PALETTE[0] alone -- it already holds whatever the
+    // game genuinely programmed via port 0x9A, since nothing else overwrites it now    
 }
 
 
@@ -933,33 +1230,30 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
   {
       VDPStatus[1]&=0xFE;
       SetVDPIRQ(VDP_IRQ_LINE, 0);
-  }    
-  
+  }
+
   /* Enabling IRQs may cause an IRQ here */
   if ((iReg==1) && ((VDP[1]^value)&value&VDP9938_REG1_IRQ) && (VDPStatus[0]&VDP9938_STAT_VBLANK))
   {
       SetVDPIRQ(VDP_IRQ_VBLANK, 1);
   }
-  
+
   /* There are VDP registers - map down to these and mask off irrelevant bits */
-  value &= VDP_RegisterMasks[iReg]; 
+  value &= VDP_RegisterMasks[iReg];
 
   /* Store value into the register */
   VDP[iReg]=value;
-  
+
    /* Depending on the register, do... */
   switch (iReg)
   {
     case  7:
       FGColor=value>>4;
       BGColor=value&0x0F;
-
-      // Handle "transparency"
-      u8 r = (u8) ((float) VDP9938A_palette[BGColor*3+0]*0.121568f);
-      u8 g = (u8) ((float) VDP9938A_palette[BGColor*3+1]*0.121568f);
-      u8 b = (u8) ((float) VDP9938A_palette[BGColor*3+2]*0.121568f);
-      
-      BG_PALETTE[17] = RGB15(r,g,b); // We swap it into BG_PALETTE[0] when we render lines...
+      u8 r = (u8)((float)VDP9938A_palette[BGColor*3+0]*0.121568f);
+      u8 g = (u8)((float)VDP9938A_palette[BGColor*3+1]*0.121568f);
+      u8 b = (u8)((float)VDP9938A_palette[BGColor*3+2]*0.121568f);
+      BG_PALETTE[17] = RGB15(r,g,b); // Legacy color stored here for safe keeping
       break;
 
     case 10:
@@ -969,12 +1263,12 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
       break;
 
     case 14: VPAGE=VDP_Memory+((int)VDP[14]<<14); break;
-    
+
     case 44: VDPWrite(value); break;
     case 46: VDPDraw(value);break;
   }
 
-  if (iReg < 7) CheckNewMode();
+  if (iReg <= 7) CheckNewMode();
 }
 
 
@@ -986,7 +1280,7 @@ ITCM_CODE byte RdData9938(void)
   byte data = VDPDlatch;
   VDPDlatch = VPAGE[VAddr];
   VAddr = (VAddr+1)&0x3FFF;
-  
+
   if(!VAddr&&(ScrMode>3))
   {
     VDP[14]=(VDP[14]+1)&7;
@@ -1088,9 +1382,10 @@ ITCM_CODE byte RdCtrl9938(void)
       // Check if we are in the visible screen area
       if (CurLine < VDP9938_START_LINE || CurLine > VDP9938_END_LINE) data |= 0x40;
 
-      // A standard scanline has 228 Z80 cycles. H-Blank typically kicks in 
-      // roughly around cycle 170-174 depending on display widths.
-      if (CPU.ICount < 60)
+      // A standard scanline has 228 Z80 cycles. H-Blank typically kicks in
+      // roughly around cycle 170-174 depending on display widths. This isn't
+      // accurate but it's good enough for most games that need the bit.
+      if (CPU.ICount < 54)
       {
           data |= 0x20; // Set HR Flag (Bit 5) -> We are inside H-Blank
       }
@@ -1104,18 +1399,20 @@ ITCM_CODE byte RdCtrl9938(void)
 }
 
 
+// A bit of a hack for split screen scrolling games
+void RefereshPreviousLines(void)
+{
+    RefreshLine((CurLine-1) - VDP9938_START_LINE);
+    RefreshLine(CurLine - VDP9938_START_LINE);
+}
+
+
 /** Loop9938() ***********************************************/
 /** Call this routine on every scanline to update the       **/
 /** screen buffer. Loop9938() returns 1 if an interrupt is  **/
 /** to be generated, 0 otherwise.                           **/
 /*************************************************************/
 u8  Internal_LineCounter = 0;
-
-void RefereshPreviousLines(void)
-{
-    RefreshLine((CurLine-1) - VDP9938_START_LINE);
-    RefreshLine(CurLine - VDP9938_START_LINE);
-}
 
 void Loop9938(void)
 {
@@ -1139,7 +1436,7 @@ void Loop9938(void)
       VDPStatus[1] &= 0xFE;         // If IE1 (R#0 bit 4) is lowered, FH flag is forced low
       SetVDPIRQ(VDP_IRQ_LINE, 0);   // And ensure the IRQ is not set for the Line Interrupt
   }
-  
+
   if (++CurLine >= VDP9938_LINES)
   {
       CurLine=0;
@@ -1192,136 +1489,16 @@ void Loop9938(void)
   }
 }
 
-ITCM_CODE void RefreshLine5(register u8 uY) 
-{
-    BG_PALETTE[0] = BG_PALETTE[16]; // MSX2 Solid
-    
-    if (!VDP9938_ScreenON) {
-        memset(XBuf + (uY << 8), BGColor, 256);
-        return;
-    }
-    
-    // Sadly, the DS-Lite/Phat need some help...
-    if (!isDSiMode())
-    {
-        extern u8 skip_render;
-        extern u16 timingFrames;
-        if (timingFrames & 1) {skip_render=1; return;}
-    }
-    
-    u32 *dst32 = (u32*)((u8*)XBuf + ((u32)uY << 8));
-
-    const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
-    if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
-
-    for (int i = 0; i < 128; i += 8) 
-    {
-        u32 s0 = *(u32*)(src + i);
-        u32 s1 = *(u32*)(src + i + 4);
-
-        u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-        u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-        u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-        u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-
-        dst32[0] = r0; dst32[1] = r1; dst32[2] = r2; dst32[3] = r3;
-        dst32 += 4;
-    }
-    ColorSprites(uY);
-}
-
-/** RefreshLine6() ********************************************/
-/** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
-/*************************************************************/
-ITCM_CODE void RefreshLine6(register u8 uY) 
-{
-    BG_PALETTE[0] = BG_PALETTE[16]; // MSX2 Solid
-
-    if (!VDP9938_ScreenON) {
-        memset(XBuf + (uY << 8), BGColor, 256); 
-        return;
-    }
-
-    register u32 *destPtr32 = (u32*)(XBuf + (uY << 8));
-    u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
-    register u8 *srcPtr = &ChrTab[addr];
-
-    // Loops 64 times. Processes exactly 128 source bytes.
-    // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
-    for (int i = 0; i < 128; i += 2) {
-        register u32 b0 = srcPtr[i];
-        register u32 b1 = srcPtr[i+1];
-
-        // This extracts two distinct 2-bit pixels per source byte.
-        // It produces 4 continuous horizontal pixels, mapping perfectly 
-        // to a 256-pixel wide screen without skipping half the line or overrunning.
-        register u32 word = ((b0 >> 6) & 0x03) |
-                            (((b0 >> 2) & 0x03) << 8) |
-                            (((b1 >> 6) & 0x03) << 16) |
-                            (((b1 >> 2) & 0x03) << 24);
-
-        *destPtr32++ = word;
-    }
-
-    ColorSprites(uY);
-}
-
-
-
-
-/** RefreshLine7() ********************************************/
-/** Refresh VDP9938 Screen 7: 512x212, 16 colors bitmap    **/
-/*************************************************************/
-ITCM_CODE void RefreshLine7(register u8 uY)
-{
-    BG_PALETTE[0] = BG_PALETTE[16]; // MSX2 Solid
-
-    if (!VDP9938_ScreenON) { memset(XBuf + (uY << 8), BGColor, 256); return; }
-
-    u32 *dst32 = (u32*)((u8*)XBuf + ((u32)uY << 8));
-    const u8 *src = ChrTab + (((u32)((uY + VScroll) & 511)) << 8);
-
-    for (int i = 0; i < 256; i += 8) {
-        u32 b0 = screen7LUT[src[i+0]];
-        u32 b1 = screen7LUT[src[i+1]];
-        u32 b2 = screen7LUT[src[i+2]];
-        u32 b3 = screen7LUT[src[i+3]];
-        u32 b4 = screen7LUT[src[i+4]];
-        u32 b5 = screen7LUT[src[i+5]];
-        u32 b6 = screen7LUT[src[i+6]];
-        u32 b7 = screen7LUT[src[i+7]];
-
-        dst32[0] = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-        dst32[1] = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
-        dst32 += 2;
-    }
-
-    ColorSprites(uY);
-}
-
-/** RefreshLine8() ********************************************/
-/** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
-/*************************************************************/
-ITCM_CODE void RefreshLine8(register u8 uY)
-{
-    BG_PALETTE[0] = BG_PALETTE[16]; // MSX2 Solid
-
-    if (!VDP9938_ScreenON) {memset(XBuf+(uY<<8),BGColor,256); return;}
-
-    memcpy(XBuf + (uY << 8), ChrTab + ((uY+VScroll) << 8), 256);
-    
-    ColorSprites(uY);
-}
 
 void Reset9938(void)
 {
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
-    
+
     BuildNibbleLUT();
     BuildScreen7LUT();
-    
+
     memset(OccBuf,0,sizeof(OccBuf));
 
     VDP[0] = 0x02;                      // Graphic mode enabled
@@ -1350,15 +1527,13 @@ void Reset9938(void)
     ChrGenM = 0x3FFF;
     SprTabM = 0x3FFF;
 
-    BG_PALETTE[0] = RGB15(0x00,0x00,0x00);
+//    BG_PALETTE[0] = RGB15(0x00,0x00,0x00);
 
     pVidFlipBuf = (u16*) (0x06000000);
-    
+
     RefreshLine = RefreshLine0;
 
     OH = IH = 0;
-
-    my_config_clear_int = myConfig.clearInt;
 
     // ---------------------------------------------------------------
     // Our background/foreground color table makes computations FAST!

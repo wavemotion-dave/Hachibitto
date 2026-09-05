@@ -129,7 +129,9 @@ extern u8 HachibittoLoadFile(void);
 extern void DisplayFileName(void);
 extern u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
 
-extern u8 MSXBios_MSX2EXT[0x4000];
+extern const unsigned char MSXBios_MSX2[];
+extern const unsigned char MSXBios_MSX2EXT[];
+
 extern u8 mapperType;
 extern u8 mapperMask;
 extern u8 msx_caps_lock;

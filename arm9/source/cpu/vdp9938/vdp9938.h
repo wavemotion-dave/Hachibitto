@@ -36,8 +36,8 @@
 #define VDP9938_Sprites16 (VDP[1]&VDP9938_REG1_SPR16)
 #define VDP9938_ScreenON  (VDP[1]&VDP9938_REG1_SCREEN)
 
-
 #define MAXSPRITE2  8       /* Sprites/line in SCREEN 4-8    */
+#define WIDTH       256     /* No border on the DS */
 
 #define ScreenON      (VDP[1]&0x40)   // Show screen         
 #define BigSprites    (VDP[1]&0x01)   // Zoomed sprites      
@@ -47,6 +47,8 @@
 #define SpritesOFF    (VDP[8]&0x02)   /* Don't show sprites  */
 #define FlipEvenOdd   (VDP[9]&0x04)   /* Flip even/odd pages */
 #define OddPage       (frame_number&1)
+#define VAdjust       (-((signed char)(VDP[18])>>4))
+#define HAdjust       (-((signed char)((VDP[18])<<4)>>4))
 
 extern byte VDP_Memory[0x20000];
 extern u8 VDP[64];

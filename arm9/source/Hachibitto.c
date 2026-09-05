@@ -61,10 +61,10 @@ u16 DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
 // smaller memory model of the original DS/DS-LITE.
 //
 // These memory buffers will be pointed to by the MemoryMap[] array. This array contains 8
-// pointers that can break down the Z80 memory into 8k chunks.  
+// pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE = 1024;                                     // 1MB of ROM Cart... for DSi we will bump this up to 4MB
+u32 MAX_CART_SIZE = 1280;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
 u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x10000]                ALIGN(32) = {0};        // RAM is 64K for the MSX2 (this is the minimum spec)
 u8 BIOS_Memory[0x10000]               ALIGN(32) = {0};        // To hold our BIOS and related OS memory (64K as the BIOS  for various machines ends up in different spots)
@@ -277,7 +277,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         {
             ay38910Mixer(len*2, mixbuf1, &myAY);
             SCCMixer(len*4, mixbuf2, &mySCC);
-     
+
             s16 *p = (s16*)dest;
             int j=0;
             for (int i=0; i<len*2; i++)
@@ -473,7 +473,7 @@ void ShowDebugZ80(void)
         DSPrint(0,idx++,7, tmp);
         sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
         DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16],VDP[17],VDP[18],VDP[19], VDP[20],VDP[21],VDP[22],VDP[23], VDP[26]);
+        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16],VDP[17],VDP[18],VDP[19], VDP[20],VDP[21],VDP[22],VDP[23]);
         DSPrint(0,idx++,7, tmp);
 
         sprintf(tmp, "VStat %02X %02X %02X %02X Data=%02X", VDPStatus[0], VDPStatus[1], VDPStatus[2], VDPStatus[3], VDPDlatch);
@@ -492,7 +492,7 @@ void ShowDebugZ80(void)
         DSPrint(0,idx++,7, tmp);
         sprintf(tmp, "Z80DE %04X", CPU.DE.W);
         DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "IRQ %04X %d", CPU.IRequest, (CPU.User % 99999));
+        sprintf(tmp, "IRQ %04X %d", CPU.IRequest, (CPU.NumInts % 99999));
         DSPrint(0,idx++,7, tmp);
         idx++;
 
@@ -953,7 +953,7 @@ void Hachibitto_main(void)
 
   // Force the sound engine to turn on when we start emulation
   bStartSoundEngine = true;
-  
+
   DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
 
   // -------------------------------------------------------------------
@@ -1010,7 +1010,7 @@ void Hachibitto_main(void)
         msxUpdateScreen();
 
         // -----------------------------------
-        // We only support NTSC 60 frames... 
+        // We only support NTSC 60 frames...
         // -----------------------------------
         if (++timingFrames == 60)
         {
@@ -1025,7 +1025,7 @@ void Hachibitto_main(void)
         {
             ShowDebugZ80();
         }
-      
+
         // ---------------------------------------------------------------------------------
         // Hold the key press for a brief instant... some machines take longer than others
         // (eg MSX needs to see the keypress for many tens of milliseconds)... This allows
@@ -1040,7 +1040,7 @@ void Hachibitto_main(void)
             kbd_keys_pressed = 0;
             memset(kbd_keys, 0x00, sizeof(kbd_keys));
             kbd_key = 0;
-      
+
             // ------------------------------------------
             // Handle any screen touch events
             // ------------------------------------------
@@ -1055,7 +1055,7 @@ void Hachibitto_main(void)
                   touchRead(&touch);
                   iTx = touch.px;
                   iTy = touch.py;
-      
+
                   if (myGlobalConfig.debugger == 3)
                   {
                       meta_key = handle_debugger_overlay(iTx, iTy);
@@ -1067,19 +1067,19 @@ void Hachibitto_main(void)
                   {
                       meta_key = handle_msx_keyboard_press(iTx, iTy);
                   }
-      
+
                   if (kbd_key != 0)
                   {
                       kbd_keys[kbd_keys_pressed++] = kbd_key;
                       key_debounce = 2;
                   }
-      
+
                   // If the special menu key indicates we should show the choice menu, do so here...
                   if (meta_key == MENU_CHOICE_MENU)
                   {
                       meta_key = MiniMenu();
                   }
-      
+
                   // -------------------------------------------------------------------
                   // If one of the special meta keys was picked, we handle that here...
                   // -------------------------------------------------------------------
@@ -1096,7 +1096,7 @@ void Hachibitto_main(void)
                           BottomScreenKeypad();
                           SoundUnPause();
                           break;
-      
+
                       case MENU_CHOICE_END_GAME:
                             SoundPause();
                             //  Ask for verification
@@ -1109,14 +1109,14 @@ void Hachibitto_main(void)
                             DisplayStatusLine(true);
                             SoundUnPause();
                           break;
-      
+
                       case MENU_CHOICE_HI_SCORE:
                           SoundPause();
                           highscore_display(file_crc);
                           DisplayStatusLine(true);
                           SoundUnPause();
                           break;
-      
+
                       case MENU_CHOICE_GAME_OPTIONS:
                           SoundPause();
                           BottomScreenOptions();
@@ -1125,7 +1125,7 @@ void Hachibitto_main(void)
                           DisplayStatusLine(true);
                           SoundUnPause();
                           break;
-      
+
                       case MENU_CHOICE_DEFINE_KEYS:
                           SoundPause();
                           BottomScreenOptions();
@@ -1134,7 +1134,7 @@ void Hachibitto_main(void)
                           DisplayStatusLine(true);
                           SoundUnPause();
                           break;
-      
+
                       case MENU_CHOICE_SAVE_GAME:
                           if  (!SaveNow)
                           {
@@ -1148,7 +1148,7 @@ void Hachibitto_main(void)
                               SoundUnPause();
                           }
                           break;
-      
+
                       case MENU_CHOICE_LOAD_GAME:
                           if  (!LoadNow)
                           {
@@ -1162,12 +1162,12 @@ void Hachibitto_main(void)
                               SoundUnPause();
                           }
                           break;
-      
+
                       default:
                           SaveNow = 0;
                           LoadNow = 0;
                   }
-      
+
 
                   if (++dampenClick > 0)  // Make sure the key is pressed for an appreciable amount of time...
                   {
@@ -1544,9 +1544,9 @@ int main(int argc, char **argv)
       MAX_CART_SIZE = 4096;
       ROM_Memory = malloc(MAX_CART_SIZE * 1024);
   }
-  else // For older DS units... 1MB max
+  else // For older DS units... 1.25MB max
   {
-      MAX_CART_SIZE = 1024;
+      MAX_CART_SIZE = 1280;
       ROM_Memory = malloc(MAX_CART_SIZE * 1024);
   }
 
@@ -1571,7 +1571,7 @@ int main(int argc, char **argv)
   // Grab the BIOS before we try to switch any directories around...
   // -----------------------------------------------------------------
   useVRAM();
-  
+
   // -----------------------------------------------------------------
   // And do an initial load of configuration... We'll match it up
   // with the game that was selected later...
@@ -1817,7 +1817,7 @@ void msxSetPal(void)
   }
   BG_PALETTE[16] = RGB15(0,0,0);
   BG_PALETTE[17] = RGB15(0,0,0);
-  
+
   for (uBcl=18; uBcl < 256; uBcl++)
   {
       //Green (G)3 bitsBits 7, 6, 5 (MSB)8 levels0 to 7Red (R)3 bitsBits 4, 3, 28 levels0 to 7Blue (B)2 bitsBits 1, 0 (LSB)4 levels0 to 3
@@ -1843,7 +1843,7 @@ ITCM_CODE void msxUpdateScreen(void)
         DelayFirstOutput--;
         return;
     }
-    
+
     if (!skip_render)
     {
         dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)pVidFlipBuf, 256*212);
@@ -1959,7 +1959,7 @@ ITCM_CODE u32 LoopZ80()
   // Execute 1 scanline worth of CPU instructions
   u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit;
   CPU.CycleDeficit = ExecZ80(cycles_to_process);
-  
+
   if (mid_frame_interrupt)
   {
       if (--mid_frame_interrupt == 0)
@@ -1978,7 +1978,7 @@ ITCM_CODE u32 LoopZ80()
   if(CPU.IRequest!=INT_NONE)
   {
       IntZ80(&CPU, CPU.IRequest);
-      CPU.User++;   // Track Interrupt Requests
+      CPU.NumInts++;   // Track Interrupt Requests
       if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
       {
           CPU.CycleDeficit = 0;
