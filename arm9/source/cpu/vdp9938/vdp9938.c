@@ -487,8 +487,8 @@ ITCM_CODE void ColorSprites(uint8_t Y)
       if((C&0x0F) || zeroNotTransparent)
       {
         PT = SprGen+((int)(IH>8? AT[2]&0xFC:AT[2])<<3)+J;
-        P=ZBuf+AT[1]+(C&0x80? 0:32);
-        O=OccBuf+AT[1]+(C&0x80? 0:32);
+        P=ZBuf+AT[1]+(C&0x80? 0:32) - (VDP[18] & 0x07);
+        O=OccBuf+AT[1]+(C&0x80? 0:32)- (VDP[18] & 0x07);
         C&=0x0F;
         J=PT[0];
 
