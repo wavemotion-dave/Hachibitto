@@ -1202,15 +1202,11 @@ void Hachibitto_main(void)
 
       if (nds_key & KEY_X)
       {
-          //temp_offset = -16; slide_dampen = 15;
-          debug[3]++;
-          swiWaitForVBlank();swiWaitForVBlank();swiWaitForVBlank();
+          temp_offset = -16; slide_dampen = 15;
       }
       if (nds_key & KEY_Y)
       {
-          //temp_offset = 16; slide_dampen = 15;
-          debug[3]--;
-          swiWaitForVBlank();swiWaitForVBlank();swiWaitForVBlank();
+          temp_offset = 16; slide_dampen = 15;
       }
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
       {
@@ -1983,9 +1979,10 @@ ITCM_CODE u32 LoopZ80()
   {
       IntZ80(&CPU, CPU.IRequest);
       CPU.User++;   // Track Interrupt Requests
-      if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE))
+      if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
       {
-          mid_frame_interrupt=2; // Refresh the last 2 lines in 2 more scanlines.
+          CPU.CycleDeficit = 0;
+          mid_frame_interrupt=3; // Let CPU run 3 lines then redraw the previous 2...
       }
   }
 

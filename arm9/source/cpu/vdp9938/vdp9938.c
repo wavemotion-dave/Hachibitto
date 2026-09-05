@@ -803,7 +803,7 @@ ITCM_CODE void RefreshLine3(u8 uY)
 
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
-  uint32_t K, C, *T;
+  uint32_t K, *T;
   int I, J;
   uint8_t *P = XBuf + (Y << 8);
   BG_PALETTE[0] = BG_PALETTE[16];
@@ -1120,7 +1120,7 @@ void RefereshPreviousLines(void)
 void Loop9938(void)
 {
   // 1. Get the 0-indexed display scanline relative to the active display area
-  int scanline = CurLine - VDP9938_START_LINE - 1;
+  int scanline = CurLine - VDP9938_START_LINE;
 
   // 2. Perform the absolute V9938 match check (accounts for vertical scroll R#23)
   // VDP[23] is the Vertical Scroll Offset, VDP[19] is the Line Interrupt Register
