@@ -11,7 +11,7 @@
 // The default NTSC machine time bases 
 // ---------------------------------------------------
 #define VDP9938_FRAMES      60
-#define VDP9938_LINE        ((VDP9938_BASE/(3*60*262)))
+#define VDP9938_CLOCKS_PER_LINE ((VDP9938_BASE/(3*60*262)))
 
 #define VDP9938_LINES       262
 #define VDP9938_START_LINE  (3+13+27)
@@ -76,6 +76,7 @@ extern void RefreshLine5(u8 uY);
 extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
+extern void RefereshPreviousLines(void);
 
 extern void WrCtrl9938(byte value);
 

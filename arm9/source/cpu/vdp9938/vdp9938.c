@@ -811,10 +811,11 @@ ITCM_CODE void RefreshLine4(u8 uY)
   register byte FC,BC;
   register byte K,*T;
   u16 J,I;
+  u8 srcY = (uY + VScroll) & 0xFF;   // scrolled row for VRAM lookup only
 
-  BG_PALETTE[0] = BG_PALETTE[16]; // MSX2 Handling
-  
-  P=(u32*)(XBuf+((uY+VScroll)<<8));
+  BG_PALETTE[0] = BG_PALETTE[16];
+
+  P=(u32*)(XBuf+(uY<<8));   // destination is always the real screen row -- bounded, safe
 
   if (!ScreenON)
     memset(P,BGColor,256);
@@ -822,8 +823,8 @@ ITCM_CODE void RefreshLine4(u8 uY)
   {
     u32 ptLow = 0; u32 ptHigh = 0;
 
-    J   = ((u16)((u16)uY&0xC0)<<5)+(uY&0x07);
-    T   = ChrTab+((u16)((u16)uY&0xF8)<<2);
+    J   = ((u16)((u16)srcY&0xC0)<<5)+(srcY&0x07);
+    T   = ChrTab+((u16)((u16)srcY&0xF8)<<2);
     u8 lastT = ~(*T);
 
     for(int X=0;X<32;X++)
@@ -845,10 +846,9 @@ ITCM_CODE void RefreshLine4(u8 uY)
       T++;
     }
 
-    RefreshSprites(uY);
+    RefreshSprites(uY);   // sprites still positioned by the real screen row, unscrolled
   }
 }
-
 
 /*********************************************************************************
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'
@@ -1107,10 +1107,16 @@ ITCM_CODE byte RdCtrl9938(void)
 /*************************************************************/
 u8  Internal_LineCounter = 0;
 
+void RefereshPreviousLines(void)
+{
+    RefreshLine((CurLine-1) - VDP9938_START_LINE);
+    RefreshLine(CurLine - VDP9938_START_LINE);
+}
+
 void Loop9938(void)
 {
   // 1. Get the 0-indexed display scanline relative to the active display area
-  int scanline = CurLine - VDP9938_START_LINE;
+  int scanline = CurLine - VDP9938_START_LINE - 1;
 
   // 2. Perform the absolute V9938 match check (accounts for vertical scroll R#23)
   // VDP[23] is the Vertical Scroll Offset, VDP[19] is the Line Interrupt Register

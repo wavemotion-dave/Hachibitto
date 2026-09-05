@@ -1199,11 +1199,15 @@ void Hachibitto_main(void)
 
       if (nds_key & KEY_X)
       {
-          temp_offset = -16; slide_dampen = 15;
+          //temp_offset = -16; slide_dampen = 15;
+          debug[3]++;
+          swiWaitForVBlank();swiWaitForVBlank();swiWaitForVBlank();
       }
       if (nds_key & KEY_Y)
       {
-          temp_offset = 16; slide_dampen = 15;
+          //temp_offset = 16; slide_dampen = 15;
+          debug[3]--;
+          swiWaitForVBlank();swiWaitForVBlank();swiWaitForVBlank();
       }
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
       {
@@ -1950,11 +1954,20 @@ void PatchZ80(register Z80 *r)
 /** Z80 code for the loaded ROM. It runs code refreshing the **/
 /** VDP and checking for interrupt requests.                 **/
 /**************************************************************/
+int mid_frame_interrupt=0;
 ITCM_CODE u32 LoopZ80()
 {
   // Execute 1 scanline worth of CPU instructions
-  u32 cycles_to_process = VDP9938_LINE + CPU.CycleDeficit;
+  u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit;
   CPU.CycleDeficit = ExecZ80(cycles_to_process);
+  
+  if (mid_frame_interrupt)
+  {
+      if (--mid_frame_interrupt == 0)
+      {
+          RefereshPreviousLines();
+      }
+  }
 
   // Run the VDP engine
   LoopVDP();
@@ -1967,6 +1980,10 @@ ITCM_CODE u32 LoopZ80()
   {
       IntZ80(&CPU, CPU.IRequest);
       CPU.User++;   // Track Interrupt Requests
+      if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE))
+      {
+          mid_frame_interrupt=2; // Refresh the last 2 lines in 2 more scanlines.
+      }
   }
 
   // Drop out unless end of screen is reached
