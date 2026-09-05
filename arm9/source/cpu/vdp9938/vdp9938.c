@@ -801,52 +801,56 @@ ITCM_CODE void RefreshLine3(u8 uY)
   }
 }
 
-/** RefreshLine4() *******************************************/
-/** Refresh line Y (0..191) of SCREEN4, including sprites   **/
-/** in this line.                                           **/
-/*************************************************************/
-ITCM_CODE void RefreshLine4(u8 uY)
+ITCM_CODE void RefreshLine4(uint8_t Y)
 {
-  u32 *P;
-  register byte FC,BC;
-  register byte K,*T;
-  u16 J,I;
-  u8 srcY = (uY + VScroll) & 0xFF;   // scrolled row for VRAM lookup only
-
+  uint32_t K, C, *T;
+  int I, J;
+  uint8_t *P = XBuf + (Y << 8);
   BG_PALETTE[0] = BG_PALETTE[16];
 
-  P=(u32*)(XBuf+(uY<<8));   // destination is always the real screen row -- bounded, safe
-
-  if (!ScreenON)
-    memset(P,BGColor,256);
+  if (!ScreenON) 
+  {
+    memset(P, BGColor, 256);
+  }
   else
   {
-    u32 ptLow = 0; u32 ptHigh = 0;
+    // R is completely unused in your loop body, removed entirely.
+    uint32_t srcY = Y + VScroll;   
+    T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
+    I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
-    J   = ((u16)((u16)srcY&0xC0)<<5)+(srcY&0x07);
-    T   = ChrTab+((u16)((u16)srcY&0xF8)<<2);
-    u8 lastT = ~(*T);
-
-    for(int X=0;X<32;X++)
+    // Cast destination to 32-bit pointer for faster 4-byte writes
+    uint32_t *P32 = (uint32_t*)P; 
+    
+    // Count down to zero to allow the ARM9 to use SUBS (eliminating CMP)
+    int X = 32;
+    do 
     {
-      if (lastT != *T)
-      {
-          lastT = *T;
-          I    = (u16)lastT<<3;
-          K    = ColTab[(J+I)&ColTabM];
-          FC   = (K>>4);
-          BC   = K & 0x0F;
-          K    = ChrGen[(J+I)&ChrGenM];
-          u32* ptLut = (u32*)(lutTablehh[FC][BC]);
-          ptLow = *(ptLut + ((K>>4)));
-          ptHigh = *(ptLut + ((K & 0xF)));
-      }
-      *P++ = ptLow;
-      *P++ = ptHigh;
-      T++;
-    }
+      // Load 8-bit character table value, explicitly casting to 32-bit register
+      uint32_t t_val = *(uint8_t*)T;
+      T = (uint32_t*)((uint8_t*)T + 1); // Safely advance 1 byte
 
-    RefreshSprites(uY);   // sprites still positioned by the real screen row, unscrolled
+      J = (int)t_val << 3;
+      uint32_t idx = (I + J);
+      
+      uint32_t K_col = ColTab[idx & ColTabM];
+      uint32_t FC    = K_col >> 4;
+      uint32_t BC    = K_col & 0x0F;
+      
+      K = ChrGen[idx & ChrGenM];
+
+      // Expand 8 pixels into two 32-bit words (4 pixels each) to utilize full bus width
+      // This eliminates 8 individual byte writes and uses ARM barrel shifter efficiently
+      uint32_t p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+      uint32_t p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+
+      P32[0] = p0;
+      P32[1] = p1;
+      P32 += 2; // Advance by 8 bytes (two 32-bit words)
+      
+    } while (--X);
+
+    ColorSprites(Y);   
   }
 }
 
@@ -856,7 +860,7 @@ ITCM_CODE void RefreshLine4(u8 uY)
 u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x1f,0xff,0xff,0xff,0xff,0xff,0x3f,0xff,
                                                              0xff,0xff,0x07,0x03,0xff,0xff,0x07,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                                                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // These are VDP9958 only
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,

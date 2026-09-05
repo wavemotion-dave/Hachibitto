@@ -471,8 +471,11 @@ void ShowDebugZ80(void)
     {
         sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
         DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15], VDP[19]);
+        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
         DSPrint(0,idx++,7, tmp);
+        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16],VDP[17],VDP[18],VDP[19], VDP[20],VDP[21],VDP[22],VDP[23], VDP[26]);
+        DSPrint(0,idx++,7, tmp);
+
         sprintf(tmp, "VStat %02X %02X %02X %02X Data=%02X", VDPStatus[0], VDPStatus[1], VDPStatus[2], VDPStatus[3], VDPDlatch);
         DSPrint(0,idx++,7, tmp);
         sprintf(tmp, "VAddr %08X", (VDP[14]<<14)+(int)VAddr);
@@ -507,7 +510,7 @@ void ShowDebugZ80(void)
         sprintf(tmp, "PPI A=%02X B=%02X",Port_PPI_A,Port_PPI_B);    DSPrint(0,idx++,7, tmp);
         sprintf(tmp, "PPI C=%02X       ",Port_PPI_C); DSPrint(0,idx++,7, tmp);
 
-        idx = 5;
+        idx = 6;
         for (u8 i=0; i< 16; i++)
         {
             sprintf(tmp, "D%-2d %-8lu %04X", i, debug[i], (u16)debug[i]); DSPrint(15,idx++,7, tmp);
