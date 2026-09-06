@@ -21,7 +21,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0002
+#define CONFIG_VER                  0x0003
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02

@@ -333,6 +333,7 @@ static void CodesCB(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesCB[I];
+  CPU.TotalCycles+=CyclesCB[I];
 
   /* R register incremented on each M1 cycle */
   INCR(1);
@@ -355,6 +356,7 @@ static void CodesDDCB(void)
   J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXXCB[I];
+  CPU.TotalCycles+=CyclesXXCB[I];
 
   switch(I)
   {
@@ -375,6 +377,7 @@ static void CodesFDCB(void)
   J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXXCB[I];
+  CPU.TotalCycles+=CyclesXXCB[I];
 
   switch(I)
   {
@@ -393,6 +396,7 @@ static void CodesED(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesED[I];
+  CPU.TotalCycles+=CyclesED[I];
 
   /* R register incremented on each M1 cycle */
   INCR(1);
@@ -416,6 +420,7 @@ static void CodesDD(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXX[I];
+  CPU.TotalCycles+=CyclesXX[I];
 
   /* R register incremented on each M1 cycle */
   INCR(1);
@@ -443,6 +448,7 @@ static void CodesFD(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXX[I];
+  CPU.TotalCycles+=CyclesXX[I];
 
   /* R register incremented on each M1 cycle */
   INCR(1);
@@ -490,6 +496,7 @@ void ResetZ80(Z80 *R)
   CPU.NumInts     = 0;
   CPU.Trace    = 0;
   CPU.TrapBadOps = 1;
+  CPU.TotalCycles = 0;
 
   JumpZ80(CPU.PC.W);
 }
@@ -512,6 +519,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=OpZ80(CPU.PC.W++);
       CPU.ICount-=Cycles[I];
+      CPU.TotalCycles+=Cycles[I];
 
       /* R register incremented on each M1 cycle */
       INCR(1);

@@ -103,7 +103,7 @@ typedef struct
   byte Trace;                       /* Set Trace=1 to start tracing         */
   byte R_HighBit;                   /* Used to preserve the high bit for R  */
   u32  R;                           /* Refresh register - masked on read    */
-  u32  TStates;                     /* Total CPU cycles                     */
+  u32  TotalCycles;                 /* Total CPU cycles                     */
   word NumInts;                     /* Number of Interrupts Processed       */
 } Z80;
 

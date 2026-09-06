@@ -1968,6 +1968,9 @@ ITCM_CODE u32 LoopZ80()
       }
   }
 
+  // Run the FDC engine
+  LoopFDC();
+  
   // Run the VDP engine
   LoopVDP();
 

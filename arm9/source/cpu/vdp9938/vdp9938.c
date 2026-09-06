@@ -46,7 +46,7 @@ static u8 screen7LUT[256] __attribute__((section(".dtcm")));
 void BuildScreen7LUT(void)
 {
     for (int i = 0; i < 256; i++)
-        screen7LUT[i] = (i >> 4) | (i & 0x0F);   // OR both nibbles - keeps thin strokes visible
+        screen7LUT[i] = (i >> 4);   // Decimate 512->256: keep the first (left) pixel of each packed pair
 }
 
 void BuildNibbleLUT(void)
