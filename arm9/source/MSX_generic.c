@@ -32,7 +32,6 @@ int ucGameChoice = -1;
 FI_MSX gpFic[MAX_ROMS];
 char szName[256];
 char szFile[256];
-u8 bForceMSXLoad = false;
 u32 file_size = 0;
 char strBuf[40];
 
@@ -593,8 +592,6 @@ u8 HachibittoChooseFile(void)
       {
         bDone=true;
         ucGameChoice = ucGameAct;
-        bForceMSXLoad = false;
-        if (keysCurrent() & KEY_X) bForceMSXLoad=true;
         WAITVBL;
       }
       else
@@ -801,7 +798,8 @@ void SetDefaultGameConfig(void)
     myConfig.maxSprites  = 0;                           // 0 means allow 32 sprites... 1 means limit to the original 4/8 sprites of the VDP
     myConfig.dpad        = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.memWipe     = 0;                           // Default to RANDOM memory
-    myConfig.yOffset     = 0;
+    myConfig.yOffset     = 0;                           // Default is no offset
+    myConfig.expansion   = 0;                           // Default is no expansion
     myConfig.soundDriver = SND_DRV_NORMAL;              // Default is normal sound driver (not Wave Direct)
     myConfig.reserved1   = 0;
     myConfig.reserved2   = 0;
@@ -920,7 +918,7 @@ const struct options_t Option_Table[1][20] =
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
-        {"CLEAR INTS",     {"STATUS READ", "AUTOMATICALLY"},                                                                                                                    &myConfig.clearInt,       2},
+        {"EXPANSION",      {"NONE", "SCC CART"},                                                                                                                                &myConfig.expansion,      2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
@@ -953,7 +951,7 @@ u8 display_options_list(bool bFullDisplay)
         }
     }
 
-    DSPrint(6,22, 0, (char *)"  B=EXIT,  START=SAVE  ");
+    DSPrint(6,20, 0, (char *)"  B=EXIT,  START=SAVE  ");
     return len;
 }
 
@@ -1282,12 +1280,12 @@ void ReadFileCRCAndConfig(void)
     // Grab the all-important file CRC - this also loads the file into ROM_Memory[]
     getfile_crc(gpFic[ucGameChoice].szName);
 
-    if (strstr(gpFic[ucGameChoice].szName, ".msx") != 0) msx_mode = 1;
-    if (strstr(gpFic[ucGameChoice].szName, ".MSX") != 0) msx_mode = 1;
-    if (strstr(gpFic[ucGameChoice].szName, ".dsk") != 0) msx_mode = 3;
-    if (strstr(gpFic[ucGameChoice].szName, ".DSK") != 0) msx_mode = 3;
-    if (strstr(gpFic[ucGameChoice].szName, ".rom") != 0) msx_mode = 1;
-    if (strstr(gpFic[ucGameChoice].szName, ".ROM") != 0) msx_mode = 1;
+    if (strstr(gpFic[ucGameChoice].szName, ".msx") != 0) msx_mode = MSX_MODE_CART;
+    if (strstr(gpFic[ucGameChoice].szName, ".MSX") != 0) msx_mode = MSX_MODE_CART;
+    if (strstr(gpFic[ucGameChoice].szName, ".rom") != 0) msx_mode = MSX_MODE_CART;
+    if (strstr(gpFic[ucGameChoice].szName, ".ROM") != 0) msx_mode = MSX_MODE_CART;
+    if (strstr(gpFic[ucGameChoice].szName, ".dsk") != 0) msx_mode = MSX_MODE_DISK;
+    if (strstr(gpFic[ucGameChoice].szName, ".DSK") != 0) msx_mode = MSX_MODE_DISK;
 
     FindConfig();    // Try to find keymap and config for this file...
 }

@@ -66,7 +66,7 @@ u16 DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
 
 u32 MAX_CART_SIZE = 1280;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
 u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
-u8 RAM_Memory[0x10000]                ALIGN(32) = {0};        // RAM is 64K for the MSX2 (this is the minimum spec)
+u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x10000]               ALIGN(32) = {0};        // To hold our BIOS and related OS memory (64K as the BIOS  for various machines ends up in different spots)
 u8 SRAM_Memory[0x4000]                ALIGN(32) = {0};        // SRAM up to 16K for the few carts which use it (e.g. MSX Deep Dungeon II, Hydlide II, etc)
 
@@ -107,8 +107,7 @@ u8 soundEmuPause     __attribute__((section(".dtcm"))) = 1;       // Set to 1 to
 // -----------------------------------------------------------------------------
 // This set of critical vars is what determines the game type is... ROM vs DSK
 // -----------------------------------------------------------------------------
-u8 msx_mode          __attribute__((section(".dtcm"))) = 0;       // Set to 1 when a .msx game is loaded for basic MSX support
-
+u8 msx_mode          __attribute__((section(".dtcm"))) = 0;       // Set to 1 when a Cartridge is loaded and 2 when a Disk is loaded.
 u8 kbd_key           __attribute__((section(".dtcm"))) = 0;       // 0 if no key pressed, othewise the ASCII key (e.g. 'A', 'B', '3', etc)
 u16 nds_key          __attribute__((section(".dtcm"))) = 0;       // 0 if no key pressed, othewise the NDS keys from keysCurrent() or similar
 u8 last_mapped_key   __attribute__((section(".dtcm"))) = 0;       // The last mapped key which has been pressed - used for key click feedback
@@ -273,7 +272,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     }
     else
     {
-        if (msx_scc_enable)   // If SCC is enabled, we need to mix the AY with the SCC chips
+        if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
         {
             ay38910Mixer(len*2, mixbuf1, &myAY);
             SCCMixer(len*4, mixbuf2, &mySCC);
@@ -506,7 +505,7 @@ void ShowDebugZ80(void)
     idx++;
     sprintf(tmp, "SCR %02X   A8=%02X", ScrMode, Port_PPI_A); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
-    sprintf(tmp, "TSS=%02X %02X %02X", FDC.track, FDC.side, FDC.sector); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Mapper %d [%02X]", mapperType, mapperMask); DSPrint(0,idx++,7, tmp);
 
     idx = 6;
     for (u8 i=0; i< 16; i++)
@@ -531,15 +530,16 @@ void DisplayStatusLine(bool bForce)
         {
             last_msx_mode = msx_mode;
         }
-        if (last_msx_scc_enable != msx_scc_enable)
+
+        if (last_msx_scc_enable != msx_scc_capable_game)
         {
             if (io_show_status == 0)
             {
                 // SCC has a little cool graphic to go with it!
-                DSPrint(20,0, (msx_scc_enable ? 2:0), (msx_scc_enable ? "012":"   "));
-                DSPrint(20,1, (msx_scc_enable ? 2:0), (msx_scc_enable ? "PQR":"   "));
+                DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
+                DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
             }
-            last_msx_scc_enable = msx_scc_enable;
+            last_msx_scc_enable = msx_scc_capable_game;
         }
         if (write_NV_counter > 0)
         {
@@ -552,7 +552,7 @@ void DisplayStatusLine(bool bForce)
             DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
         }
 
-        if (msx_mode == 3)
+        if (msx_mode == MSX_MODE_DISK)
         {
             if (io_show_status)
             {
@@ -1147,7 +1147,7 @@ void Hachibitto_main(void)
                           break;
 
                       case MENU_CHOICE_SWAP_DISK:
-                          if (msx_mode == 3) // Only makes sense for .dsk based MSX 
+                          if (msx_mode == MSX_MODE_DISK) // Only makes sense for .dsk based MSX 
                           {
                               SoundPause();
                               BottomScreenOptions();
@@ -1732,7 +1732,6 @@ void ProcessBufferedKeys(void)
  ********************************************************************************/
 u8 msxInit(char *szGame)
 {
-  extern u8 bForceMSXLoad;
   u8 RetFct,uBcl;
   u16 uVide;
 
@@ -1740,7 +1739,6 @@ u8 msxInit(char *szGame)
   memset(debug, 0x00, sizeof(debug));
 
   // See if we have forced any specific modes on loading...
-  if (bForceMSXLoad) msx_mode = 1;
   if (msx_mode) BottomScreenKeypad();  // Could Need to ensure the MSX layout is shown
 
   // -----------------------------------------------------------------
@@ -1769,7 +1767,7 @@ u8 msxInit(char *szGame)
   write_NV_counter=0;
 
   // loadrom() will figure out how big and where to load it... the 0x8000 here is meaningless.
-  RetFct = loadrom(szGame,RAM_Memory+0x8000);
+  RetFct = loadrom(szGame);
 
   // Wipe RAM area for the MSX
   msxWipeRAM();
@@ -1887,7 +1885,7 @@ void getfile_crc(const char *filename)
 /** loadrom() ******************************************************************/
 /* Open a rom file from file system and load it into the ROM_Memory[] buffer   */
 /*******************************************************************************/
-u8 loadrom(const char *filename, u8 * ptr)
+u8 loadrom(const char *filename)
 {
   u8 bOK = 0;
   int romSize = 0;

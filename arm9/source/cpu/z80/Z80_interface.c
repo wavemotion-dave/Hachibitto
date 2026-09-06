@@ -23,8 +23,9 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-u8  msx_sram_at_8000   __attribute__((section(".dtcm"))) = 0;
-u8  msx_scc_enable     __attribute__((section(".dtcm"))) = 0;
+u8  msx_sram_at_8000        __attribute__((section(".dtcm"))) = 0;
+u8  msx_scc_enable          __attribute__((section(".dtcm"))) = 0;
+u8  msx_scc_capable_game    __attribute__((section(".dtcm"))) = 0;
 
 extern u8 msx_subslot;
 
@@ -68,6 +69,20 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
             if (address <= 0xBFFF) // Between 0x8000 and 0xBFFF
             {
               return SRAM_Memory[address&0x3FFF];
+            }
+        }
+        // ----------------------------------------------------
+        // Are we reading from the SCC chip memory mapped area?
+        // ----------------------------------------------------
+        else if (msx_scc_enable && ((address & 0xF800) == 0x9800))
+        {
+             if (bCartInSegment[2])
+             {
+                // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
+                if (address >= 0x9800 && address <= 0x987F)
+                {
+                    return SCCRead(address, &mySCC); 
+                }                
             }
         }
     }
@@ -175,6 +190,11 @@ void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
         if ((value & 0x3F) == 0x3F) 
         {
             msx_scc_enable = true;
+            msx_scc_capable_game = true;
+        }
+        else
+        {
+            msx_scc_enable = false;
         }
 
         MSXCartPtr[4] = (u8*)src; 
@@ -299,11 +319,11 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
     // -------------------------------------------------------
     if (bRAMInSegment[0] && (address < 0x4000))
     {
-        RAM_Memory[address]=value;  // Allow write - this is a RAM mapped slot
+        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
     else if (bRAMInSegment[1] && (address >= 0x4000) && (address <= 0x7FFF))
     {
-        RAM_Memory[address]=value;  // Allow write - this is a RAM mapped slot
+        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
     else if ((bRAMInSegment[2] || msx_sram_at_8000) && (address >= 0x8000) && (address <= 0xBFFF))
     {
@@ -312,11 +332,11 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             SRAM_Memory[address&0x3FFF] = value;   // Write SRAM area
             write_NV_counter = 4;                  // This will back the EE in 4 seconds of non-activity on the SRAM
         }
-        else RAM_Memory[address]=value;  // Allow write - this is a RAM mapped slot
+        else *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
     else if ((bRAMInSegment[3] == 1) && (address >= 0xC000)) // A value of 1 here means we can write to the entire 16K page
     {
-        RAM_Memory[address]=value;  // Allow write - this is a RAM mapped slot
+        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
     else    // Check for MSX Mappers Mappers
     {
@@ -462,6 +482,30 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 }
             }                
         }
+        else if (mapperType == FAKE_SCC8)
+        {
+            if (bCartInSegment[2])
+            {
+                // ----------------------------------------------------
+                // Are we writing to the SCC chip memory mapped area?
+                // ----------------------------------------------------
+                if (msx_scc_enable && ((address & 0xF800) == 0x9800))
+                {
+                     SCCWrite(value, address, &mySCC);
+                }
+                else if (address == 0x9000)
+                {
+                    if ((value & 0x3F) == 0x3F) 
+                    {
+                        msx_scc_enable = true;
+                    }
+                    else
+                    {
+                        msx_scc_enable = false;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -470,9 +514,10 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 // -----------------------------------------------------------------
 void Z80_Interface_Reset(void) 
 {
-  CPU.CycleDeficit  = 0;
-  msx_sram_at_8000  = 0;
-  msx_scc_enable    = 0;
+  CPU.CycleDeficit      = 0;
+  msx_sram_at_8000      = 0;
+  msx_scc_enable        = 0;
+  msx_scc_capable_game  = 0;
 }
 
 // -----------------------------------------------------------------

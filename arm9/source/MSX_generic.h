@@ -81,7 +81,7 @@ struct __attribute__((__packed__)) Config_t
     u8  maxSprites;
     u8  dpad;
     u8  memWipe;
-    u8  clearInt;
+    u8  expansion;
     u8  yOffset;
     u8  soundDriver;
     u8  reserved1;
@@ -137,6 +137,9 @@ extern const unsigned char MSXBios_MSX2[];
 extern const unsigned char MSXBios_MSX2EXT[];
 extern const unsigned char MSXBios_MSX1[];
 
+#define MSX_MODE_CART   1
+#define MSX_MODE_DISK   2
+
 extern u8 mapperType;
 extern u8 mapperMask;
 extern u8 msx_caps_lock;
@@ -159,13 +162,14 @@ extern u8 msx_kana_lock;
 #define AT4K        14
 #define AT8K        15
 #define LIN64       16
+#define FAKE_SCC8   99
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
 extern u32 MAX_CART_SIZE;
 
 extern u8 *ROM_Memory;
-extern u8 RAM_Memory[0x10000];
+extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x10000];
 extern u8 SRAM_Memory[0x4000];
 extern u8 fastdrom_cdx2[0x4000];
@@ -240,7 +244,7 @@ extern void msx_reset(void);
 extern void msx_restore_bios(void);
 extern void MSX_HandleBeeper(void);
 
-extern u8 loadrom(const char *path,u8 * ptr);
+extern u8 loadrom(const char *path);
 
 extern u32 LoopZ80();
 extern void BufferKey(u8 key);

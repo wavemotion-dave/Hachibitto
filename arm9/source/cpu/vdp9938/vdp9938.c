@@ -457,7 +457,7 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
         /* Set 9thSprite flag in the VDP status register */
         VDPStatus[0]|=0x40;
         /* Stop drawing sprites, unless all-sprites option enabled */
-        break;
+        if (myConfig.maxSprites) break;
       }
 
       /* Mark sprite as ready to draw */
