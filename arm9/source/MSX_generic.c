@@ -429,7 +429,7 @@ void HachibittoFindFiles(void)
 // ----------------------------------------------------------------
 // Let the user select a new game (rom) file and load it up!
 // ----------------------------------------------------------------
-u8 HachibittoLoadFile(void)
+u8 HachibittoChooseFile(void)
 {
   bool bDone=false;
   u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
@@ -694,7 +694,7 @@ void SaveConfig(bool bShow)
     }
 
     // --------------------------------------------------
-    // Now save the config file out o the SD card...
+    // Now save the config file out to the SD card...
     // --------------------------------------------------
     DIR* dir = opendir("/data");
     if (dir)
@@ -786,8 +786,6 @@ void SetDefaultGlobalConfig(void)
     // A few global defaults...
     memset(&myGlobalConfig, 0x00, sizeof(myGlobalConfig));
     myGlobalConfig.showFPS        = 0;    // Don't show FPS counter by default
-    myGlobalConfig.emuText        = 1;    // Default is to show Emulator Text
-    myGlobalConfig.diskSfxMute    = 0;    // By default Disk/DDP loading sounds are enabled... 1=Mute
 }
 
 void SetDefaultGameConfig(void)
@@ -925,7 +923,7 @@ const struct options_t Option_Table[1][20] =
         {"CLEAR INTS",     {"STATUS READ", "AUTOMATICALLY"},                                                                                                                    &myConfig.clearInt,       2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
-        {"DEBUGGER",       {"OFF", "BAD OPS", "DEBUG", "FULL DEBUG"},                                                                                                           &myGlobalConfig.debugger, 4},
+        {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
         {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},
     }
 };
@@ -1405,7 +1403,7 @@ void HachibittoChangeOptions(void)
         ucA = 0x01;
         switch (ucY) {
           case 7 :      // LOAD GAME
-            HachibittoLoadFile();
+            HachibittoChooseFile();
             dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
             if (ucGameChoice != -1)
             {

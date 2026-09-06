@@ -467,70 +467,52 @@ void ShowDebugZ80(void)
 {
     u8 idx=1;
 
-    if (myGlobalConfig.debugger == 3)
-    {
-        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16],VDP[17],VDP[18],VDP[19], VDP[20],VDP[21],VDP[22],VDP[23]);
-        DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16],VDP[17],VDP[18],VDP[19], VDP[20],VDP[21],VDP[22],VDP[23]);
+    DSPrint(0,idx++,7, tmp);
 
-        sprintf(tmp, "VStat %02X %02X %02X %02X Data=%02X", VDPStatus[0], VDPStatus[1], VDPStatus[2], VDPStatus[3], VDPDlatch);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "VAddr %08X", (VDP[14]<<14)+(int)VAddr);
-        DSPrint(0,idx++,7, tmp);
-        idx++;
-
-        sprintf(tmp, "Z80PC %04X", CPU.PC.W);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "Z80SP %04X", CPU.SP.W);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "Z80AF %04X", CPU.AF.W);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "Z80BC %04X", CPU.BC.W);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "Z80DE %04X", CPU.DE.W);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "IRQ %04X %d", CPU.IRequest, (CPU.NumInts % 99999));
-        DSPrint(0,idx++,7, tmp);
-        idx++;
-
-        sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[0], myAY.ayRegs[1], myAY.ayRegs[2], myAY.ayRegs[3]);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[4], myAY.ayRegs[5], myAY.ayRegs[6], myAY.ayRegs[7]);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[8], myAY.ayRegs[9], myAY.ayRegs[10], myAY.ayRegs[11]);
-        DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[12], myAY.ayRegs[13], myAY.ayRegs[14], myAY.ayRegs[15]);
-        DSPrint(0,idx++,7, tmp);
-
-        idx++;
-        sprintf(tmp, "Screen %02X", ScrMode); DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "PPI A=%02X B=%02X",Port_PPI_A,Port_PPI_B);    DSPrint(0,idx++,7, tmp);
-        sprintf(tmp, "PPI C=%02X       ",Port_PPI_C); DSPrint(0,idx++,7, tmp);
-
-        idx = 6;
-        for (u8 i=0; i< 16; i++)
-        {
-            sprintf(tmp, "D%-2d %-8lu %04X", i, debug[i], (u16)debug[i]); DSPrint(15,idx++,7, tmp);
-        }
-    }
-    else
-    {
-        idx = 1;
-        for (u8 i=0; i<4; i++)
-        {
-            sprintf(tmp, "D%d %-7ld %04lX  D%d %-7ld %04lX", i, (s32)debug[i], (debug[i] < 0xFFFF ? debug[i]:0xFFFF), 4+i, (s32)debug[4+i], (debug[4+i] < 0xFFFF ? debug[4+i]:0xFFFF));
-            DSPrint(0,idx++,7, tmp);
-        }
-
-        if (msx_mode == 3)
-        {
-            sprintf(tmp, "FD.ST=%02X CM=%02X TR=%02X SI=%02X SE=%02X", FDC.status, FDC.command, FDC.track, FDC.side, FDC.sector); DSPrint(0,idx++,7, tmp);
-        }
-    }
+    sprintf(tmp, "VStat %02X %02X %02X %02X Data=%02X", VDPStatus[0], VDPStatus[1], VDPStatus[2], VDPStatus[3], VDPDlatch);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "VAddr %08X", (VDP[14]<<14)+(int)VAddr);
+    DSPrint(0,idx++,7, tmp);
     idx++;
+
+    sprintf(tmp, "Z80PC %04X", CPU.PC.W);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Z80SP %04X", CPU.SP.W);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Z80AF %04X", CPU.AF.W);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Z80BC %04X", CPU.BC.W);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Z80DE %04X", CPU.DE.W);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "IRQ %04X %d", CPU.IRequest, (CPU.NumInts % 99999));
+    DSPrint(0,idx++,7, tmp);
+    idx++;
+
+    sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[0], myAY.ayRegs[1], myAY.ayRegs[2], myAY.ayRegs[3]);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[4], myAY.ayRegs[5], myAY.ayRegs[6], myAY.ayRegs[7]);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[8], myAY.ayRegs[9], myAY.ayRegs[10], myAY.ayRegs[11]);
+    DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "AY:%02X %02X %02X %02X", myAY.ayRegs[12], myAY.ayRegs[13], myAY.ayRegs[14], myAY.ayRegs[15]);
+    DSPrint(0,idx++,7, tmp);
+
+    idx++;
+    sprintf(tmp, "SCR %02X   A8=%02X", ScrMode, Port_PPI_A); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "TSS=%02X %02X %02X", FDC.track, FDC.side, FDC.sector); DSPrint(0,idx++,7, tmp);
+
+    idx = 6;
+    for (u8 i=0; i< 16; i++)
+    {
+        sprintf(tmp, "D%-2d %-8lu %04X", i, debug[i], (u16)debug[i]); DSPrint(15,idx++,7, tmp);
+    }
 }
 
 
@@ -541,7 +523,7 @@ void ShowDebugZ80(void)
 // ------------------------------------------------------------
 void DisplayStatusLine(bool bForce)
 {
-    if (myGlobalConfig.emuText == 0) return;
+    if (myGlobalConfig.debugger) return; // If debugger, skip this
 
     if (msx_mode)
     {
@@ -551,9 +533,12 @@ void DisplayStatusLine(bool bForce)
         }
         if (last_msx_scc_enable != msx_scc_enable)
         {
-            // SCC has a little cool graphic to go with it!
-            DSPrint(20,0, (msx_scc_enable ? 2:0), (msx_scc_enable ? "012":"   "));
-            DSPrint(20,1, (msx_scc_enable ? 2:0), (msx_scc_enable ? "PQR":"   "));
+            if (io_show_status == 0)
+            {
+                // SCC has a little cool graphic to go with it!
+                DSPrint(20,0, (msx_scc_enable ? 2:0), (msx_scc_enable ? "012":"   "));
+                DSPrint(20,1, (msx_scc_enable ? 2:0), (msx_scc_enable ? "PQR":"   "));
+            }
             last_msx_scc_enable = msx_scc_enable;
         }
         if (write_NV_counter > 0)
@@ -566,21 +551,33 @@ void DisplayStatusLine(bool bForce)
             }
             DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
         }
+
         if (msx_mode == 3)
         {
             if (io_show_status)
             {
-                if (io_show_status == 5) {DSPrint(21,0,6, "WR"); io_show_status = 3;}
-                if (io_show_status == 4) {DSPrint(21,0,6, "RD"); io_show_status = 3;}
-                if (io_show_status == 3)
+                if (io_show_status == 5)
                 {
-                    if (!myGlobalConfig.diskSfxMute) mmEffect(SFX_FLOPPY);
+                    DSPrint(20,0,2, "345");  // Show Disk icon
+                    DSPrint(20,1,2, "STU");  // Show Disk icon
+                    io_show_status = 3;      // Show icon briefly
+                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
+                    last_msx_scc_enable = 99;
+                }
+                else if (io_show_status == 4)
+                {
+                    DSPrint(20,0,2, "345");  // Show Disk icon
+                    DSPrint(20,1,2, "STU");  // Show Disk icon
+                    io_show_status = 3;      // Show icon briefly
+                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
+                    last_msx_scc_enable = 99;
                 }
                 io_show_status--;
             }
             else
             {
-                DSPrint(8,0,6, "          ");
+                DSPrint(20,0,6, "   "); // Clear Disk icon
+                DSPrint(20,1,6, "   "); // Clear Disk icon
             }
         }
 
@@ -600,22 +597,6 @@ void DisplayStatusLine(bool bForce)
     }
 }
 
-
-#define MENU_ACTION_END             255 // Always the last sentinal value
-#define MENU_ACTION_EXIT            0   // Exit the menu
-#define MENU_ACTION_SAVE            1   // Save Disk or Cassette in primary drive
-#define MENU_ACTION_SWAP            2   // Swap Disk or Cassette in primary drive
-#define MENU_ACTION_EJECT           3   // Eject Disk or Cassette in primary drive
-
-#define MENU_ACTION_SAVE1           4   // Save Disk or Cassette in secondary drive
-#define MENU_ACTION_SWAP1           5   // Swap Disk or Cassette in secondary drive
-#define MENU_ACTION_EJECT1          6   // Eject Disk or Cassette in secondary drive
-
-#define MENU_ACTION_SAVE2           7   // Save Disk or Cassette in third drive
-#define MENU_ACTION_EJECT2          9   // Eject Disk or Cassette in third drive
-
-#define MENU_ACTION_RESET           98  // Reset the machine
-#define MENU_ACTION_SKIP            99  // Skip this MENU choice
 
 typedef struct
 {
@@ -646,6 +627,7 @@ void MiniMenuShow(bool bClearScreen, u8 sel)
     DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " DEFINE KEYS   ");  mini_menu_items++;
     DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " SAVE   STATE  ");  mini_menu_items++;
     DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " LOAD   STATE  ");  mini_menu_items++;
+    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " SWAP   DISK   ");  mini_menu_items++;
     DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " EXIT   MENU   ");  mini_menu_items++;
 }
 
@@ -686,7 +668,8 @@ u8 MiniMenu(void)
             else if (menuSelection == 4) retVal = MENU_CHOICE_DEFINE_KEYS;
             else if (menuSelection == 5) retVal = MENU_CHOICE_SAVE_GAME;
             else if (menuSelection == 6) retVal = MENU_CHOICE_LOAD_GAME;
-            else if (menuSelection == 7) retVal = MENU_CHOICE_NONE;
+            else if (menuSelection == 7) retVal = MENU_CHOICE_SWAP_DISK;
+            else if (menuSelection == 8) retVal = MENU_CHOICE_NONE;
             else retVal = MENU_CHOICE_NONE;
             break;
         }
@@ -1021,7 +1004,7 @@ void Hachibitto_main(void)
         }
 
         // If the Z80 Debugger is enabled, call it every frame. Expensive but we need the debug!
-        if (myGlobalConfig.debugger >= 2)
+        if (myGlobalConfig.debugger)
         {
             ShowDebugZ80();
         }
@@ -1056,7 +1039,7 @@ void Hachibitto_main(void)
                   iTx = touch.px;
                   iTy = touch.py;
 
-                  if (myGlobalConfig.debugger == 3)
+                  if (myGlobalConfig.debugger)
                   {
                       meta_key = handle_debugger_overlay(iTx, iTy);
                   }
@@ -1157,6 +1140,24 @@ void Hachibitto_main(void)
                               {
                                 LoadNow = 1;
                                 msxLoadState();
+                              }
+                              BottomScreenKeypad();
+                              SoundUnPause();
+                          }
+                          break;
+
+                      case MENU_CHOICE_SWAP_DISK:
+                          if (msx_mode == 3) // Only makes sense for .dsk based MSX 
+                          {
+                              SoundPause();
+                              BottomScreenOptions();
+                              HachibittoChooseFile();
+                              if (ucGameChoice >= 0) // Did the user select a game?
+                              {
+                                  FILE* file = fopen(gpFic[ucGameChoice].szName, "rb");
+                                  (void) fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file);
+                                  fclose(file);
+                                  fdc_init(WD2793, 1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
                               }
                               BottomScreenKeypad();
                               SoundUnPause();
@@ -1437,7 +1438,7 @@ void BottomScreenOptions(void)
 // ---------------------------------------------------------------------------
 void BottomScreenKeypad(void)
 {
-    if (myGlobalConfig.debugger == 3)  // Full Z80 Debug overrides things... put up the debugger overlay
+    if (myGlobalConfig.debugger)  // Full Z80 Debug overrides things... put up the debugger overlay
     {
       //  Init bottom screen
       decompress(debug_ovlTiles, bgGetGfxPtr(bg0b),  LZ77Vram);
@@ -1970,7 +1971,7 @@ ITCM_CODE u32 LoopZ80()
 
   // Run the FDC engine
   LoopFDC();
-  
+
   // Run the VDP engine
   LoopVDP();
 

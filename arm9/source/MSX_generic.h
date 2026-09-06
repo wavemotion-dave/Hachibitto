@@ -21,7 +21,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0003
+#define CONFIG_VER                  0x0004
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -58,13 +58,13 @@ struct __attribute__((__packed__)) GlobalConfig_t
     char reserved1[MAX_ROM_NAME+1];
     char reserved2[MAX_ROM_NAME+1];
     u8  showFPS;
-    u8  emuText;
-    u8  diskSfxMute;
     u8  global_0;
     u8  global_1;
     u8  global_2;
     u8  global_3;
     u8  global_4;
+    u8  global_5;
+    u8  global_6;
     u8  compressed;
     u8  debugger;
     u32 config_checksum;
@@ -125,7 +125,7 @@ extern unsigned int crc32 (unsigned int crc, const unsigned char *buf, unsigned 
 extern void HachibittoChangeKeymap(void);
 extern void HachibittoGameOptions(bool);
 extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
-extern u8 HachibittoLoadFile(void);
+extern u8 HachibittoChooseFile(void);
 extern void DisplayFileName(void);
 extern u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
 
