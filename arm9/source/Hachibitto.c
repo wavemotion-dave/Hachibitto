@@ -937,7 +937,7 @@ void Hachibitto_main(void)
   // Force the sound engine to turn on when we start emulation
   bStartSoundEngine = true;
 
-  DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
+  DelayFirstOutput = (myConfig.machineType == MACHINE_MSX1 ? 0:140); // Number of frames to skip before first output to the screen (1.4 seconds)
 
   // -------------------------------------------------------------------
   // Stay in this loop running the MSX game until the user exits...

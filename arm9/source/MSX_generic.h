@@ -75,7 +75,7 @@ struct __attribute__((__packed__)) Config_t
     u32 game_crc;
     u8  keymap[12];
     u8  msxMapper;
-    u8  slotType;
+    u8  machineType;
     u8  autoFire;
     u8  keyboard;
     u8  maxSprites;
@@ -97,6 +97,10 @@ struct __attribute__((__packed__)) Config_t
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (896*1024)))   // We use the back-end 128K of the ROM buffer for compression
 
 #define NORAM       0xFF
+
+#define MACHINE_MSX2_A  0x00
+#define MACHINE_MSX2_B  0x01
+#define MACHINE_MSX1    0x02
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
@@ -131,6 +135,7 @@ extern u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offs
 
 extern const unsigned char MSXBios_MSX2[];
 extern const unsigned char MSXBios_MSX2EXT[];
+extern const unsigned char MSXBios_MSX1[];
 
 extern u8 mapperType;
 extern u8 mapperMask;

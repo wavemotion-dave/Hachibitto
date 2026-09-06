@@ -795,7 +795,7 @@ void SetDefaultGameConfig(void)
     MapPlayer1();                // Default to Player 1 mapping
 
     myConfig.msxMapper   = GUESS;                       // MSX mapper takes its best guess
-    myConfig.slotType    = 0;                           // Type A
+    myConfig.machineType = MACHINE_MSX2_A;              // Default machine is MSX2 with Slot 3 Expanded
     myConfig.autoFire    = 0;                           // Default to no auto-fire on either button
     myConfig.keyboard    = OVL_FULLKBD;                 // Default to normal full MSX keyboard
     myConfig.maxSprites  = 0;                           // 0 means allow 32 sprites... 1 means limit to the original 4/8 sprites of the VDP
@@ -912,9 +912,9 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
-        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K [4]","ASCII 8K","KONAMI SCC [5]","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS",
+        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS",
                             "RESERVED","RESERVED", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                              &myConfig.msxMapper,      17},
-        {"SLOT TYPE",      {"TYPE A (S3 EX)", "TYPE B (S0 EX)"},                                                                                                                &myConfig.slotType,       2},
+        {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                          &myConfig.machineType,    3},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
         {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},

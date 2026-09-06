@@ -28,6 +28,25 @@ u8  msx_scc_enable     __attribute__((section(".dtcm"))) = 0;
 
 extern u8 msx_subslot;
 
+u8 SubslotRead(u16 address)
+{
+    if (myConfig.machineType == MACHINE_MSX2_B) // Type B... Expanded Slot 0
+    {
+        if (((Port_PPI_A>>6) & 0x03) == 0x00) // Is Slot 0 mapped in? That's the expanded slot.
+        {
+          return ~msx_subslot; // Compliment is returned
+        }
+    }
+    else // Type A... Expanded Slot 3
+    {
+        if (((Port_PPI_A>>6) & 0x03) == 0x03) // Is Slot 3 mapped in? That's the expanded slot.
+        {
+          return ~msx_subslot; // Compliment is returned
+        }
+    }
+    return *(MemoryMap[address>>13] + (address&0x1FFF));
+}
+
 // ----------------------------------------------------------------
 // All memory fetches run through this except OP codes which are 
 // read directly from memory. 
@@ -39,19 +58,9 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     {
         if ((address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
         {
-            if (myConfig.slotType) // Type B... Expanded Slot 0
+            if (myConfig.machineType != MACHINE_MSX1)
             {
-                if (((Port_PPI_A>>6) & 0x03) == 0x00) // Is Slot 0 mapped in? That's the expanded slot.
-                {
-                  return ~msx_subslot; // Compliment is returned
-                }
-            }
-            else // Type A... Expanded Slot 3
-            {
-                if (((Port_PPI_A>>6) & 0x03) == 0x03) // Is Slot 3 mapped in? That's the expanded slot.
-                {
-                  return ~msx_subslot; // Compliment is returned
-                }
+                return SubslotRead(address);
             }
         }
         else if (msx_sram_at_8000) // Don't need to check msx_mode as this can only be true in that mode
@@ -249,6 +258,25 @@ void HandleSuperLodeRunner(u32* src, u8 block, u16 address)
     }
 }
 
+void SubslotWrite(u8 value)
+{
+    if (myConfig.machineType == MACHINE_MSX2_B) // Type B... Expanded Slot 0
+    {
+        if (((Port_PPI_A>>6) & 0x03) == 0x00) // Is Slot 0 mapped into upper memory?
+        {
+            msx_subslot = value;
+            cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+        }
+    }
+    else // Must be MACHINE_MSX2_A
+    {
+        if (((Port_PPI_A>>6) & 0x03) == 0x03) // Is Slot 3 mapped into upper memory?
+        {
+            msx_subslot = value;
+            cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+        }
+    }
+}
 
 // ------------------------------------------------------------------
 // Write memory handles both normal writes and bankswitched since
@@ -259,23 +287,10 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 {
     if ((address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
     {
-        if (myConfig.slotType) // Type B... Expanded Slot 0
+        if (myConfig.machineType != MACHINE_MSX1)
         {
-            if (((Port_PPI_A>>6) & 0x03) == 0x00) // Is Slot 0 mapped into upper memory?
-            {
-                msx_subslot = value;
-                cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-                return;
-            }
-        }
-        else
-        {
-            if (((Port_PPI_A>>6) & 0x03) == 0x03) // Is Slot 3 mapped into upper memory?
-            {
-                msx_subslot = value;
-                cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-                return;
-            }
+            SubslotWrite(value);
+            return;
         }
     }
 
@@ -353,30 +368,19 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 // 4000h~5FFFh (mirror: C000h~DFFFh)    6000h (mirrors: 6001h~67FFh)    0
                 // 6000h~7FFFh (mirror: E000h~FFFFh)    6800h (mirrors: 6801h~68FFh)    0
                 // 8000h~9FFFh (mirror: 0000h~1FFFh)    7000h (mirrors: 7001h~77FFh)    0
-                // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0
-                //
-                // Strict ASCII 8 doesn't use the mirrors but not much harm supporting them.
+                // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0     
                 // -------------------------------------------------------------------------
-                if (bCartInSegment[1] && ((address & 0xF800) == 0x6000))
+                if (bCartInSegment[1] && (address >= 0x6000) && (address < 0x6800))
                 {
-                    MSXCartPtr[6] = (u8*)src;  // Mirror
+                    MSXCartPtr[2] = (u8*)src;  // Main ROM
                     MemoryMap[2] = MSXCartPtr[2];
-                    if (bCartInSegment[3])
-                    {
-                        MemoryMap[6] = MSXCartPtr[6];
-                    }
-                }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x6800))
+               }
+                else if (bCartInSegment[1] && (address >= 0x6800)  && (address < 0x7000))
                 {
                     MSXCartPtr[3] = (u8*)src;  // Main ROM
-                    MSXCartPtr[7] = (u8*)src;  // Mirror
                     MemoryMap[3] = MSXCartPtr[3];
-                    if (bCartInSegment[3])
-                    {
-                        MemoryMap[7] = MSXCartPtr[7];
-                    }
                 }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7000))
+                else if (bCartInSegment[1] && (address >= 0x7000)  && (address < 0x7800))
                 {
                     if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
@@ -386,18 +390,13 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     {
                         msx_sram_at_8000 = false;
                         MSXCartPtr[4] = (u8*)src;  // Main ROM
-                        MSXCartPtr[0] = (u8*)src;  // Mirror    
                         if (bCartInSegment[2])
                         {
                             MemoryMap[4] = MSXCartPtr[4];
                         }
-                        if (bCartInSegment[0])
-                        {
-                            MemoryMap[0] = MSXCartPtr[0];
-                        }                            
                     }
                 }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7800))
+                else if (bCartInSegment[1] && (address >= 0x7800) && (address < 0x8000))
                 {
                     if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
@@ -407,15 +406,11 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     {
                         msx_sram_at_8000 = false;
                         MSXCartPtr[5] = (u8*)src;  // Main ROM
-                        MSXCartPtr[1] = (u8*)src;  // Mirror                            
                         if (bCartInSegment[2]) 
                         {
                             MemoryMap[5] = MSXCartPtr[5];
                         }
-                        if (bCartInSegment[0])
-                        {
-                            MemoryMap[1] = MSXCartPtr[1];
-                        }                                                }
+                    }
                 }
             }
             else if (mapperType == SCC8)
