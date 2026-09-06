@@ -1492,6 +1492,8 @@ void Loop9938(void)
 
 void Reset9938(void)
 {
+    BG_PALETTE[0] = RGB15(0x00,0x00,0x00);
+    
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
@@ -1526,8 +1528,6 @@ void Reset9938(void)
     ColTabM = 0x3FFF;
     ChrGenM = 0x3FFF;
     SprTabM = 0x3FFF;
-
-//    BG_PALETTE[0] = RGB15(0x00,0x00,0x00);
 
     pVidFlipBuf = (u16*) (0x06000000);
 
