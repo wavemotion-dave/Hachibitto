@@ -1,9 +1,42 @@
 ;@
 ;@  SCC.s
-;@  Konami SCC/K051649 sound chip emulator for arm32.
+;@  Konami SCC+/K052539 sound chip emulator for arm32.
 ;@
 ;@  Created by Fredrik Ahlström on 2006-04-01.
 ;@  Copyright © 2006-2024 Fredrik Ahlström. All rights reserved.
+;@
+;@  SCC+ update: see SCC.i for the address-map rationale. Summary of
+;@  what changed here vs. the original SCC driver:
+;@    - SCCMixer: Ch4 now reads its own waveform (r12 is transiently
+;@      nudged +0x20 to reach it, then restored) instead of reusing
+;@      Ch3's pointer.
+;@    - SCCWrite: wave RAM now spans 0x00-0x9F (was 0x00-0x7F), the
+;@      register block moves to 0xA0-0xAF mirrored at 0xB0-0xBF (was
+;@      0x80-0x8F mirrored at 0x90-0x9F), everything from 0xC0 up is
+;@      still the catch-all "test/deform" byte.
+;@    - SCCRead: wave read range extends to 0x00-0x9F; 0xA0-0xFF
+;@      returns 0xFF (write-only registers), matching real SCC+
+;@      "Mode::Plus" peek behavior. This needed an actual compare
+;@      instead of the original's single-shift bit-7 test, because
+;@      0xA0 isn't a power-of-two boundary the way 0x80 was.
+;@    - SCCLoadState: register replay loop now targets I/O addresses
+;@      0xA0-0xAF instead of 0x80-0x8F.
+;@    - No Real/Compatible mode switching and no deformation/rotate
+;@      register behavior are implemented, same as the original
+;@      driver - sccTestReg is storage only, matching the prior
+;@      sccTestReg's level of support.
+;@    - Per-channel volume is no longer applied by self-modifying the
+;@      mixer's own instructions (the old vol0-vol4 code-patch trick).
+;@      SCCWrite now stores the precomputed volume into the existing
+;@      (previously unused) sccCh0Volume-sccCh4Volume struct fields,
+;@      and SCCMixer reads them as plain data - the same pattern
+;@      AY38910.s already uses for its ayCalculatedVolumes table.
+;@      SCCMixer can be invoked asynchronously by the audio engine
+;@      while SCCWrite runs from the Z80 core, so patching live
+;@      instruction immediates was a genuine (if narrow) race: a
+;@      write could land while the mixer's pipeline had already
+;@      fetched the old instruction. Plain byte loads/stores are
+;@      atomic, so this removes that hazard entirely.
 ;@
 #ifdef __arm__
 
@@ -35,6 +68,7 @@
 ;@ r3 -> r7 = pos+freq.
 ;@ r8  = Sample reg/volume.
 ;@ r9  = Mixer reg.
+;@ r12 = Ch3 wave base (nudged transiently to reach Ch4 wave, then restored).
 ;@ lr  = Scrap.
 ;@----------------------------------------------------------------------------
 //IIIIIVCCCCCCCCCCCC10FFFFFFFFFFFF
@@ -47,15 +81,15 @@ SCCMixer:					;@ r0=len, r1=dest, r2=SCCptr
 	ldmia r2!,{r3-r7}			;@ r2 now points to Ch0 wave.
 	add r10,r2,#0x20			;@ Ch1 Wave
 	add r11,r2,#0x40			;@ Ch2 Wave
-	add r12,r2,#0x60			;@ Ch3/4 Wave
+	add r12,r2,#0x60			;@ Ch3 Wave
 ;@----------------------------------------------------------------------------
 sccMixLoop:
 	add r3,r3,#SCCADDITION
 	movs lr,r3,lsr#27
 	mov r8,r3,lsl#18
 	subcs r3,r3,r8,asr#4
-vol0:
-	movs r9,#0x00				;@ Volume
+	ldrb r9,[r2,#sccCh0Volume-sccStateStart]	;@ Volume (plain data - safe under concurrent SCCWrite)
+	cmp r9,#0
 	ldrsbne lr,[r2,lr]			;@ Channel 0
 	mulne r9,lr,r9
 
@@ -64,8 +98,8 @@ vol0:
 	movs lr,r4,lsr#27
 	mov r8,r4,lsl#18
 	subcs r4,r4,r8,asr#4
-vol1:
-	movs r8,#0x00				;@ Volume
+	ldrb r8,[r2,#sccCh1Volume-sccStateStart]	;@ Volume (plain data)
+	cmp r8,#0
 	ldrsbne lr,[r10,lr]			;@ Channel 1
 	mlane r9,r8,lr,r9
 
@@ -74,8 +108,8 @@ vol1:
 	movs lr,r5,lsr#27
 	mov r8,r5,lsl#18
 	subcs r5,r5,r8,asr#4
-vol2:
-	movs r8,#0x00				;@ Volume
+	ldrb r8,[r2,#sccCh2Volume-sccStateStart]	;@ Volume (plain data)
+	cmp r8,#0
 	ldrsbne lr,[r11,lr]			;@ Channel 2
 	mlane r9,r8,lr,r9
 
@@ -84,8 +118,8 @@ vol2:
 	movs lr,r6,lsr#27
 	mov r8,r6,lsl#18
 	subcs r6,r6,r8,asr#4
-vol3:
-	movs r8,#0x00				;@ Volume
+	ldrb r8,[r2,#sccCh3Volume-sccStateStart]	;@ Volume (plain data)
+	cmp r8,#0
 	ldrsbne lr,[r12,lr]			;@ Channel 3
 	mlane r9,r8,lr,r9
 
@@ -94,10 +128,12 @@ vol3:
 	movs lr,r7,lsr#27
 	mov r8,r7,lsl#18
 	subcs r7,r7,r8,asr#4
-vol4:
-	movs r8,#0x00				;@ Volume
-	ldrsbne lr,[r12,lr]			;@ Channel 4, same waveform as ch3
+	add r12,r12,#0x20			;@ Ch3 Wave base -> Ch4 Wave base (SCC+, independent)
+	ldrb r8,[r2,#sccCh4Volume-sccStateStart]	;@ Volume (plain data)
+	cmp r8,#0
+	ldrsbne lr,[r12,lr]			;@ Channel 4, own waveform (SCC+)
 	mlane r9,r8,lr,r9
+	sub r12,r12,#0x20			;@ restore Ch3 Wave base for next sample
 
 
 	subs r0,r0,#1
@@ -117,7 +153,7 @@ SCCReset:					;@ r0=SCCptr
 ;@----------------------------------------------------------------------------
 	stmfd sp!,{r0,lr}
 	mov r1,#0
-	mov r2,#sccSize				;@ 144
+	mov r2,#sccSize
 	bl memset					;@ clear variables
 	ldmfd sp!,{r0,lr}
 	mov r1,#0x20
@@ -149,7 +185,7 @@ SCCLoadState:				;@ In r0=SCCptr, r1=source. Out r0=state size.
 	mov r5,#0xF
 stateLoop:
 	add r2,r4,#sccStateStart
-	add r1,r5,#0x80
+	add r1,r5,#0xA0				;@ SCC+ register block starts at 0xA0 (was 0x80)
 	ldrb r0,[r2,r1]
 	mov r2,r4
 	bl SCCWrite
@@ -169,41 +205,42 @@ SCCVolume:
 SCCRead:					;@ 0x9800-0x9FFF, r0=adr, r1=SCCptr
 	.type   SCCRead STT_FUNC
 ;@----------------------------------------------------------------------------
-	movs r0,r0,lsl#24
-	ldrbpl r0,[r1,r0,lsr#24]
-	movmi r0,#0xFF
+	and r0,r0,#0xFF				;@ 0xA0 isn't a power-of-two boundary, so this
+	cmp r0,#0xA0				;@ needs an actual compare (old code tested bit 7
+	ldrblo r0,[r1,r0]			;@ via a shift, which only worked for a 0x80 split)
+	movhs r0,#0xFF				;@ 0xA0-0xFF: freq/vol/deform block, write only
 	bx lr
 ;@----------------------------------------------------------------------------
 SCCWrite:					;@ 0x9800-0x9FFF, r0=val, r1=adr, r2=SCCptr
 	.type   SCCWrite STT_FUNC
 ;@----------------------------------------------------------------------------
-	and r1,r1,#0xFF				;@ 0x00-0x7F wave ram.
-	cmp r1,#0x90				;@ 0x80-0x8F registers, 0x90-0x9F mirror.
-	subpl r1,r1,#0x10			;@ 0xE0-0xFF test register, all mirrors.
-	cmp r1,#0x90
+	and r1,r1,#0xFF				;@ 0x00-0x9F wave ram (Ch0-Ch4, SCC+).
+	cmp r1,#0xB0				;@ 0xA0-0xAF registers, 0xB0-0xBF mirror.
+	subpl r1,r1,#0x10			;@ 0xC0-0xFF test/deform register, all mirrors.
+	cmp r1,#0xB0
 	add r3,r2,#sccCh0Wave
 	strbmi r0,[r3,r1]
 	strbpl r0,[r2,#sccTestReg]
 	bxpl lr
-	subs r1,r1,#0x80
+	subs r1,r1,#0xA0
 	ldrpl pc,[pc,r1,lsl#2]
 	bx lr
-	.long sccCh0FreqLW			;@ 0x80
-	.long sccCh0FreqHW			;@ 0x81
-	.long sccCh1FreqLW			;@ 0x82
-	.long sccCh1FreqHW			;@ 0x83
-	.long sccCh2FreqLW			;@ 0x84
-	.long sccCh2FreqHW			;@ 0x85
-	.long sccCh3FreqLW			;@ 0x86
-	.long sccCh3FreqHW			;@ 0x87
-	.long sccCh4FreqLW			;@ 0x88
-	.long sccCh4FreqHW			;@ 0x89
-	.long sccCh0VolW			;@ 0x8A
-	.long sccCh1VolW			;@ 0x8B
-	.long sccCh2VolW			;@ 0x8C
-	.long sccCh3VolW			;@ 0x8D
-	.long sccCh4VolW			;@ 0x8E
-	.long sccKeyOnW				;@ 0x8F
+	.long sccCh0FreqLW			;@ 0xA0
+	.long sccCh0FreqHW			;@ 0xA1
+	.long sccCh1FreqLW			;@ 0xA2
+	.long sccCh1FreqHW			;@ 0xA3
+	.long sccCh2FreqLW			;@ 0xA4
+	.long sccCh2FreqHW			;@ 0xA5
+	.long sccCh3FreqLW			;@ 0xA6
+	.long sccCh3FreqHW			;@ 0xA7
+	.long sccCh4FreqLW			;@ 0xA8
+	.long sccCh4FreqHW			;@ 0xA9
+	.long sccCh0VolW			;@ 0xAA
+	.long sccCh1VolW			;@ 0xAB
+	.long sccCh2VolW			;@ 0xAC
+	.long sccCh3VolW			;@ 0xAD
+	.long sccCh4VolW			;@ 0xAE
+	.long sccKeyOnW				;@ 0xAF
 
 ;@----------------------------------------------------------------------------
 sccCh0FreqLW:
@@ -283,8 +320,7 @@ sccCh0VolW:
 	andsne r1,r1,#0x01
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
-	ldr r1,=vol0
-	strb r0,[r1]
+	strb r0,[r2,#sccCh0Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh1VolW:
@@ -294,8 +330,7 @@ sccCh1VolW:
 	andsne r1,r1,#0x02
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
-	ldr r1,=vol1
-	strb r0,[r1]
+	strb r0,[r2,#sccCh1Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh2VolW:
@@ -305,8 +340,7 @@ sccCh2VolW:
 	andsne r1,r1,#0x04
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
-	ldr r1,=vol2
-	strb r0,[r1]
+	strb r0,[r2,#sccCh2Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh3VolW:
@@ -316,8 +350,7 @@ sccCh3VolW:
 	andsne r1,r1,#0x08
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
-	ldr r1,=vol3
-	strb r0,[r1]
+	strb r0,[r2,#sccCh3Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh4VolW:
@@ -327,8 +360,7 @@ sccCh4VolW:
 	andsne r1,r1,#0x10
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
-	ldr r1,=vol4
-	strb r0,[r1]
+	strb r0,[r2,#sccCh4Volume]	;@ plain data write - mixer reads it live
 ;@----------------------------------------------------------------------------
 sccKeyOnW:
 ;@----------------------------------------------------------------------------

@@ -45,6 +45,14 @@ u16 msx_block_size      __attribute__((section(".dtcm"))) = 0x2000; // Either 8K
 
 SCC mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 
+// ---------------------------------------------------------------------
+// Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
+// ---------------------------------------------------------------------
+u8  SCCPlusRAM[64*1024];                                               // Too big for .dtcm - lives in normal memory
+u8  sccplus_page[4]     __attribute__((section(".dtcm"))) = {0,1,2,3}; // Last byte written to each of the 4 select regs
+u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/BFFF: bit5=RAM mode, bit4=SCC+ compat
+u8  msx_scc_plus_enable __attribute__((section(".dtcm"))) = 0;         // Mirrors msx_scc_enable, but for the B800h window
+
 // --------------------------------------------------------------------------
 // These aren't used very often so we don't need them in fast .dtcm memory
 // --------------------------------------------------------------------------
@@ -1101,25 +1109,48 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // -------------------------------------------------------------------------
     if (msx_mode == MSX_MODE_DISK) 
     {
-        MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment 0 Unmapped
-        MSXCartPtr[1] = (u8*)BIOS_Memory+0x8000;       // Segment 1 Unmapped
-        MSXCartPtr[2] = (u8*)BIOS_Memory+0x8000;       // Segment 2 Unmapped
-        MSXCartPtr[3] = (u8*)BIOS_Memory+0x8000;       // Segment 3 Unmapped
-        MSXCartPtr[4] = (u8*)BIOS_Memory+0x8000;       // Segment 4 Unmapped
-        MSXCartPtr[5] = (u8*)BIOS_Memory+0x8000;       // Segment 5 Unmapped
-        MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment 6 Unmapped
-        MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment 7 Unmapped
-        
         if (myConfig.expansion)
         {
-            mapperType = FAKE_SCC8;
+            mapperType = SCCPLUS_RAM;
+            // ---------------------------------------------------------------
+            // This cart supplies its own private 64K of RAM (not ROM_Memory).
+            // Pre-load the game image into it once, then map pages 0-3 into
+            // the four windows as the power-on default (mirrors how a real
+            // flash cart boots before any bank-select writes happen).
+            // ---------------------------------------------------------------
+            memset(SCCPlusRAM, 0xFF, sizeof(SCCPlusRAM));
+            //memcpy(SCCPlusRAM, ROM_Memory, (romSize > sizeof(SCCPlusRAM)) ? sizeof(SCCPlusRAM) : romSize);
+
+            sccplus_mode = 0x00;
+            HandleSCCPlusModeRegister(0x00);   // derives msx_scc_enable/msx_scc_plus_enable correctly            
+            sccplus_page[0] = 0; sccplus_page[1] = 1;
+            sccplus_page[2] = 2; sccplus_page[3] = 3;
             mapperMask = 0;
+            msx_block_size = 0x2000;
+
+            MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[1] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[2] = SCCPlusRAM + (0 * 0x2000);     // 4000-5FFF -> page 0
+            MSXCartPtr[3] = SCCPlusRAM + (1 * 0x2000);     // 6000-7FFF -> page 1
+            MSXCartPtr[4] = SCCPlusRAM + (2 * 0x2000);     // 8000-9FFF -> page 2
+            MSXCartPtr[5] = SCCPlusRAM + (3 * 0x2000);     // A000-BFFF -> page 3
+            MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped            
         }
         else
         {
+            MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment 0 Unmapped
+            MSXCartPtr[1] = (u8*)BIOS_Memory+0x8000;       // Segment 1 Unmapped
+            MSXCartPtr[2] = (u8*)BIOS_Memory+0x8000;       // Segment 2 Unmapped
+            MSXCartPtr[3] = (u8*)BIOS_Memory+0x8000;       // Segment 3 Unmapped
+            MSXCartPtr[4] = (u8*)BIOS_Memory+0x8000;       // Segment 4 Unmapped
+            MSXCartPtr[5] = (u8*)BIOS_Memory+0x8000;       // Segment 5 Unmapped
+            MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment 6 Unmapped
+            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment 7 Unmapped
             mapperType = 0;
         }
-        return;
+        
+        return; // Do not process .DSK games with the ROM handling below...
     }
     
     // ------------------------------------------------------------
@@ -1339,7 +1370,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
         MSXCartPtr[5] = (u8*)ROM_Memory+0xA000;        // Segment 5
         MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment 6
         MSXCartPtr[7] = (u8*)ROM_Memory+0xE000;        // Segment 7
-        
     }
     else if ((romSize >= (16 * 1024)) && (romSize <= (MAX_CART_SIZE * 1024)))   // We'll take anything between these two...
     {
@@ -1358,14 +1388,14 @@ void MSX_InitialMemoryLayout(u32 romSize)
 
         if ((mapperType == KON8) || (mapperType == SCC8) || (mapperType == ZEN8))
         {
-            MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
-            MSXCartPtr[1] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x6000;        // Segment 3 Mirror
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 default
             MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2 default
             MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3 default
-            MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
-            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
+            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
         }
         else if (mapperType == ASC8)
         {
@@ -1485,6 +1515,34 @@ void BeeperON(u16 beeper_freq)
 
 void MSX_HandleBeeper(void)
 {
+}
+
+// ---------------------------------------------------------------------------
+// Classic Konami SCC register layout (relative to 9800h) puts the register
+// block at 0x80 and shares one 32-byte waveform between Ch3 and Ch4 (the
+// SCC+ driver instead treats 0x80-0x9F as Ch4's own independent wave RAM
+// and moved the register block to 0xA0) - so classic-mode writes need to be
+// relocated before reaching SCCWrite, and Ch3 wave writes need to be mirrored
+// into Ch4's wave RAM to reproduce the real shared-waveform behavior.
+// ---------------------------------------------------------------------------
+void SCC_LegacyWrite(u8 value, u16 address)
+{
+    u8 off = address & 0xFF;
+
+    if (off < 0x60)                        // Ch0-Ch2 wave RAM - untouched by the layout shift
+    {
+        SCCWrite(value, off, &mySCC);
+    }
+    else if (off < 0x80)                   // Ch3 wave RAM - also mirror into Ch4 (shared on real hardware)
+    {
+        SCCWrite(value, off, &mySCC);
+        SCCWrite(value, off + 0x20, &mySCC);
+    }
+    else if (off < 0x90)                   // Old freq/vol/control block (0x80-0x8F) -> new 0xA0-0xAF block
+    {
+        SCCWrite(value, off + 0x20, &mySCC);
+    }
+    // 0x90-0xFF: mirrors/deform area in classic mode - not worth modeling further
 }
 
 

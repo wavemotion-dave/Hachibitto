@@ -162,7 +162,7 @@ extern u8 msx_kana_lock;
 #define AT4K        14
 #define AT8K        15
 #define LIN64       16
-#define FAKE_SCC8   88
+#define SCCPLUS_RAM 88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
@@ -262,5 +262,8 @@ extern u8 RomDB_Lookup(u32 size);
 extern void LoadFavorites(void);
 extern void preserveCompressedMem(void);
 extern void restoreCompressedMem(void);
+extern void HandleSCCPlusModeRegister(u8 value);
+extern void SCC_LegacyWrite(u8 value, u16 address);
+extern void BuildScreen8ColorMap(void);
 
 #endif

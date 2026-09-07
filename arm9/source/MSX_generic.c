@@ -1041,13 +1041,13 @@ const struct options_t Option_Table[1][20] =
     {
         {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","CROSSBLAIM","LODERUNNER", "XEVIOUS",
                             "RESERVED","RESERVED", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                              &myConfig.msxMapper,      17},
-        {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                          &myConfig.machineType,    3},
+        {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                 &myConfig.machineType,    3},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
         {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
-        {"EXPANSION",      {"NONE", "SCC CART"},                                                                                                                                &myConfig.expansion,      2},
+        {"EXPANSION",      {"NONE", "SCC+ CART"},                                                                                                                               &myConfig.expansion,      2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
@@ -1080,7 +1080,7 @@ u8 display_options_list(bool bFullDisplay)
         }
     }
 
-    DSPrint(4,22, 0, (char *)"  B=EXIT,  START=SAVE  ");
+    DSPrint(0,22, 0, (char *)"      B=EXIT,  START=SAVE       ");
     return len;
 }
 
@@ -1532,7 +1532,7 @@ void HachibittoChangeOptions(void)
           case 7 :      // LOAD GAME
             HachibittoChooseFile();
             dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
-            DSPrint(0,4,0, "                                "); // Clear "XXX/XXX Games Available"
+            DSPrint(0,4,0, "                               "); // Clear "XXX/XXX Games Available"
             if (ucGameChoice != -1)
             {
                 ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys

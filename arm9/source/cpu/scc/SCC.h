@@ -13,11 +13,13 @@
 extern "C" {
 #endif
 
+
 typedef struct {
 	s8 ch0Wave[32];
 	s8 ch1Wave[32];
 	s8 ch2Wave[32];
 	s8 ch3Wave[32];
+    s8 ch4Wave[32];
 	u16 ch0Frq;
 	u16 ch1Frq;
 	u16 ch2Frq;

@@ -284,21 +284,33 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         {
             ay38910Mixer(len*2, mixbuf1, &myAY);
             SCCMixer(len*4, mixbuf2, &mySCC);
-
             s16 *p = (s16*)dest;
-            int j=0;
-            for (int i=0; i<len*2; i++)
+            int j = 0;
+            for (int i = 0; i < len*2; i++)
             {
-                // ------------------------------------------------------------------------
-                // We normalize the samples and mix them carefully to minimize clipping...
-                // ------------------------------------------------------------------------
-                s32 combined = (mixbuf1[i]) + ((mixbuf2[j] + mixbuf2[j+1])/2) + 32768;
-                j+=2;
-                if (combined >  32000) combined = 32000;
-                if (combined < 0) combined = 0;
+                // >>1 instead of /2 - signed division makes GCC emit sign-correction
+                // code even for a constant divisor of 2; a plain shift is one instruction.
+                s32 scc_sample = ((s32)mixbuf2[j] + (s32)mixbuf2[j+1]) >> 1;
+                j += 2;
+
+                // Same cost as the old >>1 attenuation - just a different shift amount,
+                // so this loudness fix is free relative to what you had.
+                s32 ay_sample = (s32)mixbuf1[i] - ((s32)mixbuf1[i] >> 2);
+                scc_sample    = scc_sample - (scc_sample >> 2);
+
+                s32 combined = ay_sample + scc_sample;
+
+                // Plain hard clamp - GCC turns this diamond pattern into CMP+MOVGT/MOVLT
+                // on ARMv5, i.e. predicated instructions with no branch and no misprediction
+                // cost at all, not an actual conditional jump. Cheaper than a soft-knee,
+                // which adds real arithmetic (subtract/shift/add) any time it's touched.
+                if (combined > 32767)  combined = 32767;
+                if (combined < -32768) combined = -32768;
+
                 *p++ = (s16)combined;
             }
-            p--; last_sample = *p;
+            p--;
+            last_sample = *p;
         }
         else  // Pretty simple... just AY
         {
@@ -365,6 +377,7 @@ void sound_chip_reset()
   ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
   ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
   ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
+  last_sample = mixbuf2[4];
 
   // -----------------------------------------------------------------
   // The SCC sound chip is just for a few select Konami MSX1 games
@@ -379,6 +392,7 @@ void sound_chip_reset()
   SCCWrite(0x00, 0x988F, &mySCC);
 
   SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
+  
 }
 
 // -----------------------------------------------------------------------
@@ -395,9 +409,6 @@ void dsInstallSoundEmuFIFO(void)
 //*****************************************************************************
 // Reset the MSX - mostly CPU and memory...
 //*****************************************************************************
-
-static u8 last_msx_mode = 0;
-static u8 last_msx_scc_enable = 0;
 
 // --------------------------------------------------------------
 // When we first load a ROM/CASSETTE or when the user presses
@@ -444,9 +455,6 @@ void ResetMSX(void)
   TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
   timingFrames  = 0;
   emuFps=0;
-
-  last_msx_mode = 0;
-  last_msx_scc_enable = 0;
 }
 
 //*********************************************************************************
@@ -535,21 +543,40 @@ void DisplayStatusLine(bool bForce)
 
     if (msx_mode)
     {
-        if ((last_msx_mode != msx_mode) || bForce)
+        if (msx_mode == MSX_MODE_DISK)
         {
-            last_msx_mode = msx_mode;
-        }
-
-        if (last_msx_scc_enable != msx_scc_capable_game)
-        {
-            if (io_show_status == 0)
+            if (io_show_status)
             {
-                // SCC has a little cool graphic to go with it!
-                DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
-                DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
+                if (io_show_status == 5) // Disk Write
+                {
+                    DSPrint(20,0,2, "678");  // Show Disk icon
+                    DSPrint(20,1,2, "VWX");  // Show Disk icon
+                    io_show_status = 3;      // Show icon briefly
+                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
+                }
+                else if (io_show_status == 4) // Disk Read
+                {
+                    DSPrint(20,0,2, "345");  // Show Disk icon
+                    DSPrint(20,1,2, "STU");  // Show Disk icon
+                    io_show_status = 3;      // Show icon briefly
+                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
+                }
+                io_show_status--;
             }
-            last_msx_scc_enable = msx_scc_capable_game;
+            else
+            {
+                DSPrint(20,0,6, "   "); // Clear Disk icon
+                DSPrint(20,1,6, "   "); // Clear Disk icon
+            }
         }
+        
+        if (io_show_status == 0)
+        {
+            // SCC has a little cool graphic to go with it!
+            DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
+            DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
+        }
+        
         if (write_NV_counter > 0)
         {
             --write_NV_counter;
@@ -560,35 +587,7 @@ void DisplayStatusLine(bool bForce)
             }
             DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
         }
-
-        if (msx_mode == MSX_MODE_DISK)
-        {
-            if (io_show_status)
-            {
-                if (io_show_status == 5)
-                {
-                    DSPrint(20,0,2, "345");  // Show Disk icon
-                    DSPrint(20,1,2, "STU");  // Show Disk icon
-                    io_show_status = 3;      // Show icon briefly
-                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
-                    last_msx_scc_enable = 99;
-                }
-                else if (io_show_status == 4)
-                {
-                    DSPrint(20,0,2, "345");  // Show Disk icon
-                    DSPrint(20,1,2, "STU");  // Show Disk icon
-                    io_show_status = 3;      // Show icon briefly
-                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
-                    last_msx_scc_enable = 99;
-                }
-                io_show_status--;
-            }
-            else
-            {
-                DSPrint(20,0,6, "   "); // Clear Disk icon
-                DSPrint(20,1,6, "   "); // Clear Disk icon
-            }
-        }
+        
 
         if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
         {
@@ -1476,7 +1475,6 @@ void BottomScreenKeypad(void)
     unsigned  short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1b),32*24*2);
 
-    last_msx_scc_enable = 99;
     DisplayStatusLine(true);
 }
 
