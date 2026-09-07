@@ -1,4 +1,3 @@
-void BuildScreen8ColorMap(void);
 /******************************************************************************
 * VDP 9938 (video) file
 *
@@ -33,7 +32,6 @@ u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpoch         __attribute__((section(".dtcm"))) = 0;
-
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -1087,7 +1085,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
     }
 }
 
-u8 Screen8ColorMap[256];
+u16 * const Screen8ColorMap_ex = (u16*)0x6820000;
 
 typedef struct { u8 r, g, b; } RGBColor;
 
@@ -1132,7 +1130,7 @@ void BuildScreen8ColorMap(void)
                 int dr = (int)color[a].r - color[b].r;
                 int dg = (int)color[a].g - color[b].g;
                 int db = (int)color[a].b - color[b].b;
-                int dist = dr*dr + dg*dg + 4*db*db;   // was: dr*dr + dg*dg + db*db
+                int dist = dr*dr + dg*dg + 2*db*db;   // was: dr*dr + dg*dg + db*db
                 if (dist < bestDist)
                 {
                     bestDist = dist;
@@ -1171,9 +1169,16 @@ void BuildScreen8ColorMap(void)
         }
     }
 
+    u8 Screen8ColorMap[256];
     for (int idx = 0; idx < 256; idx++)
     {
         Screen8ColorMap[idx] = slotOf[redirect[idx]];
+    }
+    
+    // Build the 16-bit lookup so we can be as efficient as possible when mapping Screen8 colors
+    for (int idx = 0; idx < 0x10000; idx++)
+    {
+        Screen8ColorMap_ex[idx] = (Screen8ColorMap[idx >> 8] << 8) | (Screen8ColorMap[idx & 0xFF]);
     }
 }
 
@@ -1188,16 +1193,15 @@ ITCM_CODE void RefreshLine8(register u8 uY)
     }
     else
     {
-        uint8_t *P = XBuf + (uY << 8);
-        uint8_t *S = ChrTab + ((uY+VScroll) << 8);
+        uint16_t *P = (uint16_t *) (XBuf + (uY << 8));
+        uint16_t *S = (uint16_t *) (ChrTab + ((uY+VScroll) << 8));
 
-        for (int i=0; i<256; i++)
+        for (int i=0; i<128; i++)
         {
-           *P++ = Screen8ColorMap[*S++];
+           *P++ = Screen8ColorMap_ex[*S++];
         }
 
-        P = XBuf + (uY << 8);
-        ColorSprites(uY, P-32);
+        ColorSprites(uY, XBuf + (uY << 8)-32);
     }
 }
 

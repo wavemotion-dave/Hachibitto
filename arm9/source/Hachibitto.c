@@ -1398,7 +1398,7 @@ void HachibittoInit(void)
   videoSetMode(MODE_0_2D  | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
   videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE  | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
   vramSetBankA(VRAM_A_MAIN_BG);
-  vramSetBankB(VRAM_B_MAIN_SPRITE);          // Once emulation of game starts, we steal this back for an additional 128K of VRAM at 0x6820000 which we will use as a snapshot buffer for taking screen pics
+  vramSetBankB(VRAM_B_MAIN_SPRITE);          // Once emulation of game starts, we steal this back for an additional 128K of VRAM at 0x6820000
   vramSetBankC(VRAM_C_SUB_BG);
 
   //  Stop blending effect of intro
@@ -1763,7 +1763,7 @@ u8 msxInit(char *szGame)
   // -----------------------------------------------------------------
   videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
   vramSetBankA(VRAM_A_MAIN_BG_0x06000000);      // This is our top emulation screen (where the game is played)
-  vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000
+  vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000 which can be used in-game
   REG_BG3CNT = BG_BMP8_256x256;
   REG_BG3PA = (1<<8);
   REG_BG3PB = 0;
@@ -1781,7 +1781,7 @@ u8 msxInit(char *szGame)
 
   write_NV_counter=0;
 
-  // loadrom() will figure out how big and where to load it... the 0x8000 here is meaningless.
+  // loadrom() will figure out how big and where to load it...
   RetFct = loadrom(szGame);
 
   // Wipe RAM area for the MSX
