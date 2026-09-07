@@ -1519,19 +1519,6 @@ void msx_restore_bios(void)
 }
 
 
-// ----------------------------
-// 0x00e1: tapion(ref, cpu);
-// 0x00e4: tapin(ref, cpu); 
-// 0x00e7: tapiof(ref, cpu);
-// 0x00ea: tapoon(ref, cpu);
-// 0x00ed: tapout(ref, cpu);
-// 0x00f0: tapoof(ref, cpu);
-// 0x00f3: stmotr(ref, cpu);
-// ----------------------------
-void MSX_HandleCassette(register Z80 *r)
-{
-}
-
 // ---------------------------------------------------------
 // The MSX has a few ports and special memory mapping
 // ---------------------------------------------------------
@@ -1553,19 +1540,6 @@ void msx_reset(void)
         msx_basic = 0x0000;
     }
 }
-
-void msx_patch_bios(void)
-{
-    // Patch the BIOS for Cassette Access...
-    BIOS_Memory[0x00e1] = 0xed; BIOS_Memory[0x00e2] = 0xfe; BIOS_Memory[0x00e3] = 0xc9;
-    BIOS_Memory[0x00e4] = 0xed; BIOS_Memory[0x00e5] = 0xfe; BIOS_Memory[0x00e6] = 0xc9;
-    BIOS_Memory[0x00e7] = 0xed; BIOS_Memory[0x00e8] = 0xfe; BIOS_Memory[0x00e9] = 0xc9;
-    BIOS_Memory[0x00ea] = 0xed; BIOS_Memory[0x00eb] = 0xfe; BIOS_Memory[0x00ec] = 0xc9;
-    BIOS_Memory[0x00ed] = 0xed; BIOS_Memory[0x00ee] = 0xfe; BIOS_Memory[0x00ef] = 0xc9;
-    BIOS_Memory[0x00f0] = 0xed; BIOS_Memory[0x00f1] = 0xfe; BIOS_Memory[0x00f2] = 0xc9;
-    BIOS_Memory[0x00f3] = 0xed; BIOS_Memory[0x00f4] = 0xfe; BIOS_Memory[0x00f5] = 0xc9;
-}
-
 
 extern char szName[];
 void msxSaveEEPROM(void)

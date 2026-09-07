@@ -215,6 +215,14 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_F3,
     META_KBD_F4,
     META_KBD_F5,
+    META_KBD_PANUP8,
+    META_KBD_PANUP12,
+    META_KBD_PANUP16,
+    META_KBD_PANUP20,
+    META_KBD_PANDN8,
+    META_KBD_PANDN12,
+    META_KBD_PANDN16,
+    META_KBD_PANDN20,
 };
 
 static char tmp[64];    // For various sprintf() calls
@@ -1145,7 +1153,7 @@ void Hachibitto_main(void)
                           break;
 
                       case MENU_CHOICE_SWAP_DISK:
-                          if (msx_mode == MSX_MODE_DISK) // Only makes sense for .dsk based MSX 
+                          if (msx_mode == MSX_MODE_DISK) // Only makes sense for .dsk based MSX
                           {
                               SoundPause();
                               BottomScreenOptions();
@@ -1199,14 +1207,6 @@ void Hachibitto_main(void)
       ucDEUX  = 0;
       nds_key  = keysCurrent();     // Get any current keys pressed on the NDS
 
-      if (nds_key & KEY_X)
-      {
-          temp_offset = -16; slide_dampen = 15;
-      }
-      if (nds_key & KEY_Y)
-      {
-          temp_offset = 16; slide_dampen = 15;
-      }
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
       {
             lcdSwap();
@@ -1322,6 +1322,14 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F3)        kbd_key = KBD_KEY_F3;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F4)        kbd_key = KBD_KEY_F4;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F5)        kbd_key = KBD_KEY_F5;
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP8)    {temp_offset = -8;  slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP12)   {temp_offset = -12; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP16)   {temp_offset = -16; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP20)   {temp_offset = -20; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN8)    {temp_offset =  8;  slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN12)   {temp_offset =  12; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN16)   {temp_offset =  16; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN20)   {temp_offset =  20; slide_dampen = 15;}
 
                       if (kbd_key != 0)
                       {
@@ -1504,6 +1512,13 @@ void irqVBlank(void)
 
     int cyBG = ((s16)myConfig.yOffset+temp_offset) << 8;
 
+    if (!(VDP[9] & 0x80))
+    {
+        slide_dampen = 0;
+        temp_offset = 0;
+        cyBG = 0;
+    }
+    
     REG_BG2Y = cyBG;
     REG_BG3Y = cyBG;
 
@@ -1519,7 +1534,6 @@ void irqVBlank(void)
             slide_dampen--;
         }
     }
-
 }
 
 /*********************************************************************************
@@ -1576,9 +1590,9 @@ int main(int argc, char **argv)
   // with the game that was selected later...
   // -----------------------------------------------------------------
   LoadConfig();
-  
+
   // Do an initial load of the Favorites file
-  LoadFavorites(); 
+  LoadFavorites();
 
   //  Handle command line argument... mostly for TWL++
   if  (argc > 1)

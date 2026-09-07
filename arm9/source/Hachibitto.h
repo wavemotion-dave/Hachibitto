@@ -120,8 +120,17 @@ extern u32 DX, DY;
 #define META_KBD_F4         0xFFFF0048
 #define META_KBD_F5         0xFFFF0049
 
-#define MAX_KEY_OPTIONS     85
+#define META_KBD_PANUP8     0xFFFF004A
+#define META_KBD_PANUP12    0xFFFF004B
+#define META_KBD_PANUP16    0xFFFF004C
+#define META_KBD_PANUP20    0xFFFF004D
 
+#define META_KBD_PANDN8     0xFFFF004E
+#define META_KBD_PANDN12    0xFFFF004F
+#define META_KBD_PANDN16    0xFFFF0050
+#define META_KBD_PANDN20    0xFFFF0051
+
+#define MAX_KEY_OPTIONS     93
 
 #define JOYMODE_JOYSTICK    0
 
@@ -221,7 +230,6 @@ extern void UnPauseSound(void);
 extern void ReadFileCRCAndConfig(void);
 extern void DisplayStatusLine(bool bForce);
 extern void ResetMSX(void);
-extern void msx_patch_bios(void);
 
 
 #define VDP_IRQ_VBLANK  0x01
