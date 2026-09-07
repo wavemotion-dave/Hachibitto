@@ -498,6 +498,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     if ((value & 0x3F) == 0x3F) 
                     {
                         msx_scc_enable = true;
+                        msx_scc_capable_game = true;
                     }
                     else
                     {

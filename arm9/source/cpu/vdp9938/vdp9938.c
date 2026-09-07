@@ -1,3 +1,4 @@
+void BuildScreen8ColorMap(void);
 /******************************************************************************
 * VDP 9938 (video) file
 *
@@ -46,7 +47,9 @@ static u8 screen7LUT[256] __attribute__((section(".dtcm")));
 void BuildScreen7LUT(void)
 {
     for (int i = 0; i < 256; i++)
+    {
         screen7LUT[i] = (i >> 4);   // Decimate 512->256: keep the first (left) pixel of each packed pair
+    }
 }
 
 void BuildNibbleLUT(void)
@@ -1084,6 +1087,96 @@ ITCM_CODE void RefreshLine7(register u8 uY)
     }
 }
 
+u8 Screen8ColorMap[256];
+
+typedef struct { u8 r, g, b; } RGBColor;
+
+void BuildScreen8ColorMap(void)
+{
+    // Decode all 256 GGGRRRBB combinations into their raw components.
+    // Kept unshifted here - since r, g and b are all shifted by the
+    // same <<2 to build RGB15, plain squared distance on these raw
+    // values is already proportional to actual color distance.
+    static RGBColor color[256];
+    for (int idx = 0; idx < 256; idx++)
+    {
+        color[idx].b = idx & 3;
+        color[idx].r = (idx >> 2) & 7;
+        color[idx].g = (idx >> 5) & 7;
+    }
+
+    // We only have 236 palette slots (20-255) for 256 distinct colors.
+    // Repeatedly collapse the two closest surviving colors together
+    // until exactly 236 remain. redirect[] chains a removed color to
+    // whichever survivor it was merged into.
+    static u8 redirect[256];
+    static u8 alive[256];
+    int aliveCount = 256;
+    for (int idx = 0; idx < 256; idx++)
+    {
+        redirect[idx] = idx;
+        alive[idx] = 1;
+    }
+
+    while (aliveCount > 236)
+    {
+        int bestA = -1, bestB = -1;
+        int bestDist = 0x7FFFFFFF;
+
+        for (int a = 0; a < 256; a++)
+        {
+            if (!alive[a]) continue;
+            for (int b = a + 1; b < 256; b++)
+            {
+                if (!alive[b]) continue;
+                int dr = (int)color[a].r - color[b].r;
+                int dg = (int)color[a].g - color[b].g;
+                int db = (int)color[a].b - color[b].b;
+                int dist = dr*dr + dg*dg + 4*db*db;   // was: dr*dr + dg*dg + db*db
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestA = a;
+                    bestB = b;
+                }
+            }
+        }
+
+        alive[bestB] = 0;
+        redirect[bestB] = bestA;
+        aliveCount--;
+    }
+
+    // Resolve chains: a color may have been merged into a color that
+    // was itself later merged elsewhere. Walk each down to its final
+    // surviving representative.
+    for (int idx = 0; idx < 256; idx++)
+    {
+        u8 r = idx;
+        while (redirect[r] != r) r = redirect[r];
+        redirect[idx] = r;
+    }
+
+    // Assign the 236 survivors to BG_PALETTE[20..255] in ascending
+    // order, then point every original color at its slot.
+    static u8 slotOf[256];
+    int nextSlot = 20;
+    for (int idx = 0; idx < 256; idx++)
+    {
+        if (alive[idx])
+        {
+            BG_PALETTE[nextSlot] = RGB15(color[idx].r << 2, color[idx].g << 2, color[idx].b << 2);
+            slotOf[idx] = nextSlot;
+            nextSlot++;
+        }
+    }
+
+    for (int idx = 0; idx < 256; idx++)
+    {
+        Screen8ColorMap[idx] = slotOf[redirect[idx]];
+    }
+}
+
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
 /*************************************************************/
@@ -1096,9 +1189,14 @@ ITCM_CODE void RefreshLine8(register u8 uY)
     else
     {
         uint8_t *P = XBuf + (uY << 8);
+        uint8_t *S = ChrTab + ((uY+VScroll) << 8);
 
-        memcpy(XBuf + (uY << 8), ChrTab + ((uY+VScroll) << 8), 256);
+        for (int i=0; i<256; i++)
+        {
+           *P++ = Screen8ColorMap[*S++];
+        }
 
+        P = XBuf + (uY << 8);
         ColorSprites(uY, P-32);
     }
 }
@@ -1161,39 +1259,6 @@ void CheckNewMode(void)
     default:   newMode=ScrMode;break;
   }
 
-  // -----------------------------------------------------------------
-  // When switching in and out of Mode 8 we need to do some magic
-  // with the palette. Screen 8 uses the colors as direct RGB values
-  // and so we need to wipe out the main 16 (plus spare) colors and
-  // put in proper RGB colors into the DS color palette. When we move
-  // back out of Screen 8 we need to restore any saved palette info.
-  // -----------------------------------------------------------------
-#if 0  
-  static u16 saved_palette[20] = {0};
-
-  if ((newMode == 8) && (ScrMode != 8))
-  {
-      // Save Palette when switching into Mode 8
-      for (int i=0; i<20; i++)
-      {
-          saved_palette[i] = BG_PALETTE[i];
-          u8 b = i & 3;
-          u8 r = (i >> 2) & 7;
-          u8 g = (i >> 5) & 7;
-          BG_PALETTE[i] = RGB15(r<<3,g<<3,b<<3);
-      }
-  }
-
-  if ((newMode != 8) && (ScrMode == 8))
-  {
-      // Restore Palette when switching out of Mode 8
-      for (int i=0; i<20; i++)
-      {
-          BG_PALETTE[i] = saved_palette[i];
-      }
-  }
-#endif
-  
   ScrMode=newMode;
 
   RefreshLine = SCR[ScrMode].Refresh;
@@ -1271,7 +1336,10 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
       u8 r = (u8)((float)VDP9938A_palette[BGColor*3+0]*0.121568f);
       u8 g = (u8)((float)VDP9938A_palette[BGColor*3+1]*0.121568f);
       u8 b = (u8)((float)VDP9938A_palette[BGColor*3+2]*0.121568f);
-      BG_PALETTE[17] = RGB15(r,g,b); // Legacy color stored here for safe keeping
+      if (ScrMode != 8)
+      {
+        BG_PALETTE[17] = RGB15(r,g,b); // Legacy color stored here for safe keeping
+      }
       break;
 
     case 10:
@@ -1520,7 +1588,8 @@ void Reset9938(void)
 
     BuildNibbleLUT();
     BuildScreen7LUT();
-
+    BuildScreen8ColorMap();
+    
     memset(OccBuf,0,sizeof(OccBuf));
 
     VDP[0] = 0x02;                      // Graphic mode enabled
@@ -1554,6 +1623,28 @@ void Reset9938(void)
     RefreshLine = RefreshLine0;
 
     OH = IH = 0;
+    
+    u16 uBcl;
+    u8 r,g,b;
+
+    // -----------------------------------------------------------------------
+    // The MSX has a 16 color palette... we set that up. MSX2 expands this.
+    // We always use the standard NTSC color palette which is fine for now
+    // but maybe in the future we add the PAL color palette for a bit more
+    // authenticity.
+    // -----------------------------------------------------------------------
+    for (uBcl=0;uBcl<16;uBcl++)
+    {
+        r = (u8) ((float) VDP9938A_palette[uBcl*3+0]*0.121568f);
+        g = (u8) ((float) VDP9938A_palette[uBcl*3+1]*0.121568f);
+        b = (u8) ((float) VDP9938A_palette[uBcl*3+2]*0.121568f);
+        SPRITE_PALETTE[uBcl] = RGB15(r,g,b);
+        BG_PALETTE[uBcl] = RGB15(r,g,b);
+    }
+    BG_PALETTE[16] = RGB15(0,0,0);
+    BG_PALETTE[17] = RGB15(0,0,0);
+    BG_PALETTE[18] = RGB15(0,0,0);
+    BG_PALETTE[19] = RGB15(0,0,0);
 
     // ---------------------------------------------------------------
     // Our background/foreground color table makes computations FAST!

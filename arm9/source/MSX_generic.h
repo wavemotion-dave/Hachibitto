@@ -230,7 +230,6 @@ extern u8 key_dia;
 extern u32 msx_last_rom_size;
 
 extern u8 msxInit(char *szGame);
-extern void msxSetPal(void);
 extern void msxUpdateScreen(void);
 extern void msxKeyProc(void);
 extern void msxRun(void);
@@ -260,5 +259,6 @@ extern void BeeperOFF(void);
 
 extern void Z80_Interface_Reset(void);
 extern u8 RomDB_Lookup(u32 size);
+extern void LoadFavorites(void);
 
 #endif

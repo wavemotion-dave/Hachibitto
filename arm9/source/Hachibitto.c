@@ -918,8 +918,6 @@ void Hachibitto_main(void)
   // Get the MSX Machine Emulator ready
   msxInit(gpFic[ucGameAct].szName);
 
-  msxSetPal();
-
   msxRun();
 
   // Frame-to-frame timing...
@@ -1578,6 +1576,9 @@ int main(int argc, char **argv)
   // with the game that was selected later...
   // -----------------------------------------------------------------
   LoadConfig();
+  
+  // Do an initial load of the Favorites file
+  LoadFavorites(); 
 
   //  Handle command line argument... mostly for TWL++
   if  (argc > 1)
@@ -1790,41 +1791,6 @@ void msxRun(void)
   Z80_Interface_Reset();                // Reset the Z80 Interface module
   ResetZ80(&CPU);                       // Reset the CZ80 core CPU
   BottomScreenKeypad();                 // Show the game-related screen with keypad / keyboard
-}
-
-/*********************************************************************************
- * Set MSX legacy Palette (MSX2 can override)
- ********************************************************************************/
-void msxSetPal(void)
-{
-  u16 uBcl;
-  u8 r,g,b;
-
-  // -----------------------------------------------------------------------
-  // The MSX has a 16 color pallette... we set that up. MSX2 expands this.
-  // We always use the standard NTSC color palette which is fine for now
-  // but maybe in the future we add the PAL color palette for a bit more
-  // authenticity.
-  // -----------------------------------------------------------------------
-  for (uBcl=0;uBcl<16;uBcl++)
-  {
-    r = (u8) ((float) VDP9938A_palette[uBcl*3+0]*0.121568f);
-    g = (u8) ((float) VDP9938A_palette[uBcl*3+1]*0.121568f);
-    b = (u8) ((float) VDP9938A_palette[uBcl*3+2]*0.121568f);
-    SPRITE_PALETTE[uBcl] = RGB15(r,g,b);
-    BG_PALETTE[uBcl] = RGB15(r,g,b);
-  }
-  BG_PALETTE[16] = RGB15(0,0,0);
-  BG_PALETTE[17] = RGB15(0,0,0);
-
-  for (uBcl=18; uBcl < 256; uBcl++)
-  {
-      //Green (G)3 bitsBits 7, 6, 5 (MSB)8 levels0 to 7Red (R)3 bitsBits 4, 3, 28 levels0 to 7Blue (B)2 bitsBits 1, 0 (LSB)4 levels0 to 3
-      b = uBcl & 3;
-      r = (uBcl >> 2) & 7;
-      g = (uBcl >> 5) & 7;
-      BG_PALETTE[uBcl] = RGB15(r<<3,g<<3,b<<3);
-  }
 }
 
 
