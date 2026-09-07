@@ -1113,6 +1113,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
         if (myConfig.expansion)
         {
             mapperType = FAKE_SCC8;
+            mapperMask = 0;
         }
         else
         {

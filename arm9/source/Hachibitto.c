@@ -294,7 +294,8 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 // ------------------------------------------------------------------------
                 s32 combined = (mixbuf1[i]) + ((mixbuf2[j] + mixbuf2[j+1])/2) + 32768;
                 j+=2;
-                if (combined >  32767) combined = 32767;
+                if (combined >  32000) combined = 32000;
+                if (combined < 0) combined = 0;
                 *p++ = (s16)combined;
             }
             p--; last_sample = *p;

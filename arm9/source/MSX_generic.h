@@ -162,7 +162,7 @@ extern u8 msx_kana_lock;
 #define AT4K        14
 #define AT8K        15
 #define LIN64       16
-#define FAKE_SCC8   99
+#define FAKE_SCC8   88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
