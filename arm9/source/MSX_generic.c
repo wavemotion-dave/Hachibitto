@@ -398,7 +398,7 @@ void ToggleFavorite(char *name)
 }
 
 /*********************************************************************************
- * Show The 14 games on the list to allow the user to choose a new game.
+ * Show The 16 games on the list to allow the user to choose a new game.
  ********************************************************************************/
 static char szName2[40];
 void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
@@ -406,44 +406,45 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
   u16 ucBcl,ucGame;
   u8 maxLen;
 
-  DSPrint(30,8,0,(NoDebGame>0 ? "<" : " "));
-  DSPrint(30,21,0,(NoDebGame+14<countCV ? ">" : " "));
+  DSPrint(30,5,0,(NoDebGame>0 ? "<" : " "));
+  DSPrint(30,22,0,(NoDebGame+16<countCV ? ">" : " "));
   sprintf(szName,"%03d/%03d FILES AVAILABLE     ",ucSel+1+NoDebGame,countCV);
-  DSPrint(2,6,0, szName);
-  for (ucBcl=0;ucBcl<14; ucBcl++)
+  DSPrint(4,4,0, szName);
+  
+  for (ucBcl=0;ucBcl<16; ucBcl++)
   {
     ucGame= ucBcl+NoDebGame;
     if (ucGame < countCV)
     {
       maxLen=strlen(gpFic[ucGame].szName);
       strcpy(szName,gpFic[ucGame].szName);
-      if (maxLen>28) szName[28]='\0';
+      if (maxLen>28) szName[30]='\0';
       if (gpFic[ucGame].uType == DIRECTORY)
       {
         szName[26] = 0; // Needs to be 2 chars shorter with brackets
         sprintf(szName2, "[%s]",szName);
-        sprintf(szName,"%-28s",szName2);
-        DSPrint(1,8+ucBcl,(ucSel == ucBcl ? 2 :  0),szName);
-        DSPrint(0,8+ucBcl,0,(char*)" ");
+        sprintf(szName,"%-30s",szName2);
+        DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 :  0),szName);
+        DSPrint(0,6+ucBcl,0,(char*)" ");
       }
       else
       {
-        sprintf(szName,"%-28s",strupr(szName));
-        DSPrint(1,8+ucBcl,(ucSel == ucBcl ? 2 : 0 ),szName);
+        sprintf(szName,"%-30s",strupr(szName));
+        DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),szName);
         
         if (IsFavorite(gpFic[ucGame].szName))
         {
-            DSPrint(0,8+ucBcl,(IsFavorite(gpFic[ucGame].szName) == 1) ? 0:2,(char*)"@");
+            DSPrint(0,6+ucBcl,(IsFavorite(gpFic[ucGame].szName) == 1) ? 0:2,(char*)"@");
         }
         else
         {
-            DSPrint(0,8+ucBcl,0,(char*)" ");
+            DSPrint(0,6+ucBcl,0,(char*)" ");
         }       
       }
     }
     else
     {
-        DSPrint(0,8+ucBcl,(ucSel == ucBcl ? 2 : 0 ),"                             ");
+        DSPrint(0,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),"                                ");
     }
   }
 }
@@ -550,13 +551,13 @@ u8 HachibittoChooseFile(void)
   unsigned short dmaVal =  *(bgGetMapPtr(bg0b) + 24*32);
   dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
   
-  DSPrint(3,5,0,"A=LOAD, SELECT=FAV, B=EXIT");
+  DSPrint(3,23,0,"A=LOAD, SELECT=FAV, B=EXIT");
 
   HachibittoFindFiles();
 
   ucGameChoice = -1;
 
-  nbRomPerPage = (countCV>=14 ? 14 : countCV);
+  nbRomPerPage = (countCV>=16 ? 16 : countCV);
   uNbRSPage = (countCV>=5 ? 5 : countCV);
 
   if (ucGameAct>countCV-nbRomPerPage)
@@ -726,7 +727,7 @@ u8 HachibittoChooseFile(void)
         chdir(gpFic[ucGameAct].szName);
         HachibittoFindFiles();
         ucGameAct = 0;
-        nbRomPerPage = (countCV>=14 ? 14 : countCV);
+        nbRomPerPage = (countCV>=16 ? 16 : countCV);
         uNbRSPage = (countCV>=5 ? 5 : countCV);
         if (ucGameAct>countCV-nbRomPerPage) {
           firstRomDisplay=countCV-nbRomPerPage;
@@ -744,14 +745,14 @@ u8 HachibittoChooseFile(void)
     // --------------------------------------------
     // If the filename is too long... scroll it.
     // --------------------------------------------
-    if (strlen(gpFic[ucGameAct].szName) > 29)
+    if (strlen(gpFic[ucGameAct].szName) > 32)
     {
       ucFlip++;
       if (ucFlip >= 25)
       {
         ucFlip = 0;
         uLenFic++;
-        if ((uLenFic+28)>strlen(gpFic[ucGameAct].szName))
+        if ((uLenFic+30)>strlen(gpFic[ucGameAct].szName))
         {
           ucFlop++;
           if (ucFlop >= 15)
@@ -762,18 +763,18 @@ u8 HachibittoChooseFile(void)
           else
             uLenFic--;
         }
-        strncpy(szName,gpFic[ucGameAct].szName+uLenFic,28);
-        szName[28] = '\0';
-        DSPrint(1,8+romSelected,2,szName);
+        strncpy(szName,gpFic[ucGameAct].szName+uLenFic,30);
+        szName[30] = '\0';
+        DSPrint(1,6+romSelected,2,szName);
       }
     }
     showRandomPreviewSnaps();
     swiWaitForVBlank();
   }
 
-  // Wait for some key to be pressed before returning
+  // Wait for key to be released before returning
   while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
-
+  
   return 0x01;
 }
 
@@ -788,7 +789,7 @@ void SaveConfig(bool bShow)
 
     if (bShow) DSPrint(6,23,0, (char*)"SAVING CONFIGURATION");
 
-    allocateCompressedMem();
+    preserveCompressedMem();
 
     // Set the global configuration version number...
     myGlobalConfig.config_ver = CONFIG_VER;
@@ -955,7 +956,7 @@ void SetDefaultGameConfig(void)
 // ----------------------------------------------------------
 void LoadConfig(void)
 {
-    allocateCompressedMem();
+    preserveCompressedMem();
 
     // -----------------------------------------------------------------
     // Start with defaults.. if we find a match in our config database
@@ -1079,7 +1080,7 @@ u8 display_options_list(bool bFullDisplay)
         }
     }
 
-    DSPrint(6,20, 0, (char *)"  B=EXIT,  START=SAVE  ");
+    DSPrint(4,22, 0, (char *)"  B=EXIT,  START=SAVE  ");
     return len;
 }
 
@@ -1347,7 +1348,7 @@ void HachibittoChangeKeymap(void)
 // -----------------------------------------------------------------------------------------
 void DisplayFileName(void)
 {
-    sprintf(szName, "[%d K] [CRC: %08X] [%d]", file_size/1024, file_crc, mapperType);
+    sprintf(szName, "[%d K] [CRC: %08X]", file_size/1024, file_crc);
     DSPrint((16 - (strlen(szName)/2)),19,0,szName);
 
     sprintf(szName,"%s",gpFic[ucGameChoice].szName);
@@ -1531,6 +1532,7 @@ void HachibittoChangeOptions(void)
           case 7 :      // LOAD GAME
             HachibittoChooseFile();
             dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
+            DSPrint(0,4,0, "                                "); // Clear "XXX/XXX Games Available"
             if (ucGameChoice != -1)
             {
                 ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys

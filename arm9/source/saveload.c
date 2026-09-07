@@ -52,23 +52,25 @@ struct RomOffset Offsets[8];
  ********************************************************************************/
 
 // --------------------------------------------------------------------------------------
-// We use a 128K buffer on the back-end of the ROM_Memory to use for lzav compression.
-// So we move that 128K block out to an unused VRAM area temporarily while we save/load.
-// This saves us from having to allocate a large 128K buffer just for save/load use.
+// We use a 256K buffer on the back-end of the ROM_Memory to use for lzav compression.
+// So we move that 256K block out to an unused VRAM area temporarily while we save/load.
+// This saves us from having to allocate a large 256K buffer just for save/load use.
 // --------------------------------------------------------------------------------------
-void allocateCompressedMem(void)
+void preserveCompressedMem(void)
 {
-    memcpy((u8*)0x6820000, COMPRESS_BUFFER, 128*1024);
+    memcpy((u8*)0x06860000, COMPRESS_BUFFER, 256*1024);
 }
 
 void restoreCompressedMem(void)
 {
-    memcpy(COMPRESS_BUFFER, (u8*)0x6820000, 128*1024);
+    memcpy(COMPRESS_BUFFER, (u8*)0x06860000, 256*1024);
 }
 
 void msxSaveState(void)
 {
+    preserveCompressedMem();
     //TODO
+    restoreCompressedMem();
 }
 
 
@@ -77,7 +79,9 @@ void msxSaveState(void)
  ********************************************************************************/
 void msxLoadState(void)
 {
+    preserveCompressedMem();
     //TODO
+    restoreCompressedMem();
 }
 
 // End of file

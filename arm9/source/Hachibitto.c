@@ -64,7 +64,7 @@ u16 DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE = 1280;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
+u32 MAX_CART_SIZE = 1256;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
 u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x10000]               ALIGN(32) = {0};        // To hold our BIOS and related OS memory (64K as the BIOS  for various machines ends up in different spots)
@@ -1559,7 +1559,7 @@ int main(int argc, char **argv)
   }
   else // For older DS units... 1.25MB max
   {
-      MAX_CART_SIZE = 1280;
+      MAX_CART_SIZE = 1256;
       ROM_Memory = malloc(MAX_CART_SIZE * 1024);
   }
 

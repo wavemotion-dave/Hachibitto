@@ -94,9 +94,9 @@ struct __attribute__((__packed__)) Config_t
     u8  reserved8;
 };
 
-#define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (896*1024)))   // We use the back-end 128K of the ROM buffer for compression
+#define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression
 
-#define NORAM       0xFF
+#define NORAM           0xFF
 
 #define MACHINE_MSX2_A  0x00
 #define MACHINE_MSX2_B  0x01
@@ -260,5 +260,7 @@ extern void BeeperOFF(void);
 extern void Z80_Interface_Reset(void);
 extern u8 RomDB_Lookup(u32 size);
 extern void LoadFavorites(void);
+extern void preserveCompressedMem(void);
+extern void restoreCompressedMem(void);
 
 #endif
