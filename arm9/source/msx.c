@@ -59,8 +59,6 @@ u8  msx_scc_plus_enable __attribute__((section(".dtcm"))) = 0;         // Mirror
 u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
 u32 msx_last_rom_size   = 0;
-u8  msx_japanese_matrix = 1;        // Default to International keyboard layout. Set to '1' to enable Japanese layout.
-
 
 extern u8 DirectRegWrite9938(u8 Value);
 
@@ -197,28 +195,23 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
               if (--last_special_key_dampen == 0)
               {
                   last_special_key = 0;
-                  DSPrint(4,0,6, "    ");
               }
           }
 
           if (last_special_key == KBD_KEY_SHIFT) 
           { 
-            DSPrint(4,0,6, "SHFT");
             key_shift = 1;
           }
           else if (last_special_key == KBD_KEY_CTRL)  
           {
-            DSPrint(4,0,6, "CTRL");
             key_ctrl = 1;
           }
           else if (last_special_key == KBD_KEY_CODE)
           {
-            if (!msx_japanese_matrix) DSPrint(4,0,6, "CODE"); // Japanese Keyboard Matrix has KANA LOCK led handling instead...
             key_code = 1;
           }
           else if (last_special_key == KBD_KEY_GRAPH)
           {
-            DSPrint(4,0,6, "GRPH");
             key_graph = 1;
           }
 
@@ -1553,8 +1546,6 @@ void msx_restore_bios(void)
 {
     memset(BIOS_Memory, 0xFF, sizeof(BIOS_Memory));
 
-    msx_japanese_matrix = 1;
-    
     if (myConfig.machineType == MACHINE_MSX1)
     {
         memcpy(BIOS_Memory, MSXBios_MSX1, 0x8000);

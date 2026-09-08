@@ -21,7 +21,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0005
+#define CONFIG_VER                  0x0006
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -65,7 +65,7 @@ struct __attribute__((__packed__)) GlobalConfig_t
     u8  global_4;
     u8  global_5;
     u8  global_6;
-    u8  compressed;
+    u8  global_7;
     u8  debugger;
     u32 config_checksum;
 };
@@ -109,6 +109,8 @@ extern u8 last_special_key;
 extern u8 last_special_key_dampen;
 extern u16 msx_init;
 extern u16 msx_basic;
+extern u8 skip_render;
+extern u16 timingFrames;
 
 extern FI_MSX gpFic[MAX_ROMS];
 extern int uNbRoms;

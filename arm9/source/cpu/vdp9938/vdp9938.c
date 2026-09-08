@@ -598,6 +598,60 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 #undef SPR_SET
 #undef SPR_OR
 }
+
+/** ScanColorSprites() ******************************************/
+/** Called when we want to scan the sprites for collision only **/
+/****************************************************************/
+ITCM_CODE void ScanColorSprites(uint8_t Y)
+{
+  static const uint8_t SprHeights[4] = { 8,16,16,32 };
+  uint8_t C,IH,OH;
+  uint8_t *AT;
+  int L,K;
+  unsigned int M;
+
+  /* No extra sprites yet */
+  VDPStatus[0]&=~0x5F;
+
+  if(SpritesOFF) return;
+
+  /* Assign initial values before counting */
+  OH = SprHeights[VDP[1]&0x03];
+  IH = SprHeights[VDP[1]&0x02];
+  AT = SprTab-4;
+  C  = MAXSPRITE2+1;
+  M  = 0;
+
+  /* Count displayed sprites */
+  for(L=0;L<32;++L)
+  {
+    M<<=1;AT+=4;              /* Iterating through SprTab      */
+    K=AT[0];                  /* Read Y from SprTab            */
+    if(K==216) break;         /* Iteration terminates if Y=216 */
+    K=(uint8_t)(K-VScroll);   /* Sprite's actual Y coordinate  */
+    if(K>256-IH) K-=256;      /* Y coordinate may be negative  */
+
+    /* Mark all valid sprites with 1s, break at MAXSPRITE2 sprites */
+    if((Y>K)&&(Y<=K+OH))
+    {
+      /* If we exceed the maximum number of sprites per line... */
+      if(!--C)
+      {
+        /* Set 9thSprite flag in the VDP status register */
+        VDPStatus[0]|=0x40;
+        /* Stop drawing sprites, unless all-sprites option enabled */
+        if (myConfig.maxSprites) break;
+      }
+
+      /* Mark sprite as ready to draw */
+      M|=1;
+    }
+  }
+
+  /* Mark last checked sprite (9th in line, Y=216, or sprite #31) */
+  VDPStatus[0]|=L<32? L:31;
+}
+
 /** RefreshLine0() *********************************************/
 /** Refresh line Y (0..191) of SCREEN0, including sprites in  **/
 /** this line.  This is the only mode that shows fewer than   **/
@@ -726,7 +780,7 @@ ITCM_CODE void RefreshLine2(u8 uY) {
   else
   {
     u32 ptLow = 0; u32 ptHigh = 0;
-
+    
     J   = ((u16)((u16)uY&0xC0)<<5)+(uY&0x07);
     T   = ChrTab+((u16)((u16)uY&0xF8)<<2);
     u8 lastT = ~(*T);
@@ -855,13 +909,6 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
     T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
     I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
-    if (!isDSiMode())
-    {
-        extern u8 skip_render;
-        extern u16 timingFrames;
-        if (timingFrames & 1) {skip_render=1; return;}
-    }
-
     // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
     // doesn't change mid-line), so check it once rather than per-pixel.
     int misaligned = ((uintptr_t)P & 3) != 0;
@@ -950,14 +997,6 @@ ITCM_CODE void RefreshLine5(register u8 uY)
     }
     else
     {
-        // Sadly, the DS-Lite/Phat need some help...
-        if (!isDSiMode())
-        {
-            extern u8 skip_render;
-            extern u16 timingFrames;
-            if (timingFrames & 1) {skip_render=1; return;}
-        }
-
         const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
         if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
 
@@ -1534,7 +1573,20 @@ void Loop9938(void)
   /* If refreshing display area, call scanline handler */
   if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE))
   {
-      RefreshLine(CurLine - VDP9938_START_LINE);
+      unsigned int tmp;
+      
+      if (timingFrames & (isDSiMode() ? 0:1))
+      {
+          skip_render=1;
+          if (ScrMode < 4)
+            ScanSprites(CurLine - VDP9938_START_LINE, &tmp);    // Skip rendering - but still scan sprites for the 5th sprite flag
+          else 
+            ScanColorSprites(CurLine - VDP9938_START_LINE);     // Skip rendering - but still scan sprites for the 9th sprite flag
+      }
+      else
+      {
+          RefreshLine(CurLine - VDP9938_START_LINE);
+      }
 
       // ---------------------------------------------------------------------
       // Some programs require that we handle collisions more frequently

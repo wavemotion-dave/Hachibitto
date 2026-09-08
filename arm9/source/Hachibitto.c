@@ -48,9 +48,10 @@ u32 DY = 0;
 
 volatile u32 dsVSyncCount = 0;
 u32 last_vsync_count = 0xFEEDBEEF;
-s16 temp_offset   __attribute__((section(".dtcm"))) = 0;
-u16 slide_dampen  __attribute__((section(".dtcm"))) = 0;
-u16 DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
+s8  temp_offset      __attribute__((section(".dtcm"))) = 0;
+u8  slide_dampen     __attribute__((section(".dtcm"))) = 0;
+u8  DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
+u8  bFirstSCCEnable  __attribute__((section(".dtcm"))) = 1;
 
 // -------------------------------------------------------------------------------------------
 // All emulated systems have ROM, RAM and possibly BIOS or SRAM. So we create generic buffers
@@ -254,12 +255,14 @@ void SoundUnPause(void)
 mm_ds_system sys   __attribute__((section(".dtcm")));
 mm_stream myStream __attribute__((section(".dtcm")));
 
-s16 mixbuf1[4096+64];      // When we have SN and AY sound we have to mix 3+3 channels
-s16 mixbuf2[4096+64];      // into a single output so we render to mix buffers first.
+s16 mixbuf1[2048+32];      // When we have AY sound and SCC possible... so 8 channels.
+s16 mixbuf2[2048+32];      // into a single output so we render to mix buffers first.
 
 u16 mixer_read      __attribute__((section(".dtcm"))) = 0;
 u16 mixer_write     __attribute__((section(".dtcm"))) = 0;
-u8 wave_direct_skip __attribute__((section(".dtcm"))) = 0;
+
+static s32 ay_smoothed __attribute__((section(".dtcm"))) = 0;
+const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
 
 // -------------------------------------------------------------------------------------------
 // maxmod will call this routine when the buffer is half-empty and requests that
@@ -267,7 +270,56 @@ u8 wave_direct_skip __attribute__((section(".dtcm"))) = 0;
 // we will fill exactly that many. If the sound is paused, we fill with 'mute' samples.
 // -------------------------------------------------------------------------------------------
 s16 last_sample __attribute__((section(".dtcm"))) = 0;
-int breather    __attribute__((section(".dtcm"))) = 0;
+
+void SmoothStartSCC(mm_word len, mm_addr dest)
+{
+    s32 combined_smoothed = last_sample;
+    
+    ay38910Mixer(len*2, mixbuf1, &myAY);
+    SCCMixer(len*4, mixbuf2, &mySCC);
+    
+    s16 *p = (s16*)dest;
+    int j = 0;
+    for (int i = 0; i < len*2; i++)
+    {
+        // >>1 instead of /2 - signed division makes GCC emit sign-correction
+        // code even for a constant divisor of 2; a plain shift is one instruction.
+        s32 scc_sample = ((s32)mixbuf2[j] + (s32)mixbuf2[j+1]) >> 1;
+        j += 2;
+
+        // Same cost as the old >>1 attenuation - just a different shift amount,
+        // so this loudness fix is free relative to what you had.
+        s32 ay_sample = (s32)mixbuf1[i] - ((s32)mixbuf1[i] >> 2);
+        scc_sample    = scc_sample - (scc_sample >> 2);
+
+        s32 combined = ay_sample + scc_sample;
+
+        // Plain hard clamp - GCC turns this diamond pattern into CMP+MOVGT/MOVLT
+        // on ARMv5, i.e. predicated instructions with no branch and no misprediction
+        // cost at all, not an actual conditional jump. Cheaper than a soft-knee,
+        // which adds real arithmetic (subtract/shift/add) any time it's touched.
+        if (combined > 32767)  combined = 32767;
+        if (combined < -32768) combined = -32768;
+        
+        // ---------------------------------------------------------------------
+        // For any large steps we want to smooth this out so that we don't hear
+        // the AY produce any sharp pops or clicks... this helps but costs CPU.
+        // ---------------------------------------------------------------------
+        s32 diff = (s32)combined - combined_smoothed;
+        if (diff >  MAX_STEP) diff =  MAX_STEP;
+        if (diff < -MAX_STEP) diff = -MAX_STEP;
+        combined_smoothed += diff;
+        *p++ = (s16)combined_smoothed;
+    }
+    p--;
+    last_sample = *p;
+}
+
+// -------------------------------------------------------------------------
+// Rolling capture of raw AY output for diagnosing the audio pop. Continuously
+// overwritten each callback; dumped to debug.log on demand via the existing
+// L+R+Y hotkey, so you don't have to time the capture to the exact pop.
+// -------------------------------------------------------------------------
 ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
@@ -282,9 +334,35 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     {
         if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
         {
+            if (bFirstSCCEnable)
+            {
+                SmoothStartSCC(len, dest);
+                bFirstSCCEnable = 0;
+                return len;
+            }
+            
             ay38910Mixer(len*2, mixbuf1, &myAY);
+            
+            // ---------------------------------------------------------------------
+            // For any large steps we want to smooth this out so that we don't hear
+            // the AY produce any sharp pops or clicks... this helps but costs CPU.
+            // ---------------------------------------------------------------------
+            int count = len * 2;
+            s16 *p = mixbuf1;
+            s32 smoothed = ay_smoothed;
+
+            while (count--) {
+                s32 diff = (s32)*p - smoothed;
+                if (diff > MAX_STEP) diff = MAX_STEP;
+                else if (diff < -MAX_STEP) diff = -MAX_STEP;
+                
+                smoothed += diff;
+                *p++ = (s16)smoothed;
+            }
+            ay_smoothed = smoothed;
+            
             SCCMixer(len*4, mixbuf2, &mySCC);
-            s16 *p = (s16*)dest;
+            p = (s16*)dest;
             int j = 0;
             for (int i = 0; i < len*2; i++)
             {
@@ -314,7 +392,23 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         }
         else  // Pretty simple... just AY
         {
-            ay38910Mixer(len*2, dest, &myAY);
+            ay38910Mixer(len * 2, dest, &myAY);
+
+            s16 *p = (s16*)dest;
+            int count = len * 2;
+            s32 smoothed = ay_smoothed;
+
+            while (count--) {
+                s32 diff = (s32)*p - smoothed;
+                if (diff > MAX_STEP) {
+                    diff = MAX_STEP;
+                } else if (diff < -MAX_STEP) {
+                    diff = -MAX_STEP;
+                }
+                smoothed += diff;
+                *p++ = (s16)smoothed;
+            }
+            ay_smoothed = smoothed;
             last_sample = ((s16*)dest)[len*2 - 1];
         }
     }
@@ -369,6 +463,10 @@ void sound_chip_reset()
   memset(mixbuf2, 0x00, sizeof(mixbuf2));
   mixer_read=0;
   mixer_write=0;
+  
+  msx_scc_capable_game = 0;
+  bFirstSCCEnable = 1;
+  SoundPause();
 
   //  --------------------------------------------------------------------
   //  The AY sound chip is for Super Game Module and MSX sound handling
@@ -377,7 +475,7 @@ void sound_chip_reset()
   ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
   ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
   ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
-
+  
   // -----------------------------------------------------------------
   // The SCC sound chip is just for a few select Konami MSX1 games
   // -----------------------------------------------------------------
@@ -391,7 +489,6 @@ void sound_chip_reset()
   SCCWrite(0x00, 0x988F, &mySCC);
 
   SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
-  
 }
 
 // -----------------------------------------------------------------------
@@ -399,7 +496,6 @@ void sound_chip_reset()
 // -----------------------------------------------------------------------
 void dsInstallSoundEmuFIFO(void)
 {
-  SoundPause();             // Pause any sound output
   sound_chip_reset();       // Reset the SN, AY and SCC chips
   setupStream();            // Setup maxmod stream...
   bStartSoundEngine = true; // Volume will 'unpause' after 1 frame in the main loop.
@@ -540,67 +636,68 @@ void DisplayStatusLine(bool bForce)
 {
     if (myGlobalConfig.debugger) return; // If debugger, skip this
 
-    if (msx_mode)
+    if (msx_mode == MSX_MODE_DISK)
     {
-        if (msx_mode == MSX_MODE_DISK)
+        if (io_show_status)
         {
-            if (io_show_status)
+            if (io_show_status == 5) // Disk Write
             {
-                if (io_show_status == 5) // Disk Write
-                {
-                    DSPrint(20,0,2, "678");  // Show Disk icon
-                    DSPrint(20,1,2, "VWX");  // Show Disk icon
-                    io_show_status = 3;      // Show icon briefly
-                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
-                }
-                else if (io_show_status == 4) // Disk Read
-                {
-                    DSPrint(20,0,2, "345");  // Show Disk icon
-                    DSPrint(20,1,2, "STU");  // Show Disk icon
-                    io_show_status = 3;      // Show icon briefly
-                    mmEffect(SFX_FLOPPY);    // Short disk sound effect
-                }
-                io_show_status--;
+                DSPrint(20,0,2, "678");  // Show Disk icon
+                DSPrint(20,1,2, "VWX");  // Show Disk icon
+                io_show_status = 3;      // Show icon briefly
+                mmEffect(SFX_FLOPPY);    // Short disk sound effect
             }
-            else
+            else if (io_show_status == 4) // Disk Read
             {
-                DSPrint(20,0,6, "   "); // Clear Disk icon
-                DSPrint(20,1,6, "   "); // Clear Disk icon
+                DSPrint(20,0,2, "345");  // Show Disk icon
+                DSPrint(20,1,2, "STU");  // Show Disk icon
+                io_show_status = 3;      // Show icon briefly
+                mmEffect(SFX_FLOPPY);    // Short disk sound effect
             }
+            io_show_status--;
         }
-        
-        if (io_show_status == 0)
+        else
         {
-            // SCC has a little cool graphic to go with it!
-            DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
-            DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
+            DSPrint(20,0,6, "   "); // Clear Disk icon
+            DSPrint(20,1,6, "   "); // Clear Disk icon
         }
-        
-        if (write_NV_counter > 0)
+    }
+    
+    if (io_show_status == 0)
+    {
+        // SCC has a little cool graphic to go with it!
+        DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
+        DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
+    }
+    
+    if (write_NV_counter > 0)
+    {
+        --write_NV_counter;
+        if (write_NV_counter == 0)
         {
-            --write_NV_counter;
-            if (write_NV_counter == 0)
-            {
-                // Save EE now!
-                msxSaveEEPROM();
-            }
-            DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
+            // Save EE now!
+            msxSaveEEPROM();
         }
-        
+        DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
+    }
+    
 
-        if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
-        {
-            // Caps Lock
-            DSPrint(1,23,0, (msx_caps_lock ? "@":" "));
-            DSPrint(2,23,(msx_caps_lock ? 2:0), (msx_caps_lock ? "@":" "));
+    if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
+    {
+        // Caps Lock
+        DSPrint(1,23,0, (msx_caps_lock ? "@":" "));
+        DSPrint(2,23,(msx_caps_lock ? 2:0), (msx_caps_lock ? "@":" "));
 
-            // KANA Lock
-            if (msx_japanese_matrix)
-            {
-                msx_kana_lock = (myAY.ayPortBOut & 0x80) ? 0:1;
-                DSPrint(22,23,(msx_kana_lock ? 2:0), (msx_kana_lock ? "^":" "));
-            }
-        }
+        msx_kana_lock = (myAY.ayPortBOut & 0x80) ? 0:1;
+        DSPrint(22,23,(msx_kana_lock ? 2:0), (msx_kana_lock ? "^":" "));
+        
+        DSPrint(1,19,0, (key_shift ? "A":" "));
+        DSPrint(2,19,(key_shift ? 2:0), (key_shift ? "A":" "));
+        
+        DSPrint(1,15,0, (key_ctrl  ? "@":" "));
+        DSPrint(2,15,(key_ctrl  ? 2:0), (key_ctrl  ? "@":" "));
+        
+        DSPrint(5,23,(key_graph ? 2:0), (key_graph ? "]":" "));        
     }
 }
 
@@ -733,7 +830,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
     }
     else if ((iTy >= 42) && (iTy < 72))   // Row 2 (number row)
     {
-        if      ((iTx >= 0)   && (iTx < 15))   kbd_key = (msx_japanese_matrix ? '[' : '`');
+        if      ((iTx >= 0)   && (iTx < 15))   kbd_key = '[';
         else if ((iTx >= 15)  && (iTx < 31))   kbd_key = '1';
         else if ((iTx >= 31)  && (iTx < 45))   kbd_key = '2';
         else if ((iTx >= 45)  && (iTx < 61))   kbd_key = '3';
@@ -762,8 +859,8 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         else if ((iTx >= 129) && (iTx < 143))  kbd_key = 'I';
         else if ((iTx >= 143) && (iTx < 158))  kbd_key = 'O';
         else if ((iTx >= 158) && (iTx < 174))  kbd_key = 'P';
-        else if ((iTx >= 174) && (iTx < 189))  kbd_key = (msx_japanese_matrix ? ']' : '[');
-        else if ((iTx >= 189) && (iTx < 203))  kbd_key = (msx_japanese_matrix ? '`' : ']');
+        else if ((iTx >= 174) && (iTx < 189))  kbd_key = ']';
+        else if ((iTx >= 189) && (iTx < 203))  kbd_key = '`';
         else if ((iTx >= 203) && (iTx < 214))  kbd_key = KBD_KEY_DEAD;
         else if ((iTx >= 214) && (iTx < 255))  kbd_key = KBD_KEY_STOP;
     }
@@ -779,8 +876,8 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         else if ((iTx >= 117) && (iTx < 132))  kbd_key = 'J';
         else if ((iTx >= 132) && (iTx < 147))  kbd_key = 'K';
         else if ((iTx >= 147) && (iTx < 161))  kbd_key = 'L';
-        else if ((iTx >= 161) && (iTx < 178))  kbd_key = (msx_japanese_matrix ? ';' : KBD_KEY_QUOTE);
-        else if ((iTx >= 178) && (iTx < 192))  kbd_key = (msx_japanese_matrix ? KBD_KEY_QUOTE : ';');
+        else if ((iTx >= 161) && (iTx < 178))  kbd_key = ';';
+        else if ((iTx >= 178) && (iTx < 192))  kbd_key = KBD_KEY_QUOTE;
         else if ((iTx >= 192) && (iTx < 214))  kbd_key = KBD_KEY_RET;
     }
     else if ((iTy >= 132) && (iTy < 162)) // Row 5 (ZXCV row)
@@ -803,7 +900,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         if      ((iTx >= 1)   && (iTx < 30))   kbd_key = KBD_KEY_CAPS;
         else if ((iTx >= 30)  && (iTx < 53))   {kbd_key = KBD_KEY_GRAPH; last_special_key = KBD_KEY_GRAPH; last_special_key_dampen = 20;}
         else if ((iTx >= 53)  && (iTx < 163))  kbd_key = ' ';
-        else if ((iTx >= 163) && (iTx < 192))  {kbd_key = KBD_KEY_CODE; if (!msx_japanese_matrix) {last_special_key = KBD_KEY_CODE; last_special_key_dampen = 20;}}
+        else if ((iTx >= 163) && (iTx < 192))  kbd_key = KBD_KEY_CODE;
         else if ((iTx >= 192) && (iTx < 255))  return MENU_CHOICE_MENU;
     }
 
@@ -1213,11 +1310,13 @@ void Hachibitto_main(void)
       }
       else if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_Y))
       {
-            DSPrint(5,0,0,"SNAPSHOT");
+            DSPrint(20,0,2, "9:;");
+            DSPrint(20,1,2, "YZ[");
             screenshot();
             debug_save();
             WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
-            DSPrint(5,0,0,"        ");
+            DSPrint(20,0,6, "   ");
+            DSPrint(20,1,6, "   ");
       }
       else if  (nds_key & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_START | KEY_SELECT | KEY_R | KEY_L | KEY_X | KEY_Y))
       {
@@ -1517,6 +1616,8 @@ void irqVBlank(void)
         cyBG = 0;
     }
     
+    if (cyBG < 0) cyBG=0;
+    
     REG_BG2Y = cyBG;
     REG_BG3Y = cyBG;
 
@@ -1568,11 +1669,14 @@ int main(int argc, char **argv)
   //  Init timer for frame management
   TIMER2_DATA=0;
   TIMER2_CR=TIMER_ENABLE|TIMER_DIV_1024;
+
+  // Install the sound driver...
+  SoundPause();
   dsInstallSoundEmuFIFO();
 
   //  Show the fade-away intro logo...
   intro_logo();
-
+  
   SetYtrigger(190); //trigger 2 lines before vsync
 
   irqSet(IRQ_VBLANK,  irqVBlank);
@@ -1618,8 +1722,6 @@ int main(int argc, char **argv)
       chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
       chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
   }
-
-  SoundPause();
 
   srand(time(NULL));
 

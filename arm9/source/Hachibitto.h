@@ -214,7 +214,6 @@ extern u16 NDS_keyMap[];
 
 extern u8 soundEmuPause;
 extern u8 write_NV_counter;
-extern u8 msx_japanese_matrix;
 extern u8 skip_render;
 
 extern int bg0, bg1, bg0b, bg1b;

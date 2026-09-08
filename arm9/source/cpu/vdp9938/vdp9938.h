@@ -79,6 +79,7 @@ extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
 extern void RefereshPreviousLines(void);
+extern void ScanColorSprites(uint8_t Y);
 
 extern void WrCtrl9938(byte value);
 

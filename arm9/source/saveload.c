@@ -48,8 +48,6 @@ struct RomOffset Offsets[8];
 #define TYPE_OTHER 5
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
-static char tmpStr[32];
-
 
 /*********************************************************************************
  * Save the current state - save everything we need to a single .sav file.
@@ -98,8 +96,9 @@ void msxSaveState(void)
       szLoadFile[len-2] = 'a';
       szLoadFile[len-1] = 'v';
     }
-    strcpy(tmpStr,"SAVING...");
-    DSPrint(6,0,0,tmpStr);
+    
+    DSPrint(20,0, 2, "-./");
+    DSPrint(20,1, 2, "MNO");
 
     FILE *handle = fopen(szLoadFile, "wb+");
     if (handle != NULL)
@@ -121,13 +120,19 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&comp_len,          sizeof(comp_len),  1, handle);
         if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,         1, handle);
         
+
+        max_len = lzav_compress_bound_hi( sizeof(VDP_Memory) );
+        comp_len = lzav_compress_hi( VDP_Memory, COMPRESS_BUFFER, sizeof(VDP_Memory), max_len );
+
+        if (retVal) retVal = fwrite(&comp_len,          sizeof(comp_len),  1, handle);
+        if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,         1, handle);
+
         fclose(handle);
     }
 
-    strcpy(tmpStr, (retVal ? "OK ":"ERR"));
-    DSPrint(15,0,0,tmpStr);
+    DSPrint(20,0, 0, "   ");
+    DSPrint(20,1, 0, "   ");
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
-    DSPrint(6,0,0,"             ");
     DisplayStatusLine(true);
 
     restoreCompressedMem();

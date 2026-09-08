@@ -100,7 +100,7 @@ u32 getCRC32(u8 *buf, u32 size)
 extern u32 MAX_CART_SIZE;
 extern u8 *ROM_Memory;
 
-ITCM_CODE u32 getFileCrc(const char* filename)
+u32 getFileCrc(const char* filename)
 {
     extern u32 file_size;
     u32 crc1 = 0;

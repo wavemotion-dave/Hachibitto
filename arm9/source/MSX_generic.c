@@ -833,7 +833,6 @@ void SaveConfig(bool bShow)
     fp = fopen("/data/Hachibitto.dat", "wb+");
     if (fp != NULL)
     {
-        myGlobalConfig.compressed = 1; // Write the AllConfigs[] below compressed
         fwrite(&myGlobalConfig, sizeof(myGlobalConfig), 1, fp); // Write the global config
 
         // --------------------------------------------------------------------
@@ -926,8 +925,8 @@ void SetDefaultGameConfig(void)
     myConfig.keyboard    = OVL_FULLKBD;                 // Default to normal full MSX keyboard
     myConfig.maxSprites  = 0;                           // 0 means allow 32 sprites... 1 means limit to the original 4/8 sprites of the VDP
     myConfig.dpad        = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
-    myConfig.memWipe     = 0;                           // Default to RANDOM memory
-    myConfig.yOffset     = 0;                           // Default is no offset
+    myConfig.memWipe     = 1;                           // Default to CLEAR memory (helps with save states)
+    myConfig.yOffset     = 0;                           // Default is no Y offset
     myConfig.expansion   = 0;                           // Default is no expansion
     myConfig.soundDriver = SND_DRV_NORMAL;              // Default is normal sound driver (not Wave Direct)
     myConfig.reserved1   = 0;
@@ -947,7 +946,6 @@ void SetDefaultGameConfig(void)
     if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 1;  // Antartic Adventure Prototype
     if (file_crc == 0x6af19e75) myConfig.maxSprites  = 1;  // Adventures in the Park
     if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 1;  // Uridium
-
 }
 
 // ----------------------------------------------------------
@@ -966,17 +964,10 @@ void LoadConfig(void)
 
     if (ReadFileCarefully("/data/Hachibitto.dat", (u8*)&myGlobalConfig, sizeof(myGlobalConfig), 0))  // Read Global Config
     {
-        if (myGlobalConfig.compressed)
-        {
-            int comp_len = 0;
-            ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig)); // Read the full game array of configs
-            ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len)); // Read the full game array of configs
-            (void)lzav_decompress( COMPRESS_BUFFER, AllConfigs, comp_len, sizeof(AllConfigs) );
-        }
-        else // Old-format... not compressed
-        {
-            ReadFileCarefully("/data/Hachibitto.dat", (u8*)&AllConfigs, sizeof(AllConfigs), sizeof(myGlobalConfig)); // Read the full game array of configs
-        }
+        int comp_len = 0;
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig)); // Read the full game array of configs
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len)); // Read the full game array of configs
+        (void)lzav_decompress( COMPRESS_BUFFER, AllConfigs, comp_len, sizeof(AllConfigs) );
 
         if (myGlobalConfig.config_ver != CONFIG_VER)
         {
