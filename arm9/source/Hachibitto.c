@@ -377,7 +377,6 @@ void sound_chip_reset()
   ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
   ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
   ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
-  last_sample = mixbuf2[4];
 
   // -----------------------------------------------------------------
   // The SCC sound chip is just for a few select Konami MSX1 games

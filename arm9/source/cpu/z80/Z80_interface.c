@@ -93,7 +93,8 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
                 // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
                 if (address >= 0x9800 && address <= 0x987F)
                 {
-                    return SCCRead(address, &mySCC); 
+                    //TBD: this breaks Metal Gear 2 - Solid Snake
+                    // return SCCRead(address, &mySCC); 
                 }                
             }
         }
