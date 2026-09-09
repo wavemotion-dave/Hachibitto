@@ -56,7 +56,7 @@ extern u16 VAddr;
 
 typedef struct {
   void (*Refresh)(u8 uY);
-  byte R2,R3,R4,R5,R6,M2,M3,M4,M5;
+  byte R2,R3,R4,R5,M2,M3,M4,M5;
 } tScrMode;
 
 extern u8 XBuf[];

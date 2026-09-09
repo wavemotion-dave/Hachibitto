@@ -15,7 +15,7 @@
 
 #include "vdp9938.h"
 
-u8 MaxSprites[2] __attribute__((section(".dtcm"))) = {32, 4};     // Normally the CV only shows 4 sprites on a line... for emulation we bump this up if configured
+u8 MaxSprites[2] __attribute__((section(".dtcm"))) = {32, 4};     // Normally the MSX1 only shows 4 sprites on a line... for emulation we bump this up if configured
 
 u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // Video flipping buffer
 
@@ -32,15 +32,16 @@ u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpoch         __attribute__((section(".dtcm"))) = 0;
+u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // new: bitmask, one bit per VDP interrupt source
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
 uint8_t OccBuf[320]     __attribute__((section(".dtcm")));
 
-static u16 nibbleLUT16[256] __attribute__((section(".dtcm")));
-
-static u8 screen7LUT[256] __attribute__((section(".dtcm")));
+static u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
+static u8 screen7LUT[256]       __attribute__((section(".dtcm")));
+static u8 Screen8ColorMap[256]  __attribute__((section(".dtcm")));
 
 void BuildScreen7LUT(void)
 {
@@ -58,9 +59,94 @@ void BuildNibbleLUT(void)
     }
 }
 
-u8 msx_irq_pending = 0;   // new: bitmask, one bit per VDP interrupt source
+typedef struct { u8 r, g, b; } RGBColor;
+void BuildScreen8ColorMap(void)
+{
+    // Decode all 256 GGGRRRBB combinations into their raw components.
+    // Kept unshifted here - since r, g and b are all shifted by the
+    // same <<2 to build RGB15, plain squared distance on these raw
+    // values is already proportional to actual color distance.
+    static RGBColor color[256];
+    for (int idx = 0; idx < 256; idx++)
+    {
+        color[idx].b = idx & 3;
+        color[idx].r = (idx >> 2) & 7;
+        color[idx].g = (idx >> 5) & 7;
+    }
 
-void SetVDPIRQ(u8 bit, u8 set) //TODO: move this to... Z80_Interface?
+    // We only have 236 palette slots (20-255) for 256 distinct colors.
+    // Repeatedly collapse the two closest surviving colors together
+    // until exactly 236 remain. redirect[] chains a removed color to
+    // whichever survivor it was merged into.
+    static u8 redirect[256];
+    static u8 alive[256];
+    int aliveCount = 256;
+    for (int idx = 0; idx < 256; idx++)
+    {
+        redirect[idx] = idx;
+        alive[idx] = 1;
+    }
+
+    while (aliveCount > 236)
+    {
+        int bestA = -1, bestB = -1;
+        int bestDist = 0x7FFFFFFF;
+
+        for (int a = 0; a < 256; a++)
+        {
+            if (!alive[a]) continue;
+            for (int b = a + 1; b < 256; b++)
+            {
+                if (!alive[b]) continue;
+                int dr = (int)color[a].r - color[b].r;
+                int dg = (int)color[a].g - color[b].g;
+                int db = (int)color[a].b - color[b].b;
+                int dist = dr*dr + dg*dg + 2*db*db;   // was: dr*dr + dg*dg + db*db
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestA = a;
+                    bestB = b;
+                }
+            }
+        }
+
+        alive[bestB] = 0;
+        redirect[bestB] = bestA;
+        aliveCount--;
+    }
+
+    // Resolve chains: a color may have been merged into a color that
+    // was itself later merged elsewhere. Walk each down to its final
+    // surviving representative.
+    for (int idx = 0; idx < 256; idx++)
+    {
+        u8 r = idx;
+        while (redirect[r] != r) r = redirect[r];
+        redirect[idx] = r;
+    }
+
+    // Assign the 236 survivors to BG_PALETTE[20..255] in ascending
+    // order, then point every original color at its slot.
+    static u8 slotOf[256];
+    int nextSlot = 20;
+    for (int idx = 0; idx < 256; idx++)
+    {
+        if (alive[idx])
+        {
+            BG_PALETTE[nextSlot] = RGB15(color[idx].r << 2, color[idx].g << 2, color[idx].b << 2);
+            slotOf[idx] = nextSlot;
+            nextSlot++;
+        }
+    }
+
+    for (int idx = 0; idx < 256; idx++)
+    {
+        Screen8ColorMap[idx] = slotOf[redirect[idx]];
+    }
+}
+
+void SetVDPIRQ(u8 bit, u8 set)
 {
     if (set) msx_irq_pending |= bit;
     else     msx_irq_pending &= ~bit;
@@ -75,16 +161,16 @@ void SetVDPIRQ(u8 bit, u8 set) //TODO: move this to... Z80_Interface?
 // all of the names you will find out there in the wild world of VDP documentation!
 // ---------------------------------------------------------------------------------------
 tScrMode SCR[MAXSCREEN+1] __attribute__((section(".dtcm")))  = {
-                // R2,  R3,  R4,  R5,  R6,  M2,  M3,  M4,  M5
-  { RefreshLine0, 0x7F,0x00,0x3F,0x00,0xFF,0x00,0x00,0x00,0x00 }, /* SCR 0:  TEXT 40x24  */
-  { RefreshLine1, 0x7F,0xFF,0x3F,0xFF,0xFF,0x00,0x00,0x00,0x00 }, /* SCR 1:  TEXT 32x24  */
-  { RefreshLine2, 0x7F,0x80,0x3C,0xFF,0xFF,0x00,0x7F,0x03,0x00 }, /* SCR 2:  BLK 256x192 */
-  { RefreshLine3, 0x7F,0x00,0x3F,0xFF,0xFF,0x00,0x00,0x00,0x00 }, /* SCR 3:  64x48x16    */
-  { RefreshLine4, 0x7F,0x80,0x3C,0xFC,0xFF,0x00,0x7F,0x03,0x03 }, /* SCR 4:  BLK 256x192 */
-  { RefreshLine5, 0x60,0x00,0x00,0xFC,0xFF,0x1F,0x00,0x00,0x03 }, /* SCR 5:  256x192x16  */
-  { RefreshLine6, 0x60,0x00,0x00,0xFC,0xFF,0x1F,0x00,0x00,0x03 }, /* SCR 6:  512x192x4   */
-  { RefreshLine7, 0x20,0x00,0x00,0xFC,0xFF,0x1F,0x00,0x00,0x03 }, /* SCR 7:  512x192x16  */
-  { RefreshLine8, 0x20,0x00,0x00,0xFC,0xFF,0x1F,0x00,0x00,0x03 }, /* SCR 8:  256x192x256 */
+                // R2,  R3,  R4,  R5,  M2,  M3,  M4,  M5
+  { RefreshLine0, 0x7F,0x00,0x3F,0x00,0x00,0x00,0x00,0x00 }, /* SCR 0:  TEXT 40x24  */
+  { RefreshLine1, 0x7F,0xFF,0x3F,0xFF,0x00,0x00,0x00,0x00 }, /* SCR 1:  TEXT 32x24  */
+  { RefreshLine2, 0x7F,0x80,0x3C,0xFF,0x00,0x7F,0x03,0x00 }, /* SCR 2:  BLK 256x192 */
+  { RefreshLine3, 0x7F,0x00,0x3F,0xFF,0x00,0x00,0x00,0x00 }, /* SCR 3:  64x48x16    */
+  { RefreshLine4, 0x7F,0x80,0x3C,0xFC,0x00,0x7F,0x03,0x03 }, /* SCR 4:  BLK 256x192 */
+  { RefreshLine5, 0x60,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 5:  256x192x16  */
+  { RefreshLine6, 0x60,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 6:  512x192x4   */
+  { RefreshLine7, 0x20,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 7:  512x192x16  */
+  { RefreshLine8, 0x20,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 8:  256x192x256 */
 };
 
 void (*RefreshLine)(u8 uY) __attribute__((section(".dtcm"))) = RefreshLine0;
@@ -1125,96 +1211,6 @@ ITCM_CODE void RefreshLine7(register u8 uY)
 }
 
 
-typedef struct { u8 r, g, b; } RGBColor;
-
-u8 Screen8ColorMap[256] __attribute__((section(".dtcm"))) = {0};
-
-void BuildScreen8ColorMap(void)
-{
-    // Decode all 256 GGGRRRBB combinations into their raw components.
-    // Kept unshifted here - since r, g and b are all shifted by the
-    // same <<2 to build RGB15, plain squared distance on these raw
-    // values is already proportional to actual color distance.
-    static RGBColor color[256];
-    for (int idx = 0; idx < 256; idx++)
-    {
-        color[idx].b = idx & 3;
-        color[idx].r = (idx >> 2) & 7;
-        color[idx].g = (idx >> 5) & 7;
-    }
-
-    // We only have 236 palette slots (20-255) for 256 distinct colors.
-    // Repeatedly collapse the two closest surviving colors together
-    // until exactly 236 remain. redirect[] chains a removed color to
-    // whichever survivor it was merged into.
-    static u8 redirect[256];
-    static u8 alive[256];
-    int aliveCount = 256;
-    for (int idx = 0; idx < 256; idx++)
-    {
-        redirect[idx] = idx;
-        alive[idx] = 1;
-    }
-
-    while (aliveCount > 236)
-    {
-        int bestA = -1, bestB = -1;
-        int bestDist = 0x7FFFFFFF;
-
-        for (int a = 0; a < 256; a++)
-        {
-            if (!alive[a]) continue;
-            for (int b = a + 1; b < 256; b++)
-            {
-                if (!alive[b]) continue;
-                int dr = (int)color[a].r - color[b].r;
-                int dg = (int)color[a].g - color[b].g;
-                int db = (int)color[a].b - color[b].b;
-                int dist = dr*dr + dg*dg + 2*db*db;   // was: dr*dr + dg*dg + db*db
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    bestA = a;
-                    bestB = b;
-                }
-            }
-        }
-
-        alive[bestB] = 0;
-        redirect[bestB] = bestA;
-        aliveCount--;
-    }
-
-    // Resolve chains: a color may have been merged into a color that
-    // was itself later merged elsewhere. Walk each down to its final
-    // surviving representative.
-    for (int idx = 0; idx < 256; idx++)
-    {
-        u8 r = idx;
-        while (redirect[r] != r) r = redirect[r];
-        redirect[idx] = r;
-    }
-
-    // Assign the 236 survivors to BG_PALETTE[20..255] in ascending
-    // order, then point every original color at its slot.
-    static u8 slotOf[256];
-    int nextSlot = 20;
-    for (int idx = 0; idx < 256; idx++)
-    {
-        if (alive[idx])
-        {
-            BG_PALETTE[nextSlot] = RGB15(color[idx].r << 2, color[idx].g << 2, color[idx].b << 2);
-            slotOf[idx] = nextSlot;
-            nextSlot++;
-        }
-    }
-
-    for (int idx = 0; idx < 256; idx++)
-    {
-        Screen8ColorMap[idx] = slotOf[redirect[idx]];
-    }
-}
-
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
 /*************************************************************/
@@ -1314,20 +1310,20 @@ void CheckNewMode(void)
   ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
   SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
   
-    if (ScrMode == 6)
-    {
-        BG_PALETTE[16] = BG_PALETTE[(BGColor>>2)&0x03];  // BD3-BD2: even columns
-        BG_PALETTE[18] = BG_PALETTE[BGColor&0x03];       // BD1-BD0: odd columns
-    }
-    else
-    {
-        BG_PALETTE[16] = BG_PALETTE[BGColor];
-    }
-    
-    if (!(VDP[8] & 0x20))          // TP=0 (default): color 0 is transparent, shows backdrop
-        BG_PALETTE[0] = BG_PALETTE[16];
-    // else (TP=1): leave BG_PALETTE[0] alone -- it already holds whatever the
-    // game genuinely programmed via port 0x9A, since nothing else overwrites it now    
+  if (ScrMode == 6)
+  {
+      BG_PALETTE[16] = BG_PALETTE[(BGColor>>2)&0x03];  // BD3-BD2: even columns
+      BG_PALETTE[18] = BG_PALETTE[BGColor&0x03];       // BD1-BD0: odd columns
+  }
+  else
+  {
+      BG_PALETTE[16] = BG_PALETTE[BGColor];
+  }
+  
+  if (!(VDP[8] & 0x20))          // TP=0 (default): color 0 is transparent, shows backdrop
+      BG_PALETTE[0] = BG_PALETTE[16];
+  // else (TP=1): leave BG_PALETTE[0] alone -- it already holds whatever the
+  // game genuinely programmed via port 0x9A, since nothing else overwrites it now    
 }
 
 
@@ -1537,8 +1533,6 @@ void RefereshPreviousLines(void)
 /** screen buffer. Loop9938() returns 1 if an interrupt is  **/
 /** to be generated, 0 otherwise.                           **/
 /*************************************************************/
-u8  Internal_LineCounter = 0;
-
 void Loop9938(void)
 {
   // 1. Get the 0-indexed display scanline relative to the active display area
