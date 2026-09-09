@@ -80,9 +80,8 @@ extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
 extern void RefereshPreviousLines(void);
 extern void ScanColorSprites(uint8_t Y);
-
+extern void vdp_9938_write_palette(u8 index, u8 red, u8 green, u8 blue);
 extern void WrCtrl9938(byte value);
-
 extern byte RdData9938(void);
 extern byte RdCtrl9938(void);
 extern void Reset9938(void);

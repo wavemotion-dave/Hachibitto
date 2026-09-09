@@ -39,7 +39,7 @@ u16 beeperFreq          __attribute__((section(".dtcm"))) = 0;
 u8 msx_beeper_process   __attribute__((section(".dtcm"))) = 0;
 u8 beeperWasOn          __attribute__((section(".dtcm"))) = 0;
 u8 msx_sram_enabled     __attribute__((section(".dtcm"))) = 0;
-u8 msx_subslot        __attribute__((section(".dtcm"))) = 0xFF;
+u8 msx_subslot          __attribute__((section(".dtcm"))) = 0xFF;
 
 u16 msx_block_size      __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 
