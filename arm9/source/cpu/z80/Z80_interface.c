@@ -506,17 +506,27 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 // 8000h~9FFFh (mirror: 0000h~1FFFh)    7000h (mirrors: 7001h~77FFh)    0
                 // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0     
                 // -------------------------------------------------------------------------
-                if (bCartInSegment[1] && (address >= 0x6000) && (address < 0x6800))
+                if (bCartInSegment[1] && ((address & 0xF800) == 0x6000))
                 {
                     MSXCartPtr[2] = (u8*)src;  // Main ROM
+                    MSXCartPtr[6] = (u8*)src;  // Mirror
                     MemoryMap[2] = MSXCartPtr[2];
-               }
-                else if (bCartInSegment[1] && (address >= 0x6800)  && (address < 0x7000))
+                    if (bCartInSegment[3])
+                    {
+                        MemoryMap[6] = MSXCartPtr[6];
+                    }
+                }
+                else if (bCartInSegment[1] && ((address & 0xF800) == 0x6800))
                 {
                     MSXCartPtr[3] = (u8*)src;  // Main ROM
+                    MSXCartPtr[7] = (u8*)src;  // Mirror
                     MemoryMap[3] = MSXCartPtr[3];
+                    if (bCartInSegment[3])
+                    {
+                        MemoryMap[7] = MSXCartPtr[7];
+                    }
                 }
-                else if (bCartInSegment[1] && (address >= 0x7000)  && (address < 0x7800))
+                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7000))
                 {
                     if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
@@ -526,13 +536,18 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     {
                         msx_sram_at_8000 = false;
                         MSXCartPtr[4] = (u8*)src;  // Main ROM
+                        MSXCartPtr[0] = (u8*)src;  // Mirror    
                         if (bCartInSegment[2])
                         {
                             MemoryMap[4] = MSXCartPtr[4];
                         }
+                        if (bCartInSegment[0])
+                        {
+                            MemoryMap[0] = MSXCartPtr[0];
+                        }                            
                     }
                 }
-                else if (bCartInSegment[1] && (address >= 0x7800) && (address < 0x8000))
+                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7800))
                 {
                     if (msx_sram_enabled && (block == msx_sram_enabled))
                     {
@@ -542,10 +557,15 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     {
                         msx_sram_at_8000 = false;
                         MSXCartPtr[5] = (u8*)src;  // Main ROM
+                        MSXCartPtr[1] = (u8*)src;  // Mirror                            
                         if (bCartInSegment[2]) 
                         {
                             MemoryMap[5] = MSXCartPtr[5];
                         }
+                        if (bCartInSegment[0])
+                        {
+                            MemoryMap[1] = MSXCartPtr[1];
+                        }                            
                     }
                 }
             }
