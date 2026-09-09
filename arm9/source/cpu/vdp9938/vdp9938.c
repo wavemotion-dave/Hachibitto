@@ -1179,7 +1179,12 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 /*************************************************************/
 ITCM_CODE void RefreshLine7(register u8 uY)
 {
-    uint8_t *P = RefreshBorder(uY);
+    // -----------------------------------------------------------------
+    // We purposely don't call RefreshLine() as we need the speed of a
+    // direct rendering into XBuf[]. This could cause problems if we 
+    // have sprites that clip at the left edge... but what can you do?!
+    // -----------------------------------------------------------------
+    uint8_t *P = (uint8_t *) (XBuf + (uY << 8));
 
     if (!ScreenON)
     {
@@ -1205,8 +1210,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
             dst32 += 2;
         }
 
-        ColorSprites(uY, P-32);
-        CommitLine(uY);
+        ColorSprites(uY, XBuf + (uY << 8)-32);
     }
 }
 
@@ -1216,6 +1220,11 @@ ITCM_CODE void RefreshLine7(register u8 uY)
 /*************************************************************/
 ITCM_CODE void RefreshLine8(register u8 uY)
 {
+    // -----------------------------------------------------------------
+    // We purposely don't call RefreshLine() as we need the speed of a
+    // direct rendering into XBuf[]. This could cause problems if we 
+    // have sprites that clip at the left edge... but what can you do?!
+    // -----------------------------------------------------------------
     if (!ScreenON)
     {
       memset(XBuf + (uY<<8), BGColor, 256);
