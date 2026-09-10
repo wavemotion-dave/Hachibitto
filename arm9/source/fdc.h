@@ -16,9 +16,6 @@
 #include "Hachibitto.h"
 #include "cpu/z80/Z80_interface.h"
 
-#define WD1770  0
-#define WD2793  1
-
 // The MSX FDC controller
 struct FDC_t
 {
@@ -48,7 +45,6 @@ struct FDC_t
 
 struct FDC_GEOMETRY_t
 {
-    u8  fdc_type;        // Either WD1770 or WD2793
     u8  drives;
     u8  sides;
     u8  tracks;
@@ -78,7 +74,7 @@ extern void fdc_write(u8 addr, u8 data);
 extern void fdc_setSide(u8 side);
 extern void fdc_setDrive(u8 drive);
 extern void fdc_reset(u8 full_reset);
-extern void fdc_init(u8 fdc_type, u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1);
+extern void fdc_init(u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1);
 extern void LoopFDC(void);     // NEW: call once per scanline, like Loop9938()
 
 #endif //_FDC_H

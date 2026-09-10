@@ -648,6 +648,8 @@ void ShowDebugZ80(void)
     sprintf(tmp, "SCR %02X   A8=%02X", ScrMode, Port_PPI_A); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "Mapper %d [%02X]", mapperType, mapperMask); DSPrint(0,idx++,7, tmp);
+    extern u32 halt_counter;
+    sprintf(tmp, "Halt C %d", halt_counter); DSPrint(0,idx++,7, tmp);
 
     idx = 6;
     for (u8 i=0; i< 16; i++)
@@ -1308,7 +1310,7 @@ void Hachibitto_main(void)
                                   FILE* file = fopen(gpFic[ucGameChoice].szName, "rb");
                                   (void) fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file);
                                   fclose(file);
-                                  fdc_init(WD2793, 1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+                                  fdc_init(1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
                               }
                               BottomScreenKeypad();
                               SoundUnPause();

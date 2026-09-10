@@ -32,7 +32,6 @@ volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we r
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
 u16 ALatch              __attribute__((section(".dtcm"))) = 0;
-
 u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
@@ -42,8 +41,7 @@ u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // new: bitmask
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
-uint8_t OccBuf[320]     __attribute__((section(".dtcm")));
-
+static uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
 static u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
 static u8 screen7LUT[256]       __attribute__((section(".dtcm")));
 
@@ -968,7 +966,6 @@ ITCM_CODE void CommitLine(u8 Y)
 
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
-  
   DEBUG_REFRESH(4);
 
   if (!ScreenON)
@@ -1053,7 +1050,6 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
           P16[2] = (uint16_t)p1;
           P16[3] = (uint16_t)(p1 >> 16);
           P16 += 4;
-
         } while (--X);
     }
 
@@ -1122,6 +1118,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
         CommitLine(uY);
     }
 }
+
 /** RefreshLine6() ********************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
 /*************************************************************/
@@ -1304,7 +1301,7 @@ void CheckNewMode(void)
     case 0x12: newMode=0;break; // Really 80 columns but ...
     default:   newMode=ScrMode;break;
   }
-
+  
   ScrMode=newMode;
 
   RefreshLine = SCR[ScrMode].Refresh;
@@ -1324,7 +1321,6 @@ void CheckNewMode(void)
   SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
   
   handle_transparency();
-  if (ScrMode < 4) RebuildLutTablehh();
 }
 
 
@@ -1367,6 +1363,7 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case  7:
       FGColor=value>>4;
       BGColor=value&0x0F;
+      if (ScrMode < 4) RebuildLutTablehh();
       break;
 
     case 10:

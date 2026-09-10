@@ -497,9 +497,8 @@ void fdc_reset(u8 full_reset)
     FDC.wait_for_write = 2;                              // Not storing any data
 }
 
-void fdc_init(u8 fdc_type, u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1)
+void fdc_init(u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1)
 {
-    Geom.fdc_type   = fdc_type;                         // Kept for header compatibility; unused now (WD2793-only)
     Geom.drives     = drives;                           // Number of drives (must be 1 or 2)
     Geom.sides      = sides;                            // Number of sides on each drive
     Geom.tracks     = tracks;                           // Number of tracks on each drive
