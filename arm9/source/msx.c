@@ -840,14 +840,15 @@ void write_port_9A(uint8_t data)
     }
     else 
     {
+        // ----------------------------------------
+        // We need to get this into GGGRRRBB format
+        // ----------------------------------------
+        
         // Second Byte: Green (bits 2-0)
-        uint8_t red   = (palette_rb_temp >> 4) & 0x07;
-        uint8_t blue  = palette_rb_temp & 0x07;
-        uint8_t green = data & 0x07;
-
         uint8_t index = VDP[16] & 0x0F;
-        BG_PALETTE[index] = RGB15(red<<2,green<<2,blue<<2);
-        BG_PALETTE[16] = BG_PALETTE[BGColor];   // border always follows whatever BGColor currently selects        
+        uint8_t color_grb = ((palette_rb_temp & 0x70) >> 2) | ((palette_rb_temp>>1) & 3) | ((data & 7) << 5);
+
+        vdp_9938_write_palette(index, color_grb);
 
         // Auto-increment Palette Register index R#16
         VDP[16] = (VDP[16] + 1) & 0x0F;

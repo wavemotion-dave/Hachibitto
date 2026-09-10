@@ -923,7 +923,7 @@ void SetDefaultGameConfig(void)
     myConfig.machineType = MACHINE_MSX2_A;              // Default machine is MSX2 with Slot 3 Expanded
     myConfig.autoFire    = 0;                           // Default to no auto-fire on either button
     myConfig.keyboard    = OVL_FULLKBD;                 // Default to normal full MSX keyboard
-    myConfig.maxSprites  = 0;                           // 0 means allow 32 sprites... 1 means limit to the original 4/8 sprites of the VDP
+    myConfig.maxSprites  = 0;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad        = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.memWipe     = 1;                           // Default to CLEAR memory (helps with save states)
     myConfig.yOffset     = 0;                           // Default is no Y offset
@@ -941,11 +941,11 @@ void SetDefaultGameConfig(void)
     // ----------------------------------------------------------------------------------
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
     // ----------------------------------------------------------------------------------
-    if (file_crc == 0xee530ad2) myConfig.maxSprites  = 1;  // QBiqs
-    if (file_crc == 0x275c800e) myConfig.maxSprites  = 1;  // Antartic Adventure
-    if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 1;  // Antartic Adventure Prototype
-    if (file_crc == 0x6af19e75) myConfig.maxSprites  = 1;  // Adventures in the Park
-    if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 1;  // Uridium
+    if (file_crc == 0xee530ad2) myConfig.maxSprites  = 0;  // QBiqs
+    if (file_crc == 0x275c800e) myConfig.maxSprites  = 0;  // Antartic Adventure
+    if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 0;  // Antartic Adventure Prototype
+    if (file_crc == 0x6af19e75) myConfig.maxSprites  = 0;  // Adventures in the Park
+    if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 0;  // Uridium
 }
 
 // ----------------------------------------------------------
@@ -1034,7 +1034,7 @@ const struct options_t Option_Table[1][20] =
                             "RESERVED","RESERVED", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                              &myConfig.msxMapper,      17},
         {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                 &myConfig.machineType,    3},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
-        {"MAX SPRITES",    {"32",  "4/8"},                                                                                                                                      &myConfig.maxSprites,     2},
+        {"MAX SPRITES",    {"4/8 PER LINE)", "32 PER LINE"},                                                                                                                    &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},

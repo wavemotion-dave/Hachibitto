@@ -15,9 +15,14 @@
 
 #include "vdp9938.h"
 
-u8 MaxSprites[2] __attribute__((section(".dtcm"))) = {32, 4};     // Normally the MSX1 only shows 4 sprites on a line... for emulation we bump this up if configured
+#define DEBUG_REFRESH(x) debug[x]++;
+//#define DEBUG_REFRESH(x)
 
 u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // Video flipping buffer
+
+u8 XPal[256] __attribute__((section(".dtcm"))) = {0};
+
+u8 XPalReal0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 
 volatile u8 bufferZone1[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
 u8 XBuf[256*212] ALIGN(32) = {0};   // VDP9938 screen is 256x212
@@ -41,7 +46,26 @@ uint8_t OccBuf[320]     __attribute__((section(".dtcm")));
 
 static u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
 static u8 screen7LUT[256]       __attribute__((section(".dtcm")));
-static u8 Screen8ColorMap[256]  __attribute__((section(".dtcm")));
+
+void handle_transparency(void)
+{    
+    XPal[0] = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
+}
+
+void vdp_9938_write_palette(u8 index, u8 color_grb)
+{
+    if (index == 0)
+    {
+        XPalReal0 = color_grb;
+    }
+    else
+    {
+        XPal[index] = color_grb;
+    }
+    
+    handle_transparency();
+    if (ScrMode < 4) RebuildLutTablehh();
+}
 
 void BuildScreen7LUT(void)
 {
@@ -59,90 +83,31 @@ void BuildNibbleLUT(void)
     }
 }
 
-typedef struct { u8 r, g, b; } RGBColor;
-void BuildScreen8ColorMap(void)
+void RebuildLutTablehh(void)
 {
-    // Decode all 256 GGGRRRBB combinations into their raw components.
-    // Kept unshifted here - since r, g and b are all shifted by the
-    // same <<2 to build RGB15, plain squared distance on these raw
-    // values is already proportional to actual color distance.
-    static RGBColor color[256];
-    for (int idx = 0; idx < 256; idx++)
+    for (int colfg=0; colfg<16; colfg++)
     {
-        color[idx].b = idx & 3;
-        color[idx].r = (idx >> 2) & 7;
-        color[idx].g = (idx >> 5) & 7;
-    }
-
-    // We only have 236 palette slots (20-255) for 256 distinct colors.
-    // Repeatedly collapse the two closest surviving colors together
-    // until exactly 236 remain. redirect[] chains a removed color to
-    // whichever survivor it was merged into.
-    static u8 redirect[256];
-    static u8 alive[256];
-    int aliveCount = 256;
-    for (int idx = 0; idx < 256; idx++)
-    {
-        redirect[idx] = idx;
-        alive[idx] = 1;
-    }
-
-    while (aliveCount > 236)
-    {
-        int bestA = -1, bestB = -1;
-        int bestDist = 0x7FFFFFFF;
-
-        for (int a = 0; a < 256; a++)
+        u32 fg = XPal[colfg];
+        for (int colbg=0; colbg<16; colbg++)
         {
-            if (!alive[a]) continue;
-            for (int b = a + 1; b < 256; b++)
-            {
-                if (!alive[b]) continue;
-                int dr = (int)color[a].r - color[b].r;
-                int dg = (int)color[a].g - color[b].g;
-                int db = (int)color[a].b - color[b].b;
-                int dist = dr*dr + dg*dg + 2*db*db;   // was: dr*dr + dg*dg + db*db
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    bestA = a;
-                    bestB = b;
-                }
-            }
+            u32 bg = XPal[colbg];
+            lutTablehh[colfg][colbg][ 0] = (bg<<0)|(bg<<8)|(bg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][ 1] = (bg<<0)|(bg<<8)|(bg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][ 2] = (bg<<0)|(bg<<8)|(fg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][ 3] = (bg<<0)|(bg<<8)|(fg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][ 4] = (bg<<0)|(fg<<8)|(bg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][ 5] = (bg<<0)|(fg<<8)|(bg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][ 6] = (bg<<0)|(fg<<8)|(fg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][ 7] = (bg<<0)|(fg<<8)|(fg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][ 8] = (fg<<0)|(bg<<8)|(bg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][ 9] = (fg<<0)|(bg<<8)|(bg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][10] = (fg<<0)|(bg<<8)|(fg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][11] = (fg<<0)|(bg<<8)|(fg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][12] = (fg<<0)|(fg<<8)|(bg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][13] = (fg<<0)|(fg<<8)|(bg<<16)|(fg<<24);
+            lutTablehh[colfg][colbg][14] = (fg<<0)|(fg<<8)|(fg<<16)|(bg<<24);
+            lutTablehh[colfg][colbg][15] = (fg<<0)|(fg<<8)|(fg<<16)|(fg<<24);
         }
-
-        alive[bestB] = 0;
-        redirect[bestB] = bestA;
-        aliveCount--;
-    }
-
-    // Resolve chains: a color may have been merged into a color that
-    // was itself later merged elsewhere. Walk each down to its final
-    // surviving representative.
-    for (int idx = 0; idx < 256; idx++)
-    {
-        u8 r = idx;
-        while (redirect[r] != r) r = redirect[r];
-        redirect[idx] = r;
-    }
-
-    // Assign the 236 survivors to BG_PALETTE[20..255] in ascending
-    // order, then point every original color at its slot.
-    static u8 slotOf[256];
-    int nextSlot = 20;
-    for (int idx = 0; idx < 256; idx++)
-    {
-        if (alive[idx])
-        {
-            BG_PALETTE[nextSlot] = RGB15(color[idx].r << 2, color[idx].g << 2, color[idx].b << 2);
-            slotOf[idx] = nextSlot;
-            nextSlot++;
-        }
-    }
-
-    for (int idx = 0; idx < 256; idx++)
-    {
-        Screen8ColorMap[idx] = slotOf[redirect[idx]];
     }
 }
 
@@ -312,7 +277,7 @@ ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
 
     s16 fifth_sprite_num =-1;                   // Used to detect the 5th sprite on a line
     AT = SprTab;                                // Pointer to the sprite table in VDP memory
-    MS = MaxSprites[myConfig.maxSprites]+1;     // We either render 4 sprites (normal - this is how an 9918 would work) or 32 sprites (enhanded mode for emulation only)
+    MS = (myConfig.maxSprites ? 32:4)+1;     // We either render 4 sprites (normal - this is how an 9918 would work) or 32 sprites (enhanded mode for emulation only)
     S5 = 5;                                     // We always want to trap on the 5th sprite
     u8 last = 31;                               // The last sprite number is 31 but we may break early if Y==208
 
@@ -399,6 +364,7 @@ ITCM_CODE void RefreshSprites(register byte Y)
       C=AT[3];                  /* C = sprite attributes */
       L=C&0x80? AT[1]-32:AT[1]; /* Sprite may be shifted left by 32 */
       C&=0x0F;                  /* C = sprite color */
+      C = XPal[C];              /* Map to correct color */
 
       if((L<256) && (L>-OH) && C)
       {
@@ -544,7 +510,7 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
         /* Set 9thSprite flag in the VDP status register */
         VDPStatus[0]|=0x40;
         /* Stop drawing sprites, unless all-sprites option enabled */
-        if (myConfig.maxSprites) break;
+        if (!myConfig.maxSprites) break;
       }
 
       /* Mark sprite as ready to draw */
@@ -726,7 +692,7 @@ ITCM_CODE void ScanColorSprites(uint8_t Y)
         /* Set 9thSprite flag in the VDP status register */
         VDPStatus[0]|=0x40;
         /* Stop drawing sprites, unless all-sprites option enabled */
-        if (myConfig.maxSprites) break;
+        if (!myConfig.maxSprites) break;
       }
 
       /* Mark sprite as ready to draw */
@@ -750,14 +716,14 @@ ITCM_CODE void RefreshLine0(u8 Y)
   register byte *P,FC,BC;
   u16 word1=0, word2=0, word3=0;
   
-  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
-
+  DEBUG_REFRESH(0);
+  
   P=XBuf+(Y<<8);
-  BC = BGColor;
-  FC = FGColor;
-
+  BC = XPal[BGColor];
+  FC = XPal[FGColor];
+  
   if(!ScreenON)
-    memset(P,BGColor,256);
+    memset(P,XPal[BGColor],256);
   else
   {
     T=ChrTab+(Y>>3)*40;
@@ -765,7 +731,7 @@ ITCM_CODE void RefreshLine0(u8 Y)
 
     u8 lastT = ~(*T);
 
-    memset(P, BGColor, 8);  // Fill the first 8 pixels with background color since the screen in TEXT mode is 240 pixels and needs the border filled
+    memset(P,XPal[BGColor], 8);  // Fill the first 8 pixels with background color since the screen in TEXT mode is 240 pixels and needs the border filled
     P += 8;                 // For this TEXT mode, we shift in 8 pixels to center the screen. We memset the background color to the first and last 8 pixels of a line to blank them.
 
     for(int X=0;X<40;X++)
@@ -795,7 +761,7 @@ ITCM_CODE void RefreshLine0(u8 Y)
       P+=6;T++;
     }
 
-    memset(P, BGColor, 8);  // Fill the last 8 pixels with background color since the screen in TEXT mode is 240 pixels and needs the border filled
+    memset(P, XPal[BGColor], 8);  // Fill the last 8 pixels with background color since the screen in TEXT mode is 240 pixels and needs the border filled
   }
 }
 
@@ -810,13 +776,13 @@ ITCM_CODE void RefreshLine1(u8 uY)
   register u32 *P;
   u8 lastT;
   
-  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
-
+  DEBUG_REFRESH(1);
+  
   P=(u32*) (XBuf+(uY<<8));
   u32 ptLow = 0; u32 ptHigh = 0;
 
   if(!ScreenON)
-    memset(P,BGColor,256);
+    memset(P,XPal[BGColor],256);
   else
   {
     T=ChrTab+((int)(uY&0xF8)<<2);
@@ -854,14 +820,14 @@ ITCM_CODE void RefreshLine2(u8 uY) {
   register byte FC,BC;
   register byte K,*T;
   u16 J,I;
-
-  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
   
+  DEBUG_REFRESH(2);
+
   P=(u32*)(XBuf+(uY<<8));
 
   if (!ScreenON)
   {
-    memset(XBuf + (uY<<8), BGColor, 256);
+    memset(XBuf + (uY<<8), XPal[BGColor], 256);
   }
   else
   {
@@ -904,13 +870,13 @@ ITCM_CODE void RefreshLine3(u8 uY)
   byte *P,*T;
   u8 lastT;
   
-  BG_PALETTE[0] = BG_PALETTE[17]; // Restore legacy palette entry in case it was overwritten
+  DEBUG_REFRESH(3);
 
   P=XBuf+(uY<<8);
 
   if (!ScreenON)
   {
-    memset(XBuf + (uY<<8), BGColor, 256);
+    memset(XBuf + (uY<<8), XPal[BGColor], 256);
   }
   else 
   {
@@ -925,8 +891,8 @@ ITCM_CODE void RefreshLine3(u8 uY)
       {
           lastT = *T;
           K=ChrGen[((int)lastT<<3)+Offset];
-          ptLow = K>>4;
-          ptHigh = K&0x0F;
+          ptLow  = XPal[K>>4];
+          ptHigh = XPal[K&0x0F];
           P[0]=P[1]=P[2]=P[3]=ptLow;
           P[4]=P[5]=P[6]=P[7]=ptHigh;
           dword1 = *((u32*)(P+0));
@@ -951,19 +917,21 @@ uint8_t *RefreshBorder(uint8_t Y)
 {
     int shift = HAdjust & ~1;   // keep your even-only clamp
 
-    // Pre-fill the small revealed border strip at its FINAL position in LineScratch
     if (ScrMode == 6)
     {
-        if (shift > 0)      for (int i=0;i<shift;i++)  LineScratch[LS_BASE+i] = (i&1) ? 18:16;
-        else if (shift < 0) for (int i=0;i<-shift;i++)  LineScratch[LS_BASE+256+shift+i] = (i&1) ? 18:16;
+        // Screen 6's border splits into two independent 2-bit fields
+        u8 borderEven = (BGColor>>2)&0x03;   // BD3-BD2
+        u8 borderOdd  = BGColor&0x03;        // BD1-BD0
+        if (shift > 0)      for (int i=0;i<shift;i++)  LineScratch[LS_BASE+i] = (i&1) ? borderOdd:borderEven;
+        else if (shift < 0) for (int i=0;i<-shift;i++)  LineScratch[LS_BASE+256+shift+i] = (i&1) ? borderOdd:borderEven;
     }
     else
     {
-        if (shift > 0)      memset(LineScratch+LS_BASE, 16, shift);
-        else if (shift < 0) memset(LineScratch+LS_BASE+256+shift, 16, -shift);
+        if (shift > 0)      memset(LineScratch+LS_BASE, BGColor, shift);
+        else if (shift < 0) memset(LineScratch+LS_BASE+256+shift, BGColor, -shift);
     }
 
-    return LineScratch + LS_BASE + shift;   // content renders here -- lands correctly by construction
+    return LineScratch + LS_BASE + shift;
 }
 
 ITCM_CODE void CommitLine(u8 Y)
@@ -971,11 +939,11 @@ ITCM_CODE void CommitLine(u8 Y)
     // Always exactly 256 bytes, always 4-aligned on both ends (XBuf rows and
     // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
     u32 *dst = (u32*)(XBuf + ((u16)Y << 8));
-    u32 *src = (u32*)(LineScratch + LS_BASE);
-    for (int i = 0; i < 64; i += 8)
+    u8 *src = (u8*)(LineScratch + LS_BASE);
+    for (int i = 0; i < 64; i++)
     {
-        dst[i+0]=src[i+0]; dst[i+1]=src[i+1]; dst[i+2]=src[i+2]; dst[i+3]=src[i+3];
-        dst[i+4]=src[i+4]; dst[i+5]=src[i+5]; dst[i+6]=src[i+6]; dst[i+7]=src[i+7];
+        *dst++ = (XPal[src[0]] << 0) | (XPal[src[1]] << 8) | (XPal[src[2]] << 16) | (XPal[src[3]] << 24);
+        src += 4;
     }
 }
 
@@ -984,10 +952,12 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
   uint32_t K, *T;
   int I, J;
   uint8_t *P = RefreshBorder(Y);
+  
+  DEBUG_REFRESH(4);
 
   if (!ScreenON)
   {
-    memset(XBuf + (Y<<8), BGColor, 256);
+    memset(XBuf + (Y<<8), XPal[BGColor], 256);
   }
   else
   {
@@ -1076,10 +1046,12 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 ITCM_CODE void RefreshLine5(register u8 uY)
 {
     uint8_t *P = RefreshBorder(uY);
+    
+    DEBUG_REFRESH(5);
 
     if (!ScreenON)
     {
-      memset(XBuf + (uY<<8), BGColor, 256);
+      memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
@@ -1140,16 +1112,18 @@ ITCM_CODE void RefreshLine5(register u8 uY)
 ITCM_CODE void RefreshLine6(register u8 uY)
 {
     uint8_t *P = RefreshBorder(uY);
+    
+    DEBUG_REFRESH(6);
 
     if (!ScreenON)
     {
-      memset(XBuf + (uY<<8), BGColor, 256);
+      memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
         u32 *destPtr32 = (u32*) P;
         u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
-        u8 *srcPtr = &ChrTab[addr];
+        u8 *srcPtr = &ChrTab[addr & 0x7FFF];
 
         // Loops 64 times. Processes exactly 128 source bytes.
         // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
@@ -1179,23 +1153,27 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 /*************************************************************/
 ITCM_CODE void RefreshLine7(register u8 uY)
 {
-    // -----------------------------------------------------------------
-    // We purposely don't call RefreshLine() as we need the speed of a
-    // direct rendering into XBuf[]. This could cause problems if we 
-    // have sprites that clip at the left edge... but what can you do?!
-    // -----------------------------------------------------------------
-    uint8_t *P = (uint8_t *) (XBuf + (uY << 8));
-
+    uint8_t *P = RefreshBorder(uY);
+    DEBUG_REFRESH(7);
+    
+    // ---------------------------------------------------------------------
+    // Mode 7 is a beast and we just need a bit more headroom... so we
+    // render 7 of 8 frames to give us that little bit of extra bandwidth.
+    // ---------------------------------------------------------------------
+    if (!(frame_number & 7) && isDSiMode()) {skip_render = 1;return;}
+    
     if (!ScreenON)
     {
-       memset(XBuf + (uY<<8), BGColor, 256);
+       memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
         u32 *dst32 = (u32*)P;
-        const u8 *src = ChrTab + (((u32)((uY + VScroll) & 511)) << 8);
+        const u8 *src = ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
+        if (FlipEvenOdd && OddPage && VDP_Memory<=src-0x10000) src-=0x10000;
 
-        for (int i = 0; i < 256; i += 8) {
+        for (int i = 0; i < 256; i += 8) 
+        {
             u32 b0 = screen7LUT[src[i+0]];
             u32 b1 = screen7LUT[src[i+1]];
             u32 b2 = screen7LUT[src[i+2]];
@@ -1210,7 +1188,8 @@ ITCM_CODE void RefreshLine7(register u8 uY)
             dst32 += 2;
         }
 
-        ColorSprites(uY, XBuf + (uY << 8)-32);
+        ColorSprites(uY, P-32);
+        CommitLine(uY);
     }
 }
 
@@ -1220,23 +1199,27 @@ ITCM_CODE void RefreshLine7(register u8 uY)
 /*************************************************************/
 ITCM_CODE void RefreshLine8(register u8 uY)
 {
+    DEBUG_REFRESH(8);
     // -----------------------------------------------------------------
     // We purposely don't call RefreshLine() as we need the speed of a
     // direct rendering into XBuf[]. This could cause problems if we 
     // have sprites that clip at the left edge... but what can you do?!
+    // It's unlikely there will be any kind of sprite tricks happening 
+    // for the Screen 8 mode so we're probably okay.
     // -----------------------------------------------------------------
     if (!ScreenON)
     {
-      memset(XBuf + (uY<<8), BGColor, 256);
+      memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
         uint16_t *P = (uint16_t *) (XBuf + (uY << 8));
-        uint8_t *S = (uint8_t *) (ChrTab + ((uY+VScroll) << 8));
+        uint8_t *S = (uint8_t *) ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
+        if (FlipEvenOdd && OddPage && VDP_Memory<=S-0x10000) S-=0x10000;
 
         for (int i=0; i<128; i++)
         {
-           *P++ = (Screen8ColorMap[S[(i*2)+1]] << 8) + Screen8ColorMap[S[(i*2)+0]];
+           *P++ = (S[(i*2)+1] << 8) + S[(i*2)+0];
         }
 
         ColorSprites(uY, XBuf + (uY << 8)-32);
@@ -1319,20 +1302,8 @@ void CheckNewMode(void)
   ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
   SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
   
-  if (ScrMode == 6)
-  {
-      BG_PALETTE[16] = BG_PALETTE[(BGColor>>2)&0x03];  // BD3-BD2: even columns
-      BG_PALETTE[18] = BG_PALETTE[BGColor&0x03];       // BD1-BD0: odd columns
-  }
-  else
-  {
-      BG_PALETTE[16] = BG_PALETTE[BGColor];
-  }
-  
-  if (!(VDP[8] & 0x20))          // TP=0 (default): color 0 is transparent, shows backdrop
-      BG_PALETTE[0] = BG_PALETTE[16];
-  // else (TP=1): leave BG_PALETTE[0] alone -- it already holds whatever the
-  // game genuinely programmed via port 0x9A, since nothing else overwrites it now    
+  handle_transparency();
+  if (ScrMode < 4) RebuildLutTablehh();
 }
 
 
@@ -1375,13 +1346,6 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case  7:
       FGColor=value>>4;
       BGColor=value&0x0F;
-      u8 r = (u8)((float)VDP9938A_palette[BGColor*3+0]*0.121568f);
-      u8 g = (u8)((float)VDP9938A_palette[BGColor*3+1]*0.121568f);
-      u8 b = (u8)((float)VDP9938A_palette[BGColor*3+2]*0.121568f);
-      if (ScrMode != 8)
-      {
-        BG_PALETTE[17] = RGB15(r,g,b); // Legacy color stored here for safe keeping
-      }
       break;
 
     case 10:
@@ -1396,7 +1360,7 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case 46: VDPDraw(value);break;
   }
 
-  if (iReg <= 7) CheckNewMode();
+  if (iReg <= 8) CheckNewMode();
 }
 
 
@@ -1633,7 +1597,31 @@ void Loop9938(void)
 
 void Reset9938(void)
 {
-    BG_PALETTE[0] = RGB15(0x00,0x00,0x00);
+    // Set universal and unchaning GGGRRRBB palette
+    for (int idx=0; idx < 256; idx++)
+    {
+        uint8_t green = (idx >> 5) & 0x07;
+        uint8_t red   = (idx >> 2) & 0x07;
+        uint8_t blue  = (idx >> 0) & 0x03;
+
+        BG_PALETTE[idx] = RGB15(red<<2,green<<2,blue<<3);
+    }
+    
+    // Set the XPal[] palette index array for Legacy colors
+    for (int idx=0; idx<16; idx++)
+    {
+        for (int idx=0; idx<16; idx++)
+        {
+            u8 g3 = (VDP9938A_palette[idx*3+1] >> 5) & 0x07;
+            u8 r3 = (VDP9938A_palette[idx*3+0] >> 5) & 0x07;
+            u8 b2 = (VDP9938A_palette[idx*3+2] >> 6) & 0x03;
+
+            u8 byte = (g3 << 5) | (r3 << 2) | b2;
+            XPal[idx] = byte ? byte : 1;   // avoid the DS's hardware-transparent index 0
+        }
+    }
+    
+    XPal[0] =  XPalReal0 = 0;   // Always transparency to start
     
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
@@ -1641,7 +1629,6 @@ void Reset9938(void)
 
     BuildNibbleLUT();
     BuildScreen7LUT();
-    BuildScreen8ColorMap();
     
     memset(OccBuf,0,sizeof(OccBuf));
 
@@ -1677,53 +1664,10 @@ void Reset9938(void)
 
     OH = IH = 0;
     
-    u16 uBcl;
-    u8 r,g,b;
-
-    // -----------------------------------------------------------------------
-    // The MSX has a 16 color palette... we set that up. MSX2 expands this.
-    // We always use the standard NTSC color palette which is fine for now
-    // but maybe in the future we add the PAL color palette for a bit more
-    // authenticity.
-    // -----------------------------------------------------------------------
-    for (uBcl=0;uBcl<16;uBcl++)
-    {
-        r = (u8) ((float) VDP9938A_palette[uBcl*3+0]*0.121568f);
-        g = (u8) ((float) VDP9938A_palette[uBcl*3+1]*0.121568f);
-        b = (u8) ((float) VDP9938A_palette[uBcl*3+2]*0.121568f);
-        SPRITE_PALETTE[uBcl] = RGB15(r,g,b);
-        BG_PALETTE[uBcl] = RGB15(r,g,b);
-    }
-    BG_PALETTE[16] = RGB15(0,0,0);
-    BG_PALETTE[17] = RGB15(0,0,0);
-    BG_PALETTE[18] = RGB15(0,0,0);
-    BG_PALETTE[19] = RGB15(0,0,0);
-
     // ---------------------------------------------------------------
     // Our background/foreground color table makes computations FAST!
     // ---------------------------------------------------------------
-    int colfg,colbg;
-    for (colfg=0;colfg<16;colfg++) {
-        for (colbg=0;colbg<16;colbg++) {
-          lutTablehh[colfg][colbg][ 0] = (colbg<<0) | (colbg<<8) | (colbg<<16) | (colbg<<24); // 0 0 0 0
-          lutTablehh[colfg][colbg][ 1] = (colbg<<0) | (colbg<<8) | (colbg<<16) | (colfg<<24); // 0 0 0 1
-          lutTablehh[colfg][colbg][ 2] = (colbg<<0) | (colbg<<8) | (colfg<<16) | (colbg<<24); // 0 0 1 0
-          lutTablehh[colfg][colbg][ 3] = (colbg<<0) | (colbg<<8) | (colfg<<16) | (colfg<<24); // 0 0 1 1
-          lutTablehh[colfg][colbg][ 4] = (colbg<<0) | (colfg<<8) | (colbg<<16) | (colbg<<24); // 0 1 0 0
-          lutTablehh[colfg][colbg][ 5] = (colbg<<0) | (colfg<<8) | (colbg<<16) | (colfg<<24); // 0 1 0 1
-          lutTablehh[colfg][colbg][ 6] = (colbg<<0) | (colfg<<8) | (colfg<<16) | (colbg<<24); // 0 1 1 0
-          lutTablehh[colfg][colbg][ 7] = (colbg<<0) | (colfg<<8) | (colfg<<16) | (colfg<<24); // 0 1 1 1
-
-          lutTablehh[colfg][colbg][ 8] = (colfg<<0) | (colbg<<8) | (colbg<<16) | (colbg<<24); // 1 0 0 0
-          lutTablehh[colfg][colbg][ 9] = (colfg<<0) | (colbg<<8) | (colbg<<16) | (colfg<<24); // 1 0 0 1
-          lutTablehh[colfg][colbg][10] = (colfg<<0) | (colbg<<8) | (colfg<<16) | (colbg<<24); // 1 0 1 0
-          lutTablehh[colfg][colbg][11] = (colfg<<0) | (colbg<<8) | (colfg<<16) | (colfg<<24); // 1 0 1 1
-          lutTablehh[colfg][colbg][12] = (colfg<<0) | (colfg<<8) | (colbg<<16) | (colbg<<24); // 1 1 0 0
-          lutTablehh[colfg][colbg][13] = (colfg<<0) | (colfg<<8) | (colbg<<16) | (colfg<<24); // 1 1 0 1
-          lutTablehh[colfg][colbg][14] = (colfg<<0) | (colfg<<8) | (colfg<<16) | (colbg<<24); // 1 1 1 0
-          lutTablehh[colfg][colbg][15] = (colfg<<0) | (colfg<<8) | (colfg<<16) | (colfg<<24); // 1 1 1 1
-        }
-    }
+    RebuildLutTablehh();
 }
 
 // End of file
