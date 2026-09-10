@@ -1083,17 +1083,6 @@ void Hachibitto_main(void)
         }
         emuActFrames++;
 
-        // -------------------------------------------------------------
-        // Vertical Sync reduces tearing but costs CPU time so this
-        // is configurable - default to '1' on DSi and '0' on DS-LITE
-        // -------------------------------------------------------------
-        while (dsVSyncCount == last_vsync_count)
-        {
-            if (myGlobalConfig.showFPS == 2) break;
-        }
-        last_vsync_count = dsVSyncCount;
-        msxUpdateScreen();
-
         // -----------------------------------
         // We only support NTSC 60 frames...
         // -----------------------------------
@@ -1104,6 +1093,36 @@ void Hachibitto_main(void)
             TIMER2_CR=TIMER_ENABLE | TIMER_DIV_1024;
             timingFrames = 0;
         }
+
+        // -------------------------------------------------------------
+        // Vertical Sync reduces tearing but costs CPU time so this
+        // is configurable - default to '1' on DSi and '0' on DS-LITE
+        // -------------------------------------------------------------
+        if (isDSiMode())
+        {
+            while (dsVSyncCount == last_vsync_count)
+            {
+                if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
+            }
+            last_vsync_count = dsVSyncCount;
+        }
+        else // DS uses timer... best we can do!
+        {
+            // ----------------------------------------------------------------------
+            // Time 1 frame... 546 (NTSC) or 646 (PAL) ticks of Timer2
+            // This is how we time frame-to frame to keep the game running at 60FPS
+            // We also allow running the game faster/slower than 100% so we use the
+            // GAME_SPEED_XXX[] array to handle that.
+            // ----------------------------------------------------------------------
+            while (TIMER2_DATA < (546*(timingFrames+1)))
+            {
+                if (skip_render) break;                   // If not drawing the frame, push on!
+                if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
+            }
+        }
+        
+        // And copy out XBuf[] to the DS VRAM!
+        msxUpdateScreen();
 
         // If the Z80 Debugger is enabled, call it every frame. Expensive but we need the debug!
         if (myGlobalConfig.debugger)

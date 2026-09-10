@@ -15,8 +15,8 @@
 
 #include "vdp9938.h"
 
-#define DEBUG_REFRESH(x) debug[x]++;
-//#define DEBUG_REFRESH(x)
+//#define DEBUG_REFRESH(x) debug[x]++;
+#define DEBUG_REFRESH(x)
 
 u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // Video flipping buffer
 
@@ -47,7 +47,7 @@ uint8_t OccBuf[320]     __attribute__((section(".dtcm")));
 static u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
 static u8 screen7LUT[256]       __attribute__((section(".dtcm")));
 
-void handle_transparency(void)
+inline void handle_transparency(void)
 {    
     XPal[0] = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
 }
@@ -547,48 +547,60 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
         {
           if(OH>IH)
           {
-            if(J&0x80) { SPR_OR(0);SPR_OR(1); }
-            if(J&0x40) { SPR_OR(2);SPR_OR(3); }
-            if(J&0x20) { SPR_OR(4);SPR_OR(5); }
-            if(J&0x10) { SPR_OR(6);SPR_OR(7); }
-            if(J&0x08) { SPR_OR(8);SPR_OR(9); }
-            if(J&0x04) { SPR_OR(10);SPR_OR(11); }
-            if(J&0x02) { SPR_OR(12);SPR_OR(13); }
-            if(J&0x01) { SPR_OR(14);SPR_OR(15); }
+            if (J)
+            {
+                if(J&0x80) { SPR_OR(0);SPR_OR(1); }
+                if(J&0x40) { SPR_OR(2);SPR_OR(3); }
+                if(J&0x20) { SPR_OR(4);SPR_OR(5); }
+                if(J&0x10) { SPR_OR(6);SPR_OR(7); }
+                if(J&0x08) { SPR_OR(8);SPR_OR(9); }
+                if(J&0x04) { SPR_OR(10);SPR_OR(11); }
+                if(J&0x02) { SPR_OR(12);SPR_OR(13); }
+                if(J&0x01) { SPR_OR(14);SPR_OR(15); }
+            }
             if(IH>8)
             {
               J=PT[16];
-              if(J&0x80) { SPR_OR(16);SPR_OR(17); }
-              if(J&0x40) { SPR_OR(18);SPR_OR(19); }
-              if(J&0x20) { SPR_OR(20);SPR_OR(21); }
-              if(J&0x10) { SPR_OR(22);SPR_OR(23); }
-              if(J&0x08) { SPR_OR(24);SPR_OR(25); }
-              if(J&0x04) { SPR_OR(26);SPR_OR(27); }
-              if(J&0x02) { SPR_OR(28);SPR_OR(29); }
-              if(J&0x01) { SPR_OR(30);SPR_OR(31); }
+              if (J)
+              {
+                  if(J&0x80) { SPR_OR(16);SPR_OR(17); }
+                  if(J&0x40) { SPR_OR(18);SPR_OR(19); }
+                  if(J&0x20) { SPR_OR(20);SPR_OR(21); }
+                  if(J&0x10) { SPR_OR(22);SPR_OR(23); }
+                  if(J&0x08) { SPR_OR(24);SPR_OR(25); }
+                  if(J&0x04) { SPR_OR(26);SPR_OR(27); }
+                  if(J&0x02) { SPR_OR(28);SPR_OR(29); }
+                  if(J&0x01) { SPR_OR(30);SPR_OR(31); }
+              }
             }
           }
           else
           {
-            if(J&0x80) SPR_OR(0);
-            if(J&0x40) SPR_OR(1);
-            if(J&0x20) SPR_OR(2);
-            if(J&0x10) SPR_OR(3);
-            if(J&0x08) SPR_OR(4);
-            if(J&0x04) SPR_OR(5);
-            if(J&0x02) SPR_OR(6);
-            if(J&0x01) SPR_OR(7);
+            if (J)
+            {
+                if(J&0x80) SPR_OR(0);
+                if(J&0x40) SPR_OR(1);
+                if(J&0x20) SPR_OR(2);
+                if(J&0x10) SPR_OR(3);
+                if(J&0x08) SPR_OR(4);
+                if(J&0x04) SPR_OR(5);
+                if(J&0x02) SPR_OR(6);
+                if(J&0x01) SPR_OR(7);
+            }
             if(IH>8)
             {
               J=PT[16];
-              if(J&0x80) SPR_OR(8);
-              if(J&0x40) SPR_OR(9);
-              if(J&0x20) SPR_OR(10);
-              if(J&0x10) SPR_OR(11);
-              if(J&0x08) SPR_OR(12);
-              if(J&0x04) SPR_OR(13);
-              if(J&0x02) SPR_OR(14);
-              if(J&0x01) SPR_OR(15);
+              if (J)
+              {
+                  if(J&0x80) SPR_OR(8);
+                  if(J&0x40) SPR_OR(9);
+                  if(J&0x20) SPR_OR(10);
+                  if(J&0x10) SPR_OR(11);
+                  if(J&0x08) SPR_OR(12);
+                  if(J&0x04) SPR_OR(13);
+                  if(J&0x02) SPR_OR(14);
+                  if(J&0x01) SPR_OR(15);
+              }
             }
           }
         }
@@ -596,48 +608,60 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
         {
           if(OH>IH)
           {
-            if(J&0x80) { SPR_SET(0);SPR_SET(1); }
-            if(J&0x40) { SPR_SET(2);SPR_SET(3); }
-            if(J&0x20) { SPR_SET(4);SPR_SET(5); }
-            if(J&0x10) { SPR_SET(6);SPR_SET(7); }
-            if(J&0x08) { SPR_SET(8);SPR_SET(9); }
-            if(J&0x04) { SPR_SET(10);SPR_SET(11); }
-            if(J&0x02) { SPR_SET(12);SPR_SET(13); }
-            if(J&0x01) { SPR_SET(14);SPR_SET(15); }
+            if (J)
+            {
+                if(J&0x80) { SPR_SET(0);SPR_SET(1); }
+                if(J&0x40) { SPR_SET(2);SPR_SET(3); }
+                if(J&0x20) { SPR_SET(4);SPR_SET(5); }
+                if(J&0x10) { SPR_SET(6);SPR_SET(7); }
+                if(J&0x08) { SPR_SET(8);SPR_SET(9); }
+                if(J&0x04) { SPR_SET(10);SPR_SET(11); }
+                if(J&0x02) { SPR_SET(12);SPR_SET(13); }
+                if(J&0x01) { SPR_SET(14);SPR_SET(15); }
+            }
             if(IH>8)
             {
               J=PT[16];
-              if(J&0x80) { SPR_SET(16);SPR_SET(17); }
-              if(J&0x40) { SPR_SET(18);SPR_SET(19); }
-              if(J&0x20) { SPR_SET(20);SPR_SET(21); }
-              if(J&0x10) { SPR_SET(22);SPR_SET(23); }
-              if(J&0x08) { SPR_SET(24);SPR_SET(25); }
-              if(J&0x04) { SPR_SET(26);SPR_SET(27); }
-              if(J&0x02) { SPR_SET(28);SPR_SET(29); }
-              if(J&0x01) { SPR_SET(30);SPR_SET(31); }
+              if (J)
+              {
+                  if(J&0x80) { SPR_SET(16);SPR_SET(17); }
+                  if(J&0x40) { SPR_SET(18);SPR_SET(19); }
+                  if(J&0x20) { SPR_SET(20);SPR_SET(21); }
+                  if(J&0x10) { SPR_SET(22);SPR_SET(23); }
+                  if(J&0x08) { SPR_SET(24);SPR_SET(25); }
+                  if(J&0x04) { SPR_SET(26);SPR_SET(27); }
+                  if(J&0x02) { SPR_SET(28);SPR_SET(29); }
+                  if(J&0x01) { SPR_SET(30);SPR_SET(31); }
+              }
             }
           }
           else
           {
-            if(J&0x80) SPR_SET(0);
-            if(J&0x40) SPR_SET(1);
-            if(J&0x20) SPR_SET(2);
-            if(J&0x10) SPR_SET(3);
-            if(J&0x08) SPR_SET(4);
-            if(J&0x04) SPR_SET(5);
-            if(J&0x02) SPR_SET(6);
-            if(J&0x01) SPR_SET(7);
+            if (J)
+            {
+                if(J&0x80) SPR_SET(0);
+                if(J&0x40) SPR_SET(1);
+                if(J&0x20) SPR_SET(2);
+                if(J&0x10) SPR_SET(3);
+                if(J&0x08) SPR_SET(4);
+                if(J&0x04) SPR_SET(5);
+                if(J&0x02) SPR_SET(6);
+                if(J&0x01) SPR_SET(7);
+            }
             if(IH>8)
             {
               J=PT[16];
-              if(J&0x80) SPR_SET(8);
-              if(J&0x40) SPR_SET(9);
-              if(J&0x20) SPR_SET(10);
-              if(J&0x10) SPR_SET(11);
-              if(J&0x08) SPR_SET(12);
-              if(J&0x04) SPR_SET(13);
-              if(J&0x02) SPR_SET(14);
-              if(J&0x01) SPR_SET(15);
+              if (J)
+              {
+                  if(J&0x80) SPR_SET(8);
+                  if(J&0x40) SPR_SET(9);
+                  if(J&0x20) SPR_SET(10);
+                  if(J&0x10) SPR_SET(11);
+                  if(J&0x08) SPR_SET(12);
+                  if(J&0x04) SPR_SET(13);
+                  if(J&0x02) SPR_SET(14);
+                  if(J&0x01) SPR_SET(15);
+              }
             }
           }
         }
@@ -660,7 +684,6 @@ ITCM_CODE void ScanColorSprites(uint8_t Y)
   uint8_t C,IH,OH;
   uint8_t *AT;
   int L,K;
-  unsigned int M;
 
   /* No extra sprites yet */
   VDPStatus[0]&=~0x5F;
@@ -672,15 +695,15 @@ ITCM_CODE void ScanColorSprites(uint8_t Y)
   IH = SprHeights[VDP[1]&0x02];
   AT = SprTab-4;
   C  = MAXSPRITE2+1;
-  M  = 0;
 
+  u8 locVScroll = VScroll;
   /* Count displayed sprites */
   for(L=0;L<32;++L)
   {
-    M<<=1;AT+=4;              /* Iterating through SprTab      */
+    AT+=4;                    /* Iterating through SprTab      */
     K=AT[0];                  /* Read Y from SprTab            */
     if(K==216) break;         /* Iteration terminates if Y=216 */
-    K=(uint8_t)(K-VScroll);   /* Sprite's actual Y coordinate  */
+    K=(uint8_t)(K-locVScroll);/* Sprite's actual Y coordinate  */
     if(K>256-IH) K-=256;      /* Y coordinate may be negative  */
 
     /* Mark all valid sprites with 1s, break at MAXSPRITE2 sprites */
@@ -691,12 +714,8 @@ ITCM_CODE void ScanColorSprites(uint8_t Y)
       {
         /* Set 9thSprite flag in the VDP status register */
         VDPStatus[0]|=0x40;
-        /* Stop drawing sprites, unless all-sprites option enabled */
-        if (!myConfig.maxSprites) break;
+        break;
       }
-
-      /* Mark sprite as ready to draw */
-      M|=1;
     }
   }
 
@@ -949,9 +968,6 @@ ITCM_CODE void CommitLine(u8 Y)
 
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
-  uint32_t K, *T;
-  int I, J;
-  uint8_t *P = RefreshBorder(Y);
   
   DEBUG_REFRESH(4);
 
@@ -961,6 +977,9 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
   }
   else
   {
+    uint32_t K, *T;
+    int I, J;
+    uint8_t *P = RefreshBorder(Y);
     uint32_t srcY = Y + VScroll;
     T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
     I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
@@ -1045,8 +1064,6 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 
 ITCM_CODE void RefreshLine5(register u8 uY)
 {
-    uint8_t *P = RefreshBorder(uY);
-    
     DEBUG_REFRESH(5);
 
     if (!ScreenON)
@@ -1055,6 +1072,8 @@ ITCM_CODE void RefreshLine5(register u8 uY)
     }
     else
     {
+        uint8_t *P = RefreshBorder(uY);
+
         const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
         if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
 
@@ -1070,7 +1089,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
             {
                 u32 s0 = *(u32*)(src + i);
                 u32 s1 = *(u32*)(src + i + 4);
-
+                
                 u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
@@ -1540,10 +1559,9 @@ void Loop9938(void)
   /* If refreshing display area, call scanline handler */
   if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE))
   {
-      unsigned int tmp;
-      
       if (timingFrames & (isDSiMode() ? 0:1))
       {
+          unsigned int tmp;
           skip_render=1;
           if (ScrMode < 4)
             ScanSprites(CurLine - VDP9938_START_LINE, &tmp);    // Skip rendering - but still scan sprites for the 5th sprite flag
