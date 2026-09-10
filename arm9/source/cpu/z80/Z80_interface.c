@@ -69,7 +69,7 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     // Everything in this block is accessing high-memory...
     if (address & 0x8000)
     {
-        if ((address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
+        if (subslot_active && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
         {
             if (myConfig.machineType != MACHINE_MSX1)
             {
@@ -417,211 +417,194 @@ void SubslotWrite(u8 value)
 // ------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u8 value,u16 address) 
 {
-    if ((address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
+    if (bRAMInSegment[address >> 14]) // RAM Exists... write it.
     {
-        if (myConfig.machineType != MACHINE_MSX1)
+        if (msx_sram_at_8000) //TODO: make this a unique mapper... that doesn't set bRAMInSegment[] true.
         {
-            SubslotWrite(value);
-            return;
-        }
-    }
-
-    // -------------------------------------------------------
-    // First see if this is a write to a RAM enabled slot...
-    // -------------------------------------------------------
-    if (bRAMInSegment[0] && (address < 0x4000))
-    {
-        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
-    }
-    else if (bRAMInSegment[1] && (address >= 0x4000) && (address <= 0x7FFF))
-    {
-        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
-    }
-    else if ((bRAMInSegment[2] || msx_sram_at_8000) && (address >= 0x8000) && (address <= 0xBFFF))
-    {
-        if (msx_sram_at_8000) 
-        {
-            SRAM_Memory[address&0x3FFF] = value;   // Write SRAM area
-            write_NV_counter = 4;                  // This will back the EE in 4 seconds of non-activity on the SRAM
-        }
-        else *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
-    }
-    else if ((bRAMInSegment[3] == 1) && (address >= 0xC000)) // A value of 1 here means we can write to the entire 16K page
-    {
-        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
-    }
-    else    // Check for MSX Mappers Mappers
-    {
-        if (mapperMask)
-        {
-            // -------------------------------------------------------------
-            // Compute the block and offset of the new memory and we 
-            // can map it into place... this is fast since we are just
-            // moving pointers around and not trying to copy memory blocks.
-            // -------------------------------------------------------------
-            u32 block = (value & mapperMask);
-            u32 msx_offset = block * msx_block_size;
-            u32 *src = (u32*)((u8*)ROM_Memory + msx_offset);
-
-            // ---------------------------------------------------------------------------------
-            // The Konami 8K Mapper without SCC:
-            // 4000h-5FFFh - fixed ROM area (not swappable)
-            // 6000h~7FFFh (mirror: E000h~FFFFh)    6000h (mirrors: 6001h~7FFFh)    1
-            // 8000h~9FFFh (mirror: 0000h~1FFFh)    8000h (mirrors: 8001h~9FFFh)    Random
-            // A000h~BFFFh (mirror: 2000h~3FFFh)    A000h (mirrors: A001h~BFFFh)    Random
-            // ---------------------------------------------------------------------------------
-            if (mapperType == KON8)
+            if ((address & 0xC000) == 0x8000)
             {
-                if (bCartInSegment[1] && (address == 0x4000))
+                SRAM_Memory[address&0x3FFF] = value;   // Write SRAM area
+                write_NV_counter = 4;                  // This will back the EE in 4 seconds of non-activity on the SRAM
+                return;
+            }
+        }
+        
+        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
+    }
+    else if (subslot_active && (address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
+    {
+        SubslotWrite(value);
+        return;
+    }
+    else if (mapperMask)
+    {
+        // -------------------------------------------------------------
+        // Compute the block and offset of the new memory and we 
+        // can map it into place... this is fast since we are just
+        // moving pointers around and not trying to copy memory blocks.
+        // -------------------------------------------------------------
+        u32 block = (value & mapperMask);
+        u32 msx_offset = block * msx_block_size;
+        u32 *src = (u32*)((u8*)ROM_Memory + msx_offset);
+
+        // ---------------------------------------------------------------------------------
+        // The Konami 8K Mapper without SCC:
+        // 4000h-5FFFh - fixed ROM area (not swappable)
+        // 6000h~7FFFh (mirror: E000h~FFFFh)    6000h (mirrors: 6001h~7FFFh)    1
+        // 8000h~9FFFh (mirror: 0000h~1FFFh)    8000h (mirrors: 8001h~9FFFh)    Random
+        // A000h~BFFFh (mirror: 2000h~3FFFh)    A000h (mirrors: A001h~BFFFh)    Random
+        // ---------------------------------------------------------------------------------
+        if (mapperType == KON8)
+        {
+            if (bCartInSegment[1] && (address == 0x4000))
+            {
+                MSXCartPtr[2] = (u8*)src;  // Main ROM
+                MSXCartPtr[6] = (u8*)src;  // Mirror
+                MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+            }
+            else if (bCartInSegment[1] && (address == 0x6000))
+            {
+                MSXCartPtr[3] = (u8*)src;  // Main ROM
+                MSXCartPtr[7] = (u8*)src;  // Mirror
+                MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+            }
+            else if (bCartInSegment[2] && (address == 0x8000))
+            {
+                MSXCartPtr[4] = (u8*)src;  // Main ROM
+                MSXCartPtr[0] = (u8*)src;  // Mirror                            
+                MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+            }
+            else if (bCartInSegment[2] && (address == 0xA000))
+            {
+                MSXCartPtr[5] = (u8*)src;  // Main ROM
+                MSXCartPtr[1] = (u8*)src;  // Mirror       
+                MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            }
+        }
+        else if (mapperType == ASC8)
+        {
+            // -------------------------------------------------------------------------
+            // The ASCII 8K Mapper:
+            // 4000h~5FFFh (mirror: C000h~DFFFh)    6000h (mirrors: 6001h~67FFh)    0
+            // 6000h~7FFFh (mirror: E000h~FFFFh)    6800h (mirrors: 6801h~68FFh)    0
+            // 8000h~9FFFh (mirror: 0000h~1FFFh)    7000h (mirrors: 7001h~77FFh)    0
+            // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0     
+            // -------------------------------------------------------------------------
+            if (bCartInSegment[1] && ((address & 0xF800) == 0x6000))
+            {
+                MSXCartPtr[2] = (u8*)src;  // Main ROM
+                MSXCartPtr[6] = (u8*)src;  // Mirror
+                MemoryMap[2] = MSXCartPtr[2];
+                if (bCartInSegment[3])
                 {
-                    MSXCartPtr[2] = (u8*)src;  // Main ROM
-                    MSXCartPtr[6] = (u8*)src;  // Mirror
-                    MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+                    MemoryMap[6] = MSXCartPtr[6];
                 }
-                else if (bCartInSegment[1] && (address == 0x6000))
+            }
+            else if (bCartInSegment[1] && ((address & 0xF800) == 0x6800))
+            {
+                MSXCartPtr[3] = (u8*)src;  // Main ROM
+                MSXCartPtr[7] = (u8*)src;  // Mirror
+                MemoryMap[3] = MSXCartPtr[3];
+                if (bCartInSegment[3])
                 {
-                    MSXCartPtr[3] = (u8*)src;  // Main ROM
-                    MSXCartPtr[7] = (u8*)src;  // Mirror
-                    MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+                    MemoryMap[7] = MSXCartPtr[7];
                 }
-                else if (bCartInSegment[2] && (address == 0x8000))
+            }
+            else if (bCartInSegment[1] && ((address & 0xF800) == 0x7000))
+            {
+                if (msx_sram_enabled && (block == msx_sram_enabled))
                 {
+                    msx_sram_at_8000 = true;
+                }
+                else
+                {
+                    msx_sram_at_8000 = false;
                     MSXCartPtr[4] = (u8*)src;  // Main ROM
-                    MSXCartPtr[0] = (u8*)src;  // Mirror                            
-                    MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-                }
-                else if (bCartInSegment[2] && (address == 0xA000))
-                {
-                    MSXCartPtr[5] = (u8*)src;  // Main ROM
-                    MSXCartPtr[1] = (u8*)src;  // Mirror       
-                    MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
-                }
-            }
-            else if (mapperType == ASC8)
-            {
-                // -------------------------------------------------------------------------
-                // The ASCII 8K Mapper:
-                // 4000h~5FFFh (mirror: C000h~DFFFh)    6000h (mirrors: 6001h~67FFh)    0
-                // 6000h~7FFFh (mirror: E000h~FFFFh)    6800h (mirrors: 6801h~68FFh)    0
-                // 8000h~9FFFh (mirror: 0000h~1FFFh)    7000h (mirrors: 7001h~77FFh)    0
-                // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0     
-                // -------------------------------------------------------------------------
-                if (bCartInSegment[1] && ((address & 0xF800) == 0x6000))
-                {
-                    MSXCartPtr[2] = (u8*)src;  // Main ROM
-                    MSXCartPtr[6] = (u8*)src;  // Mirror
-                    MemoryMap[2] = MSXCartPtr[2];
-                    if (bCartInSegment[3])
-                    {
-                        MemoryMap[6] = MSXCartPtr[6];
-                    }
-                }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x6800))
-                {
-                    MSXCartPtr[3] = (u8*)src;  // Main ROM
-                    MSXCartPtr[7] = (u8*)src;  // Mirror
-                    MemoryMap[3] = MSXCartPtr[3];
-                    if (bCartInSegment[3])
-                    {
-                        MemoryMap[7] = MSXCartPtr[7];
-                    }
-                }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7000))
-                {
-                    if (msx_sram_enabled && (block == msx_sram_enabled))
-                    {
-                        msx_sram_at_8000 = true;
-                    }
-                    else
-                    {
-                        msx_sram_at_8000 = false;
-                        MSXCartPtr[4] = (u8*)src;  // Main ROM
-                        MSXCartPtr[0] = (u8*)src;  // Mirror    
-                        if (bCartInSegment[2])
-                        {
-                            MemoryMap[4] = MSXCartPtr[4];
-                        }
-                        if (bCartInSegment[0])
-                        {
-                            MemoryMap[0] = MSXCartPtr[0];
-                        }                            
-                    }
-                }
-                else if (bCartInSegment[1] && ((address & 0xF800) == 0x7800))
-                {
-                    if (msx_sram_enabled && (block == msx_sram_enabled))
-                    {
-                        msx_sram_at_8000 = true;
-                    }
-                    else
-                    {
-                        msx_sram_at_8000 = false;
-                        MSXCartPtr[5] = (u8*)src;  // Main ROM
-                        MSXCartPtr[1] = (u8*)src;  // Mirror                            
-                        if (bCartInSegment[2]) 
-                        {
-                            MemoryMap[5] = MSXCartPtr[5];
-                        }
-                        if (bCartInSegment[0])
-                        {
-                            MemoryMap[1] = MSXCartPtr[1];
-                        }                            
-                    }
-                }
-            }
-            else if (mapperType == SCC8)
-            {
-                // ----------------------------------------------------
-                // Are we writing to the SCC chip memory mapped area?
-                // ----------------------------------------------------
-                if (msx_scc_enable && ((address & 0xF800) == 0x9800))
-                {
-                     SCC_LegacyWrite(value, address);
-                }
-                
-                HandleKonamiSCC8(src, block, address, value);
-            }
-            else if (mapperType == ASC16)
-            {
-                HandleAscii16K(src, block, address);
-            }
-            else if (mapperType == ZEN8)
-            {
-                HandleZemina8K(src, block, address);
-            }
-            else if (mapperType == ZEN16)
-            {
-                HandleZemina16K(src, block, address);
-            }
-            else if (mapperType == XEVIOUS)
-            {
-                HandleXevious(src, block, address);
-            }
-            else if (mapperType == SUPERLR)
-            {
-                if (address <= 0x3FFF) 
-                {
-                    HandleSuperLodeRunner(src, block, address);
-                }
-            }
-            else if (mapperType == XBLAM)
-            {
-                if (address == 0x4045)
-                {
-                    MSXCartPtr[4] = (u8*)src;          // Main ROM at 8000
-                    MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000                  
-                    if (bCartInSegment[2]) 
+                    MSXCartPtr[0] = (u8*)src;  // Mirror    
+                    if (bCartInSegment[2])
                     {
                         MemoryMap[4] = MSXCartPtr[4];
+                    }
+                    if (bCartInSegment[0])
+                    {
+                        MemoryMap[0] = MSXCartPtr[0];
+                    }                            
+                }
+            }
+            else if (bCartInSegment[1] && ((address & 0xF800) == 0x7800))
+            {
+                if (msx_sram_enabled && (block == msx_sram_enabled))
+                {
+                    msx_sram_at_8000 = true;
+                }
+                else
+                {
+                    msx_sram_at_8000 = false;
+                    MSXCartPtr[5] = (u8*)src;  // Main ROM
+                    MSXCartPtr[1] = (u8*)src;  // Mirror                            
+                    if (bCartInSegment[2]) 
+                    {
                         MemoryMap[5] = MSXCartPtr[5];
                     }
+                    if (bCartInSegment[0])
+                    {
+                        MemoryMap[1] = MSXCartPtr[1];
+                    }                            
                 }
-            }                
+            }
         }
-        else if (mapperType == SCCPLUS_RAM)
+        else if (mapperType == SCC8)
         {
-            HandleSCCPlus(address, value);
+            // ----------------------------------------------------
+            // Are we writing to the SCC chip memory mapped area?
+            // ----------------------------------------------------
+            if (msx_scc_enable && ((address & 0xF800) == 0x9800))
+            {
+                 SCC_LegacyWrite(value, address);
+            }
+            
+            HandleKonamiSCC8(src, block, address, value);
         }
+        else if (mapperType == ASC16)
+        {
+            HandleAscii16K(src, block, address);
+        }
+        else if (mapperType == ZEN8)
+        {
+            HandleZemina8K(src, block, address);
+        }
+        else if (mapperType == ZEN16)
+        {
+            HandleZemina16K(src, block, address);
+        }
+        else if (mapperType == XEVIOUS)
+        {
+            HandleXevious(src, block, address);
+        }
+        else if (mapperType == SUPERLR)
+        {
+            if (address <= 0x3FFF) 
+            {
+                HandleSuperLodeRunner(src, block, address);
+            }
+        }
+        else if (mapperType == XBLAM)
+        {
+            if (address == 0x4045)
+            {
+                MSXCartPtr[4] = (u8*)src;          // Main ROM at 8000
+                MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000                  
+                if (bCartInSegment[2]) 
+                {
+                    MemoryMap[4] = MSXCartPtr[4];
+                    MemoryMap[5] = MSXCartPtr[5];
+                }
+            }
+        }                
+    }
+    else if (mapperType == SCCPLUS_RAM)
+    {
+        HandleSCCPlus(address, value);
     }
 }
 

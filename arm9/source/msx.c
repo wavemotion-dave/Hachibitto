@@ -27,6 +27,7 @@
 // ---------------------------------------
 // Some MSX Mapper / Slot Handling stuff
 // ---------------------------------------
+u8 subslot_active       __attribute__((section(".dtcm"))) = 0;
 u8 mapperType           __attribute__((section(".dtcm"))) = 0;
 u8 mapperMask           __attribute__((section(".dtcm"))) = 0;
 u8 bCartInSegment[4]    __attribute__((section(".dtcm"))) = {0,0,0,0};
@@ -537,6 +538,7 @@ void msx_slot_map_msx1(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
+    subslot_active = 0;
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -657,7 +659,8 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. This is our expanded slot.
+            subslot_active = 1;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
             MemoryMap[6] = BIOS_Memory+0x8000;
@@ -677,6 +680,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
+    subslot_active = 0;
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -798,6 +802,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
+            subslot_active = 1;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
             MemoryMap[6] = BIOS_Memory+0x8000;

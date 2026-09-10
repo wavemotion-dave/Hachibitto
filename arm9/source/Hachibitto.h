@@ -185,6 +185,7 @@ extern u16 emuActFrames;
 extern u16 timingFrames;
 
 extern u8 msx_scc_enable;
+extern u8 msx_scc_plus_enable;
 extern u8 msx_scc_capable_game;
 
 extern char initial_file[];

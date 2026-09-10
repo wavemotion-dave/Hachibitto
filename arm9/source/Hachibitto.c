@@ -94,7 +94,6 @@ u8 key_shift __attribute__((section(".dtcm"))) = false;
 u8 key_ctrl  __attribute__((section(".dtcm"))) = false;
 u8 key_code  __attribute__((section(".dtcm"))) = false;
 u8 key_graph __attribute__((section(".dtcm"))) = false;
-u8 key_dia   __attribute__((section(".dtcm"))) = false;
 
 // ---------------------------------------------------------------------------
 // Some timing and frame rate comutations to keep the emulation on pace...
@@ -258,9 +257,6 @@ mm_stream myStream __attribute__((section(".dtcm")));
 s16 mixbuf1[2048+32];      // When we have AY sound and SCC possible... so 8 channels.
 s16 mixbuf2[2048+32];      // into a single output so we render to mix buffers first.
 
-u16 mixer_read      __attribute__((section(".dtcm"))) = 0;
-u16 mixer_write     __attribute__((section(".dtcm"))) = 0;
-
 static s32 ay_smoothed __attribute__((section(".dtcm"))) = 0;
 const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
 
@@ -315,12 +311,7 @@ void SmoothStartSCC(mm_word len, mm_addr dest)
     last_sample = *p;
 }
 
-// -------------------------------------------------------------------------
-// Rolling capture of raw AY output for diagnosing the audio pop. Continuously
-// overwritten each callback; dumped to debug.log on demand via the existing
-// L+R+Y hotkey, so you don't have to time the capture to the exact pop.
-// -------------------------------------------------------------------------
-ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
+ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
     {
@@ -416,6 +407,47 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     return  len;
 }
 
+ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
+{
+    if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
+    {
+        s16 *p = (s16*)dest;
+        for (int i=0; i<len*2; i++)
+        {
+           *p++ = last_sample;      // To prevent pops and clicks... just keep outputting the last sample
+        }
+    }
+    else
+    {
+        if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
+        {
+            ay38910Mixer(len*2, mixbuf1, &myAY);
+            SCCMixer(len*4, mixbuf2, &mySCC);
+     
+            s16 *p = (s16*)dest;
+            int j=0;
+            for (int i=0; i<len*2; i++)
+            {
+                // ------------------------------------------------------------------------
+                // We normalize the samples and mix them carefully to minimize clipping...
+                // ------------------------------------------------------------------------
+                s32 combined = (mixbuf1[i]) + ((mixbuf2[j] + mixbuf2[j+1])/2) + 32768;
+                j+=2;
+                if (combined >  32767) combined = 32767;
+                *p++ = (s16)combined;
+            }
+            p--; last_sample = *p;
+        }
+        else  // Pretty simple... just AY
+        {
+            ay38910Mixer(len*2, dest, &myAY);
+            last_sample = ((s16*)dest)[len*2 - 1];
+        }
+    }
+
+    return  len;
+}
+
 // -------------------------------------------------------------------------------------------
 // Setup the maxmod audio stream - this will be a 16-bit Stereo PCM output at 55KHz which
 // sounds about right for the MSX audio data stream.
@@ -437,7 +469,7 @@ void setupStream(void)
   //----------------------------------------------------------------
   myStream.sampling_rate  = sample_rate;            // sample_rate for the CV to match the SN/AY drivers
   myStream.buffer_length  = buffer_size;            // buffer length = (512+16)
-  myStream.callback       = OurSoundMixer;          // set callback function
+  myStream.callback       = (isDSiMode() ? OurSoundMixer_DSi : OurSoundMixer); // set callback function
   myStream.format         = MM_STREAM_16BIT_STEREO; // format = stereo 16-bit
   myStream.timer          = MM_TIMER0;              // use hardware timer 0
   myStream.manual         = false;                  // use automatic filling
@@ -461,8 +493,6 @@ void sound_chip_reset()
 {
   memset(mixbuf1, 0x00, sizeof(mixbuf1));
   memset(mixbuf2, 0x00, sizeof(mixbuf2));
-  mixer_read=0;
-  mixer_write=0;
   
   msx_scc_capable_game = 0;
   bFirstSCCEnable = 1;
@@ -1317,7 +1347,6 @@ void Hachibitto_main(void)
       key_ctrl = false;
       key_code = false;
       key_graph = false;
-      key_dia = false;
 
       ucDEUX  = 0;
       nds_key  = keysCurrent();     // Get any current keys pressed on the NDS

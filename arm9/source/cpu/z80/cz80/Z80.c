@@ -65,7 +65,7 @@ inline byte RdZ80(word A)   {return cpu_readmem16(A);}
 #define S(Fl)        CPU.AF.B.l|=Fl
 #define R(Fl)        CPU.AF.B.l&=~(Fl)
 #define FLAGS(Rg,Fl) CPU.AF.B.l=Fl|ZSTable[Rg]
-#define INCR(N)      CPU.R++       // Faster to just increment this odd 7-bit RAM Refresh counter here and mask off and OR the high bit back in when asked for in CodesED.h
+#define INCR(N)      //We don't bother to increment R. Nothing worthwhile uses it and we simply simulate the value when a caller asks for it.
 
 #define M_RLC(Rg)      \
   CPU.AF.B.l=Rg>>7;Rg=(Rg<<1)|CPU.AF.B.l;CPU.AF.B.l|=PZSTable[Rg]

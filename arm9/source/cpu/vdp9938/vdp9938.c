@@ -22,7 +22,7 @@ u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // 
 
 u8 XPal[256] __attribute__((section(".dtcm"))) = {0};
 
-u8 XPalReal0;   // the genuinely-programmed color for slot 0, independent of TP substitution
+u8 XPalReal0 __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 
 volatile u8 bufferZone1[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
 u8 XBuf[256*212] ALIGN(32) = {0};   // VDP9938 screen is 256x212
@@ -1090,13 +1090,10 @@ ITCM_CODE void RefreshLine5(register u8 uY)
                 u32 s0 = *(u32*)(src + i);
                 u32 s1 = *(u32*)(src + i + 4);
                 
-                u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-
-                dst32[0] = r0; dst32[1] = r1; dst32[2] = r2; dst32[3] = r3;
-                dst32 += 4;
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
             }
         }
         else
@@ -1146,7 +1143,8 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 
         // Loops 64 times. Processes exactly 128 source bytes.
         // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
-        for (int i = 0; i < 128; i += 2) {
+        for (int i = 0; i < 128; i += 2) 
+        {
             u32 b0 = srcPtr[i];
             u32 b1 = srcPtr[i+1];
 
@@ -1179,7 +1177,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
     // Mode 7 is a beast and we just need a bit more headroom... so we
     // render 7 of 8 frames to give us that little bit of extra bandwidth.
     // ---------------------------------------------------------------------
-    if (!(frame_number & 7) && isDSiMode()) {skip_render = 1;return;}
+    if (!(frame_number & 7) && msx_scc_plus_enable) {skip_render = 1;return;}
     
     if (!ScreenON)
     {
@@ -1191,22 +1189,26 @@ ITCM_CODE void RefreshLine7(register u8 uY)
         const u8 *src = ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=src-0x10000) src-=0x10000;
 
-        for (int i = 0; i < 256; i += 8) 
+        const u32* s32 = (const u32*)src;
+        for (int i = 0; i < 32; i++)
         {
-            u32 b0 = screen7LUT[src[i+0]];
-            u32 b1 = screen7LUT[src[i+1]];
-            u32 b2 = screen7LUT[src[i+2]];
-            u32 b3 = screen7LUT[src[i+3]];
-            u32 b4 = screen7LUT[src[i+4]];
-            u32 b5 = screen7LUT[src[i+5]];
-            u32 b6 = screen7LUT[src[i+6]];
-            u32 b7 = screen7LUT[src[i+7]];
+            u32 chunk0 = *s32++;
+            u32 chunk1 = *s32++;
 
-            dst32[0] = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-            dst32[1] = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
-            dst32 += 2;
+            u32 b0 = screen7LUT[chunk0 & 0xFF];
+            u32 b1 = screen7LUT[(chunk0 >> 8) & 0xFF];
+            u32 b2 = screen7LUT[(chunk0 >> 16) & 0xFF];
+            u32 b3 = screen7LUT[(chunk0 >> 24) & 0xFF];
+
+            u32 b4 = screen7LUT[chunk1 & 0xFF];
+            u32 b5 = screen7LUT[(chunk1 >> 8) & 0xFF];
+            u32 b6 = screen7LUT[(chunk1 >> 16) & 0xFF];
+            u32 b7 = screen7LUT[(chunk1 >> 24) & 0xFF];
+
+            *dst32++ = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+            *dst32++ = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
         }
-
+        
         ColorSprites(uY, P-32);
         CommitLine(uY);
     }
