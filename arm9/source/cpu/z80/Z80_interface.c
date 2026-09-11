@@ -23,12 +23,6 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-u8  msx_sram_at_8000        __attribute__((section(".dtcm"))) = 0;
-u8  msx_scc_enable          __attribute__((section(".dtcm"))) = 0;
-u8  msx_scc_capable_game    __attribute__((section(".dtcm"))) = 0;
-
-extern u8 msx_subslot;
-
 u8 SubslotRead(u16 address)
 {
     if (myConfig.machineType == MACHINE_MSX2_B) // Type B... Expanded Slot 0
@@ -51,7 +45,6 @@ u8 SubslotRead(u16 address)
 extern u8 SCCPlusRAM[];
 extern u8 sccplus_page[4];
 extern u8 sccplus_mode;
-extern u8 msx_scc_plus_enable;
 
 static inline void SCCPlus_MapWindow(u8 idx, u8 page)
 {
@@ -67,41 +60,41 @@ static inline void SCCPlus_MapWindow(u8 idx, u8 page)
 ITCM_CODE u8 cpu_readmem16(u16 address) 
 {
     // Everything in this block is accessing high-memory...
-    if (address & 0x8000)
+    if (unlikely(special_ram_access))
     {
-        if (subslot_active && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
-        {
-            if (myConfig.machineType != MACHINE_MSX1)
-            {
-                return SubslotRead(address);
-            }
-        }
-        else if (msx_sram_at_8000) // Don't need to check msx_mode as this can only be true in that mode
-        {
-            if (address <= 0xBFFF) // Between 0x8000 and 0xBFFF
-            {
-              return SRAM_Memory[address&0x3FFF];
-            }
-        }
         // ----------------------------------------------------
         // Are we reading from the SCC chip memory mapped area?
         // ----------------------------------------------------
-        else if (msx_scc_enable && ((address & 0xF800) == 0x9800))
+        if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
         {
              if (bCartInSegment[2])
              {
                 // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
                 if (address >= 0x9800 && address <= 0x987F)
                 {
-                    //TBD: this breaks Metal Gear 2 - Solid Snake
+                    //TBD: this breaks Metal Gear 2 - Solid Snake. Leave it disabled for now...
                     // return SCCRead(address, &mySCC); 
                 }                
             }
         }
-        else if (msx_scc_plus_enable && (address >= 0xB800) && (address <= 0xBFFD))
+        else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
         {
             if (bCartInSegment[2]) return SCCRead(address, &mySCC);
         }        
+        else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
+        {
+            if (myConfig.machineType != MACHINE_MSX1)
+            {
+                return SubslotRead(address);
+            }
+        }
+        else if (special_ram_access & SPEC_RAM_SRAM_ACTIVE) // Don't need to check msx_mode as this can only be true in that mode
+        {
+            if ((address >= 0x8000) && (address <= 0xBFFF)) // Between 0x8000 and 0xBFFF
+            {
+              return SRAM_Memory[address&0x3FFF];
+            }
+        }
     }
     
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
@@ -212,7 +205,7 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     {
         if ((value&0x3F) == 0x3F) 
         {
-            msx_scc_enable = true; 
+            special_ram_access |= SPEC_RAM_SCC_ENABLED;
             msx_scc_capable_game = true;           // SCC sound - set a flag so we process this special sound chip
             return;
         }
@@ -251,11 +244,11 @@ void HandleAscii16K(u32* src, u8 block, u16 address)
         // ---------------------------------------------------------------------------------------------------------
         if (msx_sram_enabled && (block == msx_sram_enabled))
         {
-            msx_sram_at_8000 = true;
+            special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
         }
         else
         {
-            msx_sram_at_8000 = false;
+            special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
             MSXCartPtr[4] = (u8*)src;
             MSXCartPtr[5] = (u8*)src+0x2000;
             if (bCartInSegment[2]) 
@@ -332,10 +325,18 @@ void HandleSCCPlusModeRegister(u8 value)
     sccplus_mode = value;
 
     // Bit5 alone decides which window shows the audio registers
-    msx_scc_enable      = !(sccplus_mode & 0x20);
-    msx_scc_plus_enable =  (sccplus_mode & 0x20) ? 1 : 0;
+    if (sccplus_mode & 0x20)
+    {
+        special_ram_access &= ~SPEC_RAM_SCC_ENABLED;
+        special_ram_access |= SPEC_RAM_SCC_PLUS_ENABLED;
+    }
+    else // Normal SCC
+    {
+        special_ram_access &= ~SPEC_RAM_SCC_PLUS_ENABLED;
+        special_ram_access |= SPEC_RAM_SCC_ENABLED;
+    }
     
-    if (msx_scc_plus_enable || msx_scc_enable)
+    if (special_ram_access & (SPEC_RAM_SCC_ENABLED | SPEC_RAM_SCC_PLUS_ENABLED))
     {
         msx_scc_capable_game = true;
     }
@@ -355,14 +356,14 @@ void HandleSCCPlus(u16 address, u8 value)
     }
 
     // SCC+ registers shadow A000-BFFF whenever Sound Mode = SCC+
-    if (bCartInSegment[2] && msx_scc_plus_enable && (address >= 0xB800) && (address <= 0xBFFD))
+    if (bCartInSegment[2] && (special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
     {
         SCCWrite(value, address, &mySCC);
         return;
     }
 
     // Classic SCC registers shadow 8000-9FFF whenever Sound Mode = compat
-    if (bCartInSegment[2] && msx_scc_enable && ((address & 0xF800) == 0x9800))
+    if (bCartInSegment[2] && (special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
         SCC_LegacyWrite(value, address);
         return;
@@ -419,7 +420,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 {
     if (bRAMInSegment[address >> 14]) // RAM Exists... write it.
     {
-        if (msx_sram_at_8000) //TODO: make this a unique mapper... that doesn't set bRAMInSegment[] true.
+        if (unlikely(special_ram_access & SPEC_RAM_SRAM_ACTIVE)) //TODO: make this a unique mapper... that doesn't set bRAMInSegment[] true.
         {
             if ((address & 0xC000) == 0x8000)
             {
@@ -431,7 +432,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
         
         *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
-    else if (subslot_active && (address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
+    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
     {
         SubslotWrite(value);
         return;
@@ -514,11 +515,11 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             {
                 if (msx_sram_enabled && (block == msx_sram_enabled))
                 {
-                    msx_sram_at_8000 = true;
+                    special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
                 }
                 else
                 {
-                    msx_sram_at_8000 = false;
+                    special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
                     MSXCartPtr[4] = (u8*)src;  // Main ROM
                     MSXCartPtr[0] = (u8*)src;  // Mirror    
                     if (bCartInSegment[2])
@@ -535,11 +536,11 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             {
                 if (msx_sram_enabled && (block == msx_sram_enabled))
                 {
-                    msx_sram_at_8000 = true;
+                    special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
                 }
                 else
                 {
-                    msx_sram_at_8000 = false;
+                    special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
                     MSXCartPtr[5] = (u8*)src;  // Main ROM
                     MSXCartPtr[1] = (u8*)src;  // Mirror                            
                     if (bCartInSegment[2]) 
@@ -558,7 +559,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             // ----------------------------------------------------
             // Are we writing to the SCC chip memory mapped area?
             // ----------------------------------------------------
-            if (msx_scc_enable && ((address & 0xF800) == 0x9800))
+            if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
             {
                  SCC_LegacyWrite(value, address);
             }
@@ -614,10 +615,8 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 void Z80_Interface_Reset(void) 
 {
   CPU.CycleDeficit      = 0;
-  msx_sram_at_8000      = 0;
-  msx_scc_enable        = 0;
   msx_scc_capable_game  = 0;
-  msx_scc_plus_enable   = 0;
+  special_ram_access    = 0x00;
 }
 
 // -----------------------------------------------------------------

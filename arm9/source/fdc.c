@@ -55,7 +55,7 @@ extern u8 disk_unsaved_data[];
 #define FDC_CPU_CLOCK        3579545                                  // Z80 clock, NTSC
 #define FDC_DATA_RATE_BPS    250000                                   // MSX double-density (MFM)
 #define FDC_CYCLES_PER_BYTE  (FDC_CPU_CLOCK / (FDC_DATA_RATE_BPS/8))  // ~114 T-states/byte
-#define FDC_STEP_CYCLES      (FDC_CYCLES_PER_BYTE * 8)                // Seek/step settle time -- tune to taste
+#define FDC_STEP_CYCLES      (FDC_CPU_CLOCK / 1000 * 6)               // ~6ms/step, a plausible mid-range real value
 
 void fdc_debug(u8 bWrite, u8 addr, u8 data)
 {

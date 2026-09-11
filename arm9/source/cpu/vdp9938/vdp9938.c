@@ -29,12 +29,13 @@ volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we r
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
-u16 ALatch              __attribute__((section(".dtcm"))) = 0;
+u8 ALatch               __attribute__((section(".dtcm"))) = 0;
 u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
-u8 CurrentEpoch         __attribute__((section(".dtcm"))) = 0;
+u8 CurrentEpochSaved    __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
+u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -61,6 +62,37 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     
     handle_transparency();
     if (ScrMode < 4) RebuildLutTablehh();
+}
+
+// When CPU writes to Port 0x9A
+// Note that in real hardware, Port 0x9A shares the
+// same 'first byte' register with ports 0x9A and 0x99
+// and so that is handled here by reuse of ALatch. They 
+// do use separate flip-flops however.
+ITCM_CODE void write_port_9A(uint8_t data)
+{
+    if (!palette_latch) 
+    {
+        // First Byte: Red (bits 6-4) and Blue (bits 2-0)
+        ALatch = data;
+        palette_latch = true;
+    }
+    else 
+    {
+        // ----------------------------------------
+        // We need to get this into GGGRRRBB format
+        // ----------------------------------------
+        
+        // Second Byte: Green (bits 2-0)
+        uint8_t index = VDP[16] & 0x0F;
+        uint8_t color_grb = ((ALatch & 0x70) >> 2) | ((ALatch>>1) & 3) | ((data & 7) << 5);
+
+        vdp_9938_write_palette(index, color_grb);
+
+        // Auto-increment Palette Register index R#16
+        VDP[16] = (VDP[16] + 1) & 0x0F;
+        palette_latch = false;
+    }
 }
 
 void BuildScreen7LUT(void)
@@ -465,7 +497,8 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
   int L,K;
   unsigned int M;
 
-  CurrentEpoch++;
+  // Local copy is slightly faster than a global fetch...
+  u8 CurrentEpoch = (++CurrentEpochSaved);
 
   /* SPR_SET: unconditional overwrite (background OR earlier-sprite pixel),
      and record that this pixel now holds sprite data.
@@ -930,7 +963,7 @@ u8 LineScratch[400] __attribute__((section(".dtcm")));
 
 uint8_t *RefreshBorder(uint8_t Y)
 {
-    int shift = HAdjust & ~1;   // keep your even-only clamp
+    int shift = HAdjust & ~1;   // even-only clamp - we only scroll in 2 pixel jumps which is not perfect but allows for faster rendering.
 
     if (ScrMode == 6)
     {
@@ -953,12 +986,15 @@ ITCM_CODE void CommitLine(u8 Y)
 {
     // Always exactly 256 bytes, always 4-aligned on both ends (XBuf rows and
     // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
-    u32 *dst = (u32*)(XBuf + ((u16)Y << 8));
-    u8 *src = (u8*)(LineScratch + LS_BASE);
-    for (int i = 0; i < 64; i++)
+    u32 * restrict dst = (u32*)(XBuf + ((u16)Y << 8));
+    const u8 * restrict src = (const u8*)(LineScratch + LS_BASE);
+    for (int i=0; i<16;i++)
     {
         *dst++ = (XPal[src[0]] << 0) | (XPal[src[1]] << 8) | (XPal[src[2]] << 16) | (XPal[src[3]] << 24);
-        src += 4;
+        *dst++ = (XPal[src[4]] << 0) | (XPal[src[5]] << 8) | (XPal[src[6]] << 16) | (XPal[src[7]] << 24);
+        *dst++ = (XPal[src[8]] << 0) | (XPal[src[9]] << 8) | (XPal[src[10]] << 16) | (XPal[src[11]] << 24);
+        *dst++ = (XPal[src[12]] << 0) | (XPal[src[13]] << 8) | (XPal[src[14]] << 16) | (XPal[src[15]] << 24);
+        src += 16;
     }
 }
 
@@ -1077,17 +1113,28 @@ ITCM_CODE void RefreshLine5(register u8 uY)
 
         if (!misaligned)
         {
-            u32 *dst32 = (u32*)P;
+            u32 * restrict dst32 = (u32*)P;
+            const u32 * restrict src32 = (u32*)src;
 
-            for (int i = 0; i < 128; i += 8)
+            for (int i = 0; i < 8; i++)
             {
-                u32 s0 = *(u32*)(src + i);
-                u32 s1 = *(u32*)(src + i + 4);
+                u32 s0 = src32[0];
+                u32 s1 = src32[1];
                 
                 *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                s0 = src32[2];
+                s1 = src32[3];
+                
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                
+                src32 += 4;
             }
         }
         else
@@ -1169,9 +1216,18 @@ ITCM_CODE void RefreshLine7(register u8 uY)
     
     // ---------------------------------------------------------------------
     // Mode 7 is a beast and we just need a bit more headroom... so we
-    // render 7 of 8 frames to give us that little bit of extra bandwidth.
+    // render 7 of 8 frames to give us that little bit of extra bandwidth
+    // if we have SCC plus enabled - the combo of Screen 7 plus tons of 
+    // channels of sound are just a bit too much...
     // ---------------------------------------------------------------------
-    if (!(frame_number & 7) && msx_scc_plus_enable) {skip_render = 1;return;}
+    if (special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED)
+    {
+        if (!(frame_number & 7)) // Skip the 8th frame...
+        {
+            skip_render = 1;
+            return;
+        }
+    }
     
     if (!ScreenON)
     {
@@ -1184,7 +1240,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
         const u8 *src = ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=src-0x10000) src-=0x10000;
 
-        const u32* s32 = (const u32*)src;
+        const u32* restrict s32 = (const u32*)src;
         for (int i = 0; i < 32; i++)
         {
             u32 chunk0 = *s32++;
@@ -1319,6 +1375,7 @@ void CheckNewMode(void)
   SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
   
   handle_transparency();
+  if (ScrMode < 4) RebuildLutTablehh();
 }
 
 
@@ -1361,7 +1418,6 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case  7:
       FGColor=value>>4;
       BGColor=value&0x0F;
-      if (ScrMode < 4) RebuildLutTablehh();
       break;
 
     case 10:
@@ -1439,7 +1495,7 @@ ITCM_CODE void WrCtrl9938(byte value)
     {
       case 0x80:
       case 0xC0:
-        Write9938(value&0x3F,ALatch); // Write VDP9938: registers 0-63
+        Write9938(value&0x3F, ALatch); // Write VDP9938: registers 0-63
         break;
 
       case 0x00:

@@ -27,25 +27,27 @@
 // ---------------------------------------
 // Some MSX Mapper / Slot Handling stuff
 // ---------------------------------------
-u8 subslot_active       __attribute__((section(".dtcm"))) = 0;
-u8 mapperType           __attribute__((section(".dtcm"))) = 0;
-u8 mapperMask           __attribute__((section(".dtcm"))) = 0;
-u8 bCartInSegment[4]    __attribute__((section(".dtcm"))) = {0,0,0,0};
-u8 bRAMInSegment[4]     __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 mapperType               __attribute__((section(".dtcm"))) = 0;
+u8 mapperMask               __attribute__((section(".dtcm"))) = 0;
+u8 bCartInSegment[4]        __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bRAMInSegment[4]         __attribute__((section(".dtcm"))) = {0,0,0,0};
+    
+u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
+u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
+    
+u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
+u8 msx_beeper_process       __attribute__((section(".dtcm"))) = 0;
+u8 beeperWasOn              __attribute__((section(".dtcm"))) = 0;
+u8 msx_sram_enabled         __attribute__((section(".dtcm"))) = 0;
+u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
+u8  msx_scc_capable_game    __attribute__((section(".dtcm"))) = 0;
+u8  special_ram_access      __attribute__((section(".dtcm"))) = 0;
 
-u8 *MSXCartPtr[8]       __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
-u8 *MSXRamPtr[8]        __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
+u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 
-u16 beeperFreq          __attribute__((section(".dtcm"))) = 0;
-u8 msx_beeper_process   __attribute__((section(".dtcm"))) = 0;
-u8 beeperWasOn          __attribute__((section(".dtcm"))) = 0;
-u8 msx_sram_enabled     __attribute__((section(".dtcm"))) = 0;
-u8 msx_subslot          __attribute__((section(".dtcm"))) = 0xFF;
+SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
+AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 
-u16 msx_block_size      __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
-
-SCC     mySCC           __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
-AY38910 myAY            __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -53,7 +55,6 @@ AY38910 myAY            __attribute__((section(".dtcm")));          // Declare n
 u8  SCCPlusRAM[64*1024];                                               // Too big for .dtcm - lives in normal memory
 u8  sccplus_page[4]     __attribute__((section(".dtcm"))) = {0,1,2,3}; // Last byte written to each of the 4 select regs
 u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/BFFF: bit5=RAM mode, bit4=SCC+ compat
-u8  msx_scc_plus_enable __attribute__((section(".dtcm"))) = 0;         // Mirrors msx_scc_enable, but for the B800h window
 
 // --------------------------------------------------------------------------
 // These aren't used very often so we don't need them in fast .dtcm memory
@@ -539,7 +540,7 @@ void msx_slot_map_msx1(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
-    subslot_active = 0;
+    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -661,7 +662,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. This is our expanded slot.
-            subslot_active = 1;
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
             MemoryMap[6] = BIOS_Memory+0x8000;
@@ -681,7 +682,8 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
-    subslot_active = 0;
+    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
+    
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -803,7 +805,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
-            subslot_active = 1;
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
             MemoryMap[6] = BIOS_Memory+0x8000;
@@ -833,42 +835,13 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 // ----------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip plus Slot Mapper $A8
 // ----------------------------------------------------------------------
-// When CPU writes to Port 0x9A:
-u8 palette_latch = 0;
-u8 palette_rb_temp = 0;
-void write_port_9A(uint8_t data)
-{
-    if (!palette_latch) 
-    {
-        // First Byte: Red (bits 6-4) and Blue (bits 2-0)
-        palette_rb_temp = data;
-        palette_latch = true;
-    }
-    else 
-    {
-        // ----------------------------------------
-        // We need to get this into GGGRRRBB format
-        // ----------------------------------------
-        
-        // Second Byte: Green (bits 2-0)
-        uint8_t index = VDP[16] & 0x0F;
-        uint8_t color_grb = ((palette_rb_temp & 0x70) >> 2) | ((palette_rb_temp>>1) & 3) | ((data & 7) << 5);
-
-        vdp_9938_write_palette(index, color_grb);
-
-        // Auto-increment Palette Register index R#16
-        VDP[16] = (VDP[16] + 1) & 0x0F;
-        palette_latch = false;
-    }
-}
-
 ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value) 
 {
     // MSX ports are 8-bit
     Port &= 0x00FF;
 
     if      (Port == 0x98) {WrData9938(Value);}
-    else if (Port == 0x99) {palette_latch = false; WrCtrl9938(Value);}
+    else if (Port == 0x99) {WrCtrl9938(Value);}
     else if (Port == 0x9A) {write_port_9A(Value);}
     else if (Port == 0x9B) {DirectRegWrite9938(Value);}         // Indirect Register Area
     else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
@@ -1069,7 +1042,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             //memcpy(SCCPlusRAM, ROM_Memory, (romSize > sizeof(SCCPlusRAM)) ? sizeof(SCCPlusRAM) : romSize);
 
             sccplus_mode = 0x00;
-            HandleSCCPlusModeRegister(0x00);   // derives msx_scc_enable/msx_scc_plus_enable correctly            
+            HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly            
             sccplus_page[0] = 0; sccplus_page[1] = 1;
             sccplus_page[2] = 2; sccplus_page[3] = 3;
             mapperMask = 0;
@@ -1536,7 +1509,6 @@ void msx_restore_bios(void)
 // ---------------------------------------------------------
 void msx_reset(void)
 {
-    msx_sram_at_8000 = false;
     if (msx_mode)
     {
         MSX_InitialMemoryLayout(msx_last_file_size);

@@ -86,6 +86,9 @@ extern byte RdData9938(void);
 extern byte RdCtrl9938(void);
 extern void Reset9938(void);
 extern void RebuildLutTablehh(void);
+// When CPU writes to Port 0x9A:
+extern u8 palette_latch;
+extern void write_port_9A(uint8_t data);
 
 extern u16 CurLine;                            // Current Scanline
 extern u8 VDP[64],VDPStatus[10],VDPDlatch;     // VDP registers
@@ -104,7 +107,7 @@ static inline __attribute__((always_inline)) void WrData9938(byte V)  // This on
 {
     VDPDlatch = VPAGE[VAddr] = V;
     VAddr     = (VAddr+1)&0x3FFF;
-    if(!VAddr&&(ScrMode>3))
+    if(!VAddr&&(ScrMode&0xFC))
     {
       VDP[14]=(VDP[14]+1)&7;
       VPAGE=VDP_Memory+((int)VDP[14]<<14);

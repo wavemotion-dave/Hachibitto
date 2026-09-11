@@ -17,6 +17,9 @@
 #include "cpu/ay38910/AY38910.h"
 #include "cpu/scc/SCC.h"
 
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #define MAX_ROMS                    1024
 #define MAX_ROM_NAME                160
 
@@ -102,6 +105,12 @@ struct __attribute__((__packed__)) Config_t
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
 
+extern u8 special_ram_access;
+#define SPEC_RAM_SUBSLOT_ACTIVE     0x01
+#define SPEC_RAM_SRAM_ACTIVE        0x02
+#define SPEC_RAM_SCC_ENABLED        0x04
+#define SPEC_RAM_SCC_PLUS_ENABLED   0x08
+
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
 extern u16 msx_init;
@@ -170,22 +179,11 @@ extern u8 msx_sram_enabled;
 extern u8 last_mega_bank;
 extern u16 msx_block_size;
 extern u32 file_crc;
-
 extern u8 romBankMask;
-
-// -------------------------------
-// A few misc externs needed...
-// -------------------------------
-extern u8 msx_sram_at_8000;
-
 extern u8 key_shift_hold;
-
 extern u8 Port_PPI_A;
 extern u8 Port_PPI_B;
 extern u8 Port_PPI_C;
-
-extern u8 subslot_active;
-
 extern void ProcessBufferedKeys(void);
 extern u8 BufferedKeys[32];
 extern u8 BufferedKeysWriteIdx;
@@ -202,7 +200,8 @@ extern u8 key_code;
 extern u8 key_graph;
 extern u8 key_dia;
 extern u32 msx_last_file_size;
-
+extern u8 msx_scc_capable_game;
+extern u8 msx_subslot;
 extern void msxUpdateScreen(void);
 extern void getfile_crc(const char *path);
 extern void msxLoadState();
