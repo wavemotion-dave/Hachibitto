@@ -17,6 +17,8 @@
 extern u32 debug[0x10];
 extern u32 DX, DY;
 
+#define DS_LCD_VRAM   ((u16*)0x06000000) // This is where we draw on the DS screen into LCD VRAM
+
 // These are the various special icons/menu operations
 #define MENU_CHOICE_NONE         0x00
 #define MENU_CHOICE_RESET_GAME   0x01
@@ -100,37 +102,36 @@ extern u32 DX, DY;
 #define META_KBD_SEMI       0xFFFF0034
 #define META_KBD_QUOTE      0xFFFF0035
 #define META_KBD_SLASH      0xFFFF0036
-#define META_KBD_BACKSLASH  0xFFFF0037
-#define META_KBD_PLUS       0xFFFF0038
-#define META_KBD_MINUS      0xFFFF0039
-#define META_KBD_LBRACKET   0xFFFF003A
-#define META_KBD_RBRACKET   0xFFFF003B
-#define META_KBD_CARET      0xFFFF003C
-#define META_KBD_ASTERISK   0xFFFF003D
-#define META_KBD_ATSIGN     0xFFFF003E
-#define META_KBD_BS         0xFFFF003F
-#define META_KBD_TAB        0xFFFF0040
-#define META_KBD_INS        0xFFFF0041
-#define META_KBD_DEL        0xFFFF0042
-#define META_KBD_CLR        0xFFFF0043
-#define META_KBD_STOP_BRK   0xFFFF0044
-#define META_KBD_F1         0xFFFF0045
-#define META_KBD_F2         0xFFFF0046
-#define META_KBD_F3         0xFFFF0047
-#define META_KBD_F4         0xFFFF0048
-#define META_KBD_F5         0xFFFF0049
+#define META_KBD_CARET      0xFFFF0037
+#define META_KBD_MINUS      0xFFFF0038
+#define META_KBD_LBRACKET   0xFFFF0039
+#define META_KBD_RBRACKET   0xFFFF003A
+#define META_KBD_ATSIGN     0xFFFF003B
+#define META_KBD_BS         0xFFFF003C
+#define META_KBD_TAB        0xFFFF003D
+#define META_KBD_INS        0xFFFF003E
+#define META_KBD_DEL        0xFFFF003F
+#define META_KBD_CLR        0xFFFF0040
+#define META_KBD_STOP_BRK   0xFFFF0041
+#define META_KBD_F1         0xFFFF0042
+#define META_KBD_F2         0xFFFF0043
+#define META_KBD_F3         0xFFFF0044
+#define META_KBD_F4         0xFFFF0045
+#define META_KBD_F5         0xFFFF0046
 
-#define META_KBD_PANUP8     0xFFFF004A
-#define META_KBD_PANUP12    0xFFFF004B
-#define META_KBD_PANUP16    0xFFFF004C
-#define META_KBD_PANUP20    0xFFFF004D
+#define META_KBD_PANUP8     0xFFFF0047
+#define META_KBD_PANUP12    0xFFFF0048
+#define META_KBD_PANUP16    0xFFFF0049
+#define META_KBD_PANUP20    0xFFFF004A
 
-#define META_KBD_PANDN8     0xFFFF004E
-#define META_KBD_PANDN12    0xFFFF004F
-#define META_KBD_PANDN16    0xFFFF0050
-#define META_KBD_PANDN20    0xFFFF0051
+#define META_KBD_PANDN8     0xFFFF004B
+#define META_KBD_PANDN12    0xFFFF004C
+#define META_KBD_PANDN16    0xFFFF004D
+#define META_KBD_PANDN20    0xFFFF004E
+#define META_KBD_SHOWTOP    0xFFFF004F
+#define META_KBD_SHOWBOT    0xFFFF0050
 
-#define MAX_KEY_OPTIONS     93
+#define MAX_KEY_OPTIONS     92
 
 #define JOYMODE_JOYSTICK    0
 
@@ -146,39 +147,24 @@ extern u32 DX, DY;
 #define KBD_KEY_F3          7
 #define KBD_KEY_F4          8
 #define KBD_KEY_F5          9
-#define KBD_KEY_F6          10
-#define KBD_KEY_F7          11
-#define KBD_KEY_F8          12
-#define KBD_KEY_F9          13
-#define KBD_KEY_F10         14
-#define KBD_KEY_CTRL        15
-#define KBD_KEY_SHIFT       16
-#define KBD_KEY_ESC         17
-#define KBD_KEY_STOP        18  // Some machines call it 'STOP' and others 'BREAK' but reasonably similar functdionality
-#define KBD_KEY_BREAK       18  // Some machines call it 'STOP' and others 'BREAK' but reasonably similar functdionality
-#define KBD_KEY_SEL         19
-#define KBD_KEY_RET         20
-#define KBD_KEY_DEL         21
-#define KBD_KEY_INS         22
-#define KBD_KEY_UNUSED      23
-#define KBD_KEY_HOME        24
-#define KBD_KEY_QUOTE       25
-#define KBD_KEY_CAPS        26
-#define KBD_KEY_TAB         27
-#define KBD_KEY_BS          28
-#define KBD_KEY_CODE        29
-#define KBD_KEY_GRAPH       30
-#define KBD_KEY_DEAD        31
-#define KBD_KEY_WILDCARD    32
-#define KBD_KEY_STORE       33
-#define KBD_KEY_PRINT       34
-#define KBD_KEY_CLEAR       35
-#define KBD_KEY_MOVE        36
-#define KBD_KEY_UNDO        37
-#define KBD_KEY_LF          38
-#define KBD_KEY_DIA         39
-#define KBD_KEY_YEN         40
-#define KBD_KEY_CAS         255
+#define KBD_KEY_CTRL        10
+#define KBD_KEY_SHIFT       11
+#define KBD_KEY_ESC         12
+#define KBD_KEY_STOP        13
+#define KBD_KEY_SEL         14
+#define KBD_KEY_RET         15
+#define KBD_KEY_DEL         16
+#define KBD_KEY_INS         17
+#define KBD_KEY_CLEAR       18
+#define KBD_KEY_HOME        19
+#define KBD_KEY_QUOTE       20
+#define KBD_KEY_CAPS        21
+#define KBD_KEY_TAB         22
+#define KBD_KEY_BS          23
+#define KBD_KEY_CODE        24
+#define KBD_KEY_GRAPH       25
+#define KBD_KEY_DEAD        26
+#define KBD_KEY_YEN         27
 
 extern u16 emuFps;
 extern u16 emuActFrames;
@@ -199,12 +185,7 @@ extern u8 msx_mode;
 extern u8 kbd_keys_pressed;
 extern u8 kbd_keys[12];
 
-extern char disk_last_file[3][256];
-extern char disk_last_path[3][256];
-extern u32  disk_last_size[3];
-extern u8   disk_unsaved_data[3];
-
-#define MODE_MSX            0x0100
+extern u8 disk_unsaved_data[2];
 
 #define WAITVBL swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank();
 
@@ -219,8 +200,6 @@ extern u8 skip_render;
 
 extern int bg0, bg1, bg0b, bg1b;
 
-extern u16 *pVidFlipBuf;                         // Video flipping buffer
-
 extern u8 io_show_status;
 
 extern void BottomScreenOptions(void);
@@ -231,15 +210,13 @@ extern void ReadFileCRCAndConfig(void);
 extern void DisplayStatusLine(bool bForce);
 extern void ResetMSX(void);
 
-
 #define VDP_IRQ_VBLANK  0x01
 #define VDP_IRQ_LINE    0x02
-extern void SetVDPIRQ(u8 bit, u8 set);
 
+extern void SetVDPIRQ(u8 bit, u8 set);
 
 extern void debug_init();
 extern void debug_save();
 extern void debug_printf(const char * str, ...);
-
 
 #endif

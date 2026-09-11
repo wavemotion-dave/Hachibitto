@@ -44,7 +44,8 @@ u8 msx_subslot          __attribute__((section(".dtcm"))) = 0xFF;
 
 u16 msx_block_size      __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 
-SCC mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
+SCC     mySCC           __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
+AY38910 myAY            __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -1151,6 +1152,22 @@ void MSX_InitialMemoryLayout(u32 romSize)
         
         return; // Do not process .DSK games with the ROM handling below...
     }
+    else // For ROMs we need a mapper type... User might have pre-selected one or we need to guess.
+    {
+        if (myConfig.msxMapper == GUESS)
+        {
+            // Look for the matching SHA1 in the ROM Database
+            mapperType = RomDB_Lookup(romSize);
+            if (mapperType == 0xFF) // Not found... let's do our best to guess it...
+            {
+                mapperType = MSX_GuessROMType(romSize);
+            }
+        }
+        else // User has selected a specific mapper... who are we to argue?!
+        {
+            mapperType = myConfig.msxMapper;   
+        }
+    }
     
     // ------------------------------------------------------------
     // Setup the Z80 memory based on the MSX game ROM size loaded
@@ -1180,9 +1197,9 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 7
         }
     }
-    else if (romSize <= (16 * 1024) && (myConfig.msxMapper != SCC8))
+    else if (romSize <= (16 * 1024) && (mapperType != SCC8))
     {
-        if (myConfig.msxMapper == AT4K)  // Load the 16K rom at 0x4000 without Mirrors
+        if (mapperType == AT4K)  // Load the 16K rom at 0x4000 without Mirrors
         {
                 MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
@@ -1193,7 +1210,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA              
         }
-        else if (myConfig.msxMapper == AT8K) // Load the 16K rom at 0x8000 without Mirrors
+        else if (mapperType == AT8K) // Load the 16K rom at 0x8000 without Mirrors
         {
                 MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
@@ -1204,7 +1221,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA              
         }
-        else
+        else // This game loads with MIRRORS active
         {
             if (msx_basic)  // Basic Game loads at 0x8000 without Mirrors
             {
@@ -1230,7 +1247,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             }
         }
     }
-    else if (romSize <= (32 * 1024) && (myConfig.msxMapper != SCC8))
+    else if (romSize <= (32 * 1024) && (mapperType != SCC8))
     {
         // ------------------------------------------------------------------------------------------------------
         // For 32K roms, we need more information to determine exactly where to load it... however
@@ -1239,7 +1256,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
         // code should be loaded... if the INIT is address 0x4000 or higher (this is fairly common) then we
         // load the 32K rom into banks 1+2 and we mirror the first 16K on page 0 and the upper 16K on page 3.
         // ------------------------------------------------------------------------------------------------------
-        if (myConfig.msxMapper == AT0K)  // Then the full 32K ROM is mapped here
+        if (mapperType == AT0K)  // Then the full 32K ROM is mapped here
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
             MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
@@ -1250,7 +1267,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
             MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
         }
-        else  if (myConfig.msxMapper == AT4K)  // Then the full 32K ROM is mapped here
+        else  if (mapperType == AT4K)  // Then the full 32K ROM is mapped here
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
             MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
@@ -1261,7 +1278,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
             MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
         }
-        else if (myConfig.msxMapper == AT8K)  // Then the full 32K ROM is mapped here
+        else if (mapperType == AT8K)  // Then the full 32K ROM is mapped here
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
             MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
@@ -1285,22 +1302,22 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
                 MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
             }
-            else  // Otherwise we load in bank 0+1 and mirrors on 2+3
+            else  // Otherwise we load in bank 1+2 and mirrors on 0+3
             {
-                MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
-                MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
+                MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
+                MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
                 MSXCartPtr[2] = (u8*)ROM_Memory+0x4000;        // Segment 2
                 MSXCartPtr[3] = (u8*)ROM_Memory+0x6000;        // Segment 3
-                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
-                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
+                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
                 MSXCartPtr[6] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
                 MSXCartPtr[7] = (u8*)ROM_Memory+0x8000;        // Segment 3 Mirror
             }
         }
     }
-    else if (romSize == (48 * 1024) && (myConfig.msxMapper != SCC8))
+    else if (romSize == (48 * 1024) && (mapperType != SCC8))
     {
-        if ((myConfig.msxMapper == KON8) || (myConfig.msxMapper == ZEN8))
+        if ((mapperType == KON8) || (mapperType == ZEN8))
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
             MSXCartPtr[1] = (u8*)ROM_Memory+0x6000;        // Segment 3 Mirror
@@ -1312,7 +1329,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
             mapperMask = 0x07;
         }
-        else if (myConfig.msxMapper == ASC8)
+        else if (mapperType == ASC8)
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
             MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 0 
@@ -1324,7 +1341,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0 
             mapperMask = 0x07;
         }
-        else if ((myConfig.msxMapper == ASC16) || (myConfig.msxMapper == ZEN16))
+        else if ((mapperType == ASC16) || (mapperType == ZEN16))
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
             MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1 
@@ -1336,10 +1353,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 
             mapperMask = 0x03;
         }
-        else if (myConfig.msxMapper == AT4K)
+        else if (mapperType == AT4K) // Mirror Page 1 to Page 0
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA 
-            MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Mirror of Segment 0
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Mirror of Segment 1
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
             MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
             MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2 
@@ -1359,7 +1376,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0xE000;        // Segment NA
         }
     }
-    else if ((romSize == (64 * 1024)) && (myConfig.msxMapper == LIN64))   // 64K Linear ROM
+    else if ((romSize == (64 * 1024)) && (mapperType == LIN64))   // 64K Linear ROM
     {
         MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
         MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
@@ -1372,19 +1389,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
     }
     else if ((romSize >= (16 * 1024)) && (romSize <= (MAX_CART_SIZE * 1024)))   // We'll take anything between these two...
     {
-        if (myConfig.msxMapper == GUESS)
-        {
-            mapperType = RomDB_Lookup(romSize);
-            if (mapperType == 0xFF) // Not found... let's do our best to guess it...
-            {
-                mapperType = MSX_GuessROMType(romSize);
-            }
-        }
-        else
-        {
-            mapperType = myConfig.msxMapper;   
-        }
-
         if ((mapperType == KON8) || (mapperType == SCC8) || (mapperType == ZEN8))
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
@@ -1492,9 +1496,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
     }
     else    
     {
-        // Size not right for MSX support... we've already pre-filled 0xFF so nothing more to do here...
+        // Size not right for MSX support... we've already pre-filled 0xFF so nothing more to do here... System will not run.
     }
     
+    // Some mappers have 8K blocks, some have 16K blocks... sort that out here.
     msx_block_size = ((mapperType == ASC16 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS) ? 0x4000:0x2000);
 }
 
@@ -1506,14 +1511,17 @@ void MSX_InitialMemoryLayout(u32 romSize)
 // ------------------------------------------------------------------------------------
 void BeeperOFF(void)
 {
+    //TODO: beeper not supported yet
 }
 
 void BeeperON(u16 beeper_freq)
 {
+    //TODO: beeper not supported yet
 }
 
 void MSX_HandleBeeper(void)
 {
+    //TODO: beeper not supported yet
 }
 
 // ---------------------------------------------------------------------------
@@ -1545,9 +1553,9 @@ void SCC_LegacyWrite(u8 value, u16 address)
 }
 
 
-// ---------------------------------------------------------
-// Restore the BIOS and point to it...
-// ---------------------------------------------------------
+// ---------------------------------------------------------------
+// Restore the MSX BIOS into the memory buffer and point to it...
+// ---------------------------------------------------------------
 void msx_restore_bios(void)
 {
     memset(BIOS_Memory, 0xFF, sizeof(BIOS_Memory));
@@ -1576,7 +1584,8 @@ void msx_restore_bios(void)
 
 
 // ---------------------------------------------------------
-// The MSX has a few ports and special memory mapping
+// The MSX reset has some special memory mapping depending
+// on if we have loaded a .DSK or a .ROM file.
 // ---------------------------------------------------------
 void msx_reset(void)
 {
@@ -1645,6 +1654,5 @@ void msxLoadEEPROM(void)
       memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
     }
 }
-
 
 // End of file

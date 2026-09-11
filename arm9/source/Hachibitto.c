@@ -81,10 +81,7 @@ u8 msx_caps_lock        = 0;
 u8 msx_kana_lock        = 0;
 u8 write_NV_counter     = 0;
 
-u8   disk_unsaved_data[3]      = {0,0,0};
-u32  disk_last_size[3]         = {0,0,0};
-char disk_last_file[3][256]    = {"","",""};
-char disk_last_path[3][256]    = {"","",""};
+u8   disk_unsaved_data[2]      = {0,0};
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -196,13 +193,10 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_SEMI,
     META_KBD_QUOTE,
     META_KBD_SLASH,
-    META_KBD_BACKSLASH,
-    META_KBD_PLUS,
+    META_KBD_CARET,
     META_KBD_MINUS,
     META_KBD_LBRACKET,
     META_KBD_RBRACKET,
-    META_KBD_CARET,
-    META_KBD_ASTERISK,
     META_KBD_ATSIGN,
     META_KBD_BS,
     META_KBD_TAB,
@@ -223,6 +217,8 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_PANDN12,
     META_KBD_PANDN16,
     META_KBD_PANDN20,
+    META_KBD_SHOWTOP,
+    META_KBD_SHOWBOT,
 };
 
 static char tmp[64];    // For various sprintf() calls
@@ -1451,14 +1447,11 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SEMI)      kbd_key = ';';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_QUOTE)     kbd_key = KBD_KEY_QUOTE;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SLASH)     kbd_key = '/';
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_BACKSLASH) kbd_key = '\\';
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PLUS)      kbd_key = '+';
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CARET)     kbd_key = '^';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_MINUS)     kbd_key = '-';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_LBRACKET)  kbd_key = '[';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_RBRACKET)  kbd_key = ']';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_BS)        kbd_key = KBD_KEY_BS;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CARET)     kbd_key = '^';
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_ASTERISK)  kbd_key = '*';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_ATSIGN)    kbd_key = '@';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_TAB)       kbd_key = KBD_KEY_TAB;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_INS)       kbd_key = KBD_KEY_INS;
@@ -1478,6 +1471,8 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN12)   {temp_offset =  12; slide_dampen = 15;}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN16)   {temp_offset =  16; slide_dampen = 15;}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN20)   {temp_offset =  20; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWTOP)   {myConfig.yOffset = 0;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWBOT)   {myConfig.yOffset = 20;}
 
                       if (kbd_key != 0)
                       {
@@ -1839,11 +1834,6 @@ u32 JoyState       __attribute__((section(".dtcm"))) = 0;           // Joystick 
 // ------------------------------------------------------------
 u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;  // Our global file CRC32 to uniquiely identify this game
 
-// --------------------------------------------------------------
-// The master AY sound chip for the MSX. We might also have SCC.
-// --------------------------------------------------------------
-AY38910 myAY   __attribute__((section(".dtcm")));
-
 /*********************************************************************************
  * Keyboard Key Buffering Engine...
  ********************************************************************************/
@@ -1926,7 +1916,7 @@ u8 msxInit(char *szGame)
   for (uBcl=0;uBcl<255;uBcl++)
   {
      uVide=0;
-     dmaFillWords(uVide | (uVide<<16),pVidFlipBuf+uBcl*128,256);
+     dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
   }
 
   write_NV_counter=0;
@@ -1975,7 +1965,7 @@ ITCM_CODE void msxUpdateScreen(void)
 
     if (!skip_render)
     {
-        dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)pVidFlipBuf, 256*212);
+        dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM, 256*212);
     }
     skip_render=0;
 }

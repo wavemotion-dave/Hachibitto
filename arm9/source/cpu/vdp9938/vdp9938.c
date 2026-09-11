@@ -18,8 +18,6 @@
 //#define DEBUG_REFRESH(x) debug[x]++;
 #define DEBUG_REFRESH(x)
 
-u16 *pVidFlipBuf __attribute__((section(".dtcm"))) = (u16*) (0x06000000);    // Video flipping buffer
-
 u8 XPal[256] __attribute__((section(".dtcm"))) = {0};
 
 u8 XPalReal0 __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
@@ -36,7 +34,7 @@ u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpoch         __attribute__((section(".dtcm"))) = 0;
-u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // new: bitmask, one bit per VDP interrupt source
+u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -966,96 +964,96 @@ ITCM_CODE void CommitLine(u8 Y)
 
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
-  DEBUG_REFRESH(4);
-
-  if (!ScreenON)
-  {
-    memset(XBuf + (Y<<8), XPal[BGColor], 256);
-  }
-  else
-  {
-    uint32_t K, *T;
-    int I, J;
-    uint8_t *P = RefreshBorder(Y);
-    uint32_t srcY = Y + VScroll;
-    T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
-    I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
-
-    // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
-    // doesn't change mid-line), so check it once rather than per-pixel.
-    int misaligned = ((uintptr_t)P & 3) != 0;
-
-    uint32_t *P32 = (uint32_t*)P;
-    uint16_t *P16 = (uint16_t*)P;
-
-    uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
-    uint32_t p0 = 0, p1 = 0;
-
-    int X = 32;
-
-    if (!misaligned)
+    DEBUG_REFRESH(4);
+   
+    if (!ScreenON)
     {
-        do
-        {
-          uint32_t t_val = *(uint8_t*)T;
-          T = (uint32_t*)((uint8_t*)T + 1);
-
-          if (t_val != lastT)
-          {
-              lastT = t_val;
-              J = (int)t_val << 3;
-              uint32_t idx = (I + J);
-
-              uint32_t K_col = ColTab[idx & ColTabM];
-              uint32_t FC    = K_col >> 4;
-              uint32_t BC    = K_col & 0x0F;
-
-              K = ChrGen[idx & ChrGenM];
-
-              p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-              p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-          }
-
-          P32[0] = p0;
-          P32[1] = p1;
-          P32 += 2;
-
-        } while (--X);
+      memset(XBuf + (Y<<8), XPal[BGColor], 256);
     }
     else
     {
-        do
-        {
-          uint32_t t_val = *(uint8_t*)T;
-          T = (uint32_t*)((uint8_t*)T + 1);
-
-          if (t_val != lastT)
+      uint32_t K, *T;
+      int I, J;
+      uint8_t *P = RefreshBorder(Y);
+      uint32_t srcY = Y + VScroll;
+      T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
+      I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
+   
+      // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
+      // doesn't change mid-line), so check it once rather than per-pixel.
+      int misaligned = ((uintptr_t)P & 3) != 0;
+   
+      uint32_t *P32 = (uint32_t*)P;
+      uint16_t *P16 = (uint16_t*)P;
+   
+      uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
+      uint32_t p0 = 0, p1 = 0;
+   
+      int X = 32;
+   
+      if (!misaligned)
+      {
+          do
           {
-              lastT = t_val;
-              J = (int)t_val << 3;
-              uint32_t idx = (I + J);
-
-              uint32_t K_col = ColTab[idx & ColTabM];
-              uint32_t FC    = K_col >> 4;
-              uint32_t BC    = K_col & 0x0F;
-
-              K = ChrGen[idx & ChrGenM];
-
-              p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-              p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-          }
-
-          P16[0] = (uint16_t)p0;
-          P16[1] = (uint16_t)(p0 >> 16);
-          P16[2] = (uint16_t)p1;
-          P16[3] = (uint16_t)(p1 >> 16);
-          P16 += 4;
-        } while (--X);
+            uint32_t t_val = *(uint8_t*)T;
+            T = (uint32_t*)((uint8_t*)T + 1);
+   
+            if (t_val != lastT)
+            {
+                lastT = t_val;
+                J = (int)t_val << 3;
+                uint32_t idx = (I + J);
+   
+                uint32_t K_col = ColTab[idx & ColTabM];
+                uint32_t FC    = K_col >> 4;
+                uint32_t BC    = K_col & 0x0F;
+   
+                K = ChrGen[idx & ChrGenM];
+   
+                p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+                p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+            }
+   
+            P32[0] = p0;
+            P32[1] = p1;
+            P32 += 2;
+   
+          } while (--X);
+      }
+      else
+      {
+          do
+          {
+              uint32_t t_val = *(uint8_t*)T;
+              T = (uint32_t*)((uint8_t*)T + 1);
+              
+              if (t_val != lastT)
+              {
+                  lastT = t_val;
+                  J = (int)t_val << 3;
+                  uint32_t idx = (I + J);
+              
+                  uint32_t K_col = ColTab[idx & ColTabM];
+                  uint32_t FC    = K_col >> 4;
+                  uint32_t BC    = K_col & 0x0F;
+              
+                  K = ChrGen[idx & ChrGenM];
+              
+                  p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+                  p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+              }
+              
+              P16[0] = (uint16_t)p0;
+              P16[1] = (uint16_t)(p0 >> 16);
+              P16[2] = (uint16_t)p1;
+              P16[3] = (uint16_t)(p1 >> 16);
+              P16 += 4;
+          } while (--X);
+      }
+   
+      ColorSprites(Y, P-32);
+      CommitLine(Y);
     }
-
-    ColorSprites(Y, P-32);
-    CommitLine(Y);
-  }
 }
 
 ITCM_CODE void RefreshLine5(register u8 uY)
@@ -1167,7 +1165,6 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 /*************************************************************/
 ITCM_CODE void RefreshLine7(register u8 uY)
 {
-    uint8_t *P = RefreshBorder(uY);
     DEBUG_REFRESH(7);
     
     // ---------------------------------------------------------------------
@@ -1182,6 +1179,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
     }
     else
     {
+        uint8_t *P = RefreshBorder(uY);
         u32 *dst32 = (u32*)P;
         const u8 *src = ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=src-0x10000) src-=0x10000;
@@ -1674,8 +1672,6 @@ void Reset9938(void)
     ColTabM = 0x3FFF;
     ChrGenM = 0x3FFF;
     SprTabM = 0x3FFF;
-
-    pVidFlipBuf = (u16*) (0x06000000);
 
     RefreshLine = RefreshLine0;
 

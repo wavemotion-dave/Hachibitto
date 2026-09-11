@@ -21,7 +21,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0007
+#define CONFIG_VER                  0x0008
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -45,7 +45,6 @@ typedef struct {
   u8 uType;
   u32 uCrc;
 } FI_MSX;
-
 
 struct __attribute__((__packed__)) GlobalConfig_t
 {
@@ -111,27 +110,8 @@ extern u8 skip_render;
 extern u16 timingFrames;
 
 extern FI_MSX gpFic[MAX_ROMS];
-extern int uNbRoms;
 extern int ucGameAct;
 extern int ucGameChoice;
-
-extern void allocateCompressedMem(void);
-extern void restoreCompressedMem(void);
-
-extern void LoadConfig(void);
-extern u8 showMessage(char *szCh1, char *szCh2);
-extern void HachibittoModeNormal(void);
-extern void HachibittoInitScreenUp(void);
-extern void HachibittoFindFiles(void);
-extern void HachibittoChangeOptions(void);
-extern void DSPrint(int iX,int iY,int iScr,char *szMessage);
-extern unsigned int crc32 (unsigned int crc, const unsigned char *buf, unsigned int len);
-extern void HachibittoChangeKeymap(void);
-extern void HachibittoGameOptions(bool);
-extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
-extern u8 HachibittoChooseFile(void);
-extern void DisplayFileName(void);
-extern u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
 
 #define MSX_MODE_CART   1
 #define MSX_MODE_DISK   2
@@ -141,24 +121,24 @@ extern u8 mapperMask;
 extern u8 msx_caps_lock;
 extern u8 msx_kana_lock;
 
-#define GUESS       0
-#define MIRRORED    1
-#define KON8        2
-#define ASC8        3
-#define SCC8        4
-#define ASC16       5
-#define ZEN8        6
-#define ZEN16       7
-#define XBLAM       8
-#define SUPERLR     9
-#define XEVIOUS     10
-#define RES1        11
-#define RES2        12
-#define AT0K        13
-#define AT4K        14
-#define AT8K        15
-#define LIN64       16
-#define SCCPLUS_RAM 88
+#define GUESS           0
+#define MIRRORED        1
+#define KON8            2
+#define ASC8            3
+#define SCC8            4
+#define ASC16           5
+#define ZEN8            6
+#define ZEN16           7
+#define XBLAM           8
+#define SUPERLR         9
+#define XEVIOUS         10
+#define RES1            11
+#define RES2            12
+#define AT0K            13
+#define AT4K            14
+#define AT8K            15
+#define LIN64           16
+#define SCCPLUS_RAM     88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
@@ -223,34 +203,22 @@ extern u8 key_graph;
 extern u8 key_dia;
 extern u32 msx_last_file_size;
 
-extern u8 msxInit(char *szGame);
 extern void msxUpdateScreen(void);
 extern void getfile_crc(const char *path);
-
 extern void msxLoadState();
 extern void msxSaveState();
-
 extern void msxWipeRAM(void);
 extern void msx_reset(void);
 extern void msx_restore_bios(void);
-
-extern u8 loadrom(const char *path);
-
-extern u32 LoopZ80();
 extern void BufferKey(u8 key);
 extern void BufferKeys(char *str);
-
 extern void MSX_InitialMemoryLayout(u32 romSize);
-
 extern void msxSaveEEPROM(void);
 extern void msxLoadEEPROM(void);
-
 extern void MSX_HandleBeeper(void);
 extern void BeeperON(u16 beeper_freq);
 extern void BeeperOFF(void);
-
 extern void Z80_Interface_Reset(void);
-extern u8 RomDB_Lookup(u32 size);
 extern void LoadFavorites(void);
 extern void preserveCompressedMem(void);
 extern void restoreCompressedMem(void);
@@ -258,5 +226,23 @@ extern void HandleSCCPlusModeRegister(u8 value);
 extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void BuildScreen8ColorMap(void);
 extern void msxRun(void);
+extern void allocateCompressedMem(void);
+extern void restoreCompressedMem(void);
+extern void LoadConfig(void);
+extern void HachibittoInitScreenUp(void);
+extern void HachibittoFindFiles(void);
+extern void HachibittoChangeOptions(void);
+extern void DSPrint(int iX,int iY,int iScr,char *szMessage);
+extern void HachibittoChangeKeymap(void);
+extern void HachibittoGameOptions(bool);
+extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
+extern void DisplayFileName(void);
+extern u32  ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
+extern u8   HachibittoChooseFile(void);
+extern u8   showMessage(char *szCh1, char *szCh2);
+extern u8   msxInit(char *szGame);
+extern u8   loadrom(const char *path);
+extern u32  LoopZ80();
+extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
 
 #endif

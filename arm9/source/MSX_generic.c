@@ -125,34 +125,33 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD SEMI",
   "KEYBOARD QUOTE",
   "KEYBOARD SLASH", //65
-  "KEYBOARD BSLASH",
-  "KEYBOARD PLUS",
+  "KEYBOARD CARET",
   "KEYBOARD MINUS",
   "KEYBOARD LBRACKET",
-  "KEYBOARD RBRACKET", //70
-  "KEYBOARD CARET",
-  "KEYBOARD ASTERISK",
-  "KEYBOARD ATSIGN",
+  "KEYBOARD RBRACKET",
+  "KEYBOARD ATSIGN", //70
   "KEYBOARD BS",
-  "KEYBOARD TAB", //75
+  "KEYBOARD TAB",
   "KEYBOARD INS",
   "KEYBOARD DEL",
-  "KEYBOARD CLEAR",
+  "KEYBOARD CLEAR", // 75
   "KEYBOARD STOP",
-  "KEYBOARD F1", //80
+  "KEYBOARD F1", 
   "KEYBOARD F2",
   "KEYBOARD F3",
-  "KEYBOARD F4",
+  "KEYBOARD F4", //80
   "KEYBOARD F5",
 
-  "PAN UP 8", //85
+  "PAN UP 8", //82
   "PAN UP 12",
   "PAN UP 16",
-  "PAN UP 20",
+  "PAN UP 20", //85
   "PAN DOWN 8",
-  "PAN DOWN 12", //90
+  "PAN DOWN 12",
   "PAN DOWN 16",
   "PAN DOWN 20",
+  "SHOW TOP",    //90
+  "SHOW BOTTOM",
 };
 
 
@@ -864,8 +863,8 @@ void MapPlayer1(void)
     myConfig.keymap[3]   = 3;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 4;    // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 5;    // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 87;   // NDS X Button mapped to PAN UP 16
-    myConfig.keymap[7]   = 91;   // NDS Y Button mapped to PAN DN 16
+    myConfig.keymap[6]   = 84;   // NDS X Button mapped to PAN UP 16
+    myConfig.keymap[7]   = 88;   // NDS Y Button mapped to PAN DN 16
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -880,8 +879,8 @@ void MapPlayer2(void)
     myConfig.keymap[3]   = 9;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 10;   // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 11;   // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 87;   // NDS X Button mapped to PAN UP 16
-    myConfig.keymap[7]   = 91;   // NDS Y Button mapped to PAN DN 16
+    myConfig.keymap[6]   = 84;   // NDS X Button mapped to PAN UP 16
+    myConfig.keymap[7]   = 88;   // NDS Y Button mapped to PAN DN 16
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -890,18 +889,18 @@ void MapPlayer2(void)
 
 void MapCursors(void)
 {
-    myConfig.keymap[0]   = 56;    // UP Arrow
-    myConfig.keymap[1]   = 57;    // Down Arrow
-    myConfig.keymap[2]   = 58;    // Left Arrow
-    myConfig.keymap[3]   = 59;    // Right Arrow
-    myConfig.keymap[4]   = 52;    // Space
-    myConfig.keymap[5]   = 52;    // Space
-    myConfig.keymap[6]   = 87;    // NDS X Button mapped to PAN UP 16
-    myConfig.keymap[7]   = 91;    // NDS Y Button mapped to PAN DN 16
-    myConfig.keymap[8]   = 49;    // NDS R      mapped to CTRL
-    myConfig.keymap[9]   = 48;    // NDS L      mapped to SHIFT
-    myConfig.keymap[10]  = 39;    // 1
-    myConfig.keymap[11]  = 40;    // 2
+    myConfig.keymap[0]   = 56;   // UP Arrow
+    myConfig.keymap[1]   = 57;   // Down Arrow
+    myConfig.keymap[2]   = 58;   // Left Arrow
+    myConfig.keymap[3]   = 59;   // Right Arrow
+    myConfig.keymap[4]   = 52;   // Space
+    myConfig.keymap[5]   = 56;   // Up Arrow
+    myConfig.keymap[6]   = 84;   // NDS X Button mapped to PAN UP 16
+    myConfig.keymap[7]   = 88;   // NDS Y Button mapped to PAN DN 16
+    myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
+    myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
+    myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
+    myConfig.keymap[10]  = 53;   // NDS Select mapped to RETURN
 }
 
 
