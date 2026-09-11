@@ -4,7 +4,7 @@
 // Copying and distribution of this emulator, its source code and associated
 // readme files, with or without modification, are permitted in any medium without
 // royalty provided this copyright notice is used and wavemotion-dave (Phoenix-Edition),
-// Alekmaul (original port) and Marat Fayzullin (ColEM core) are thanked profusely.
+// Alekmaul (original port) and Marat Fayzullin (fMSX core) are thanked profusely.
 //
 // The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
 // =====================================================================================
@@ -59,7 +59,7 @@ u8  msx_scc_plus_enable __attribute__((section(".dtcm"))) = 0;         // Mirror
 // --------------------------------------------------------------------------
 u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
-u32 msx_last_rom_size   = 0;
+u32 msx_last_file_size   = 0;
 
 extern u8 DirectRegWrite9938(u8 Value);
 
@@ -1069,7 +1069,7 @@ void msxWipeRAM(void)
 // -------------------------------------------------------------------------
 void MSX_InitialMemoryLayout(u32 romSize)
 {
-    msx_last_rom_size = romSize;
+    msx_last_file_size = romSize;
     
     // -------------------------------------
     // Make sure the MSX ports are clear
@@ -1583,10 +1583,10 @@ void msx_reset(void)
     msx_sram_at_8000 = false;
     if (msx_mode)
     {
-        MSX_InitialMemoryLayout(msx_last_rom_size);
+        MSX_InitialMemoryLayout(msx_last_file_size);
         if (msx_mode == MSX_MODE_DISK) // .dsk based MSX 
         {
-            fdc_init(1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+            fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
             fdc_reset(true);
         }
     }

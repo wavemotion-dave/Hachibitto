@@ -4,7 +4,7 @@
 // Copying and distribution of this emulator, its source code and associated
 // readme files, with or without modification, are permitted in any medium without
 // royalty provided this copyright notice is used and wavemotion-dave (Phoenix-Edition),
-// Alekmaul (original port) and Marat Fayzullin (ColEM core) are thanked profusely.
+// Alekmaul (original port) and Marat Fayzullin (fMSX core) are thanked profusely.
 //
 // The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
 // =====================================================================================
@@ -33,8 +33,6 @@
 #define DPAD_NORMAL                 0
 #define DPAD_DIAGONALS              1
 #define DPAD_SLIDE_N_GLIDE          2
-
-#define CPU_CLEAR_INT_ON_VDP_READ   0
 
 #define OVL_FULLKBD                 0
 #define OVL_ALPHAKBD                1
@@ -135,10 +133,6 @@ extern u8 HachibittoChooseFile(void);
 extern void DisplayFileName(void);
 extern u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
 
-extern const unsigned char MSXBios_MSX2[];
-extern const unsigned char MSXBios_MSX2EXT[];
-extern const unsigned char MSXBios_MSX1[];
-
 #define MSX_MODE_CART   1
 #define MSX_MODE_DISK   2
 
@@ -175,14 +169,14 @@ extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x10000];
 extern u8 SRAM_Memory[0x4000];
 extern u8 fastdrom_cdx2[0x4000];
+extern const unsigned char MSXBios_MSX2[];
+extern const unsigned char MSXBios_MSX2EXT[];
+extern const unsigned char MSXBios_MSX1[];
 
 extern u8 bCartInSegment[4];
 extern u8 bRAMInSegment[4];
 extern u8 *MSXCartPtr[8];
 extern u8 *MemoryMap[8];
-extern u8 msx_slot_dirty[4];
-
-extern u8  msx_last_block[4];
 
 extern AY38910 myAY;
 extern SCC     mySCC;
@@ -198,10 +192,6 @@ extern u16 msx_block_size;
 extern u32 file_crc;
 
 extern u8 romBankMask;
-
-extern u8 SGC_Bank[4];
-extern u8 SGC_SST_State;
-extern u8 SGC_SST_CmdPos;
 
 // -------------------------------
 // A few misc externs needed...
@@ -231,12 +221,10 @@ extern u8 key_ctrl;
 extern u8 key_code;
 extern u8 key_graph;
 extern u8 key_dia;
-extern u32 msx_last_rom_size;
+extern u32 msx_last_file_size;
 
 extern u8 msxInit(char *szGame);
 extern void msxUpdateScreen(void);
-extern void msxKeyProc(void);
-extern void msxRun(void);
 extern void getfile_crc(const char *path);
 
 extern void msxLoadState();
@@ -245,7 +233,6 @@ extern void msxSaveState();
 extern void msxWipeRAM(void);
 extern void msx_reset(void);
 extern void msx_restore_bios(void);
-extern void MSX_HandleBeeper(void);
 
 extern u8 loadrom(const char *path);
 
@@ -258,6 +245,7 @@ extern void MSX_InitialMemoryLayout(u32 romSize);
 extern void msxSaveEEPROM(void);
 extern void msxLoadEEPROM(void);
 
+extern void MSX_HandleBeeper(void);
 extern void BeeperON(u16 beeper_freq);
 extern void BeeperOFF(void);
 
@@ -269,5 +257,6 @@ extern void restoreCompressedMem(void);
 extern void HandleSCCPlusModeRegister(u8 value);
 extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void BuildScreen8ColorMap(void);
+extern void msxRun(void);
 
 #endif

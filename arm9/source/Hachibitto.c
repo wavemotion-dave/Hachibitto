@@ -4,7 +4,7 @@
 // Copying and distribution of this emulator, its source code and associated
 // readme files, with or without modification, are permitted in any medium without
 // royalty provided this copyright notice is used and wavemotion-dave (Phoenix-Edition),
-// Alekmaul (original port) and Marat Fayzullin (ColEM core) are thanked profusely.
+// Alekmaul (original port) and Marat Fayzullin (fMSX core) are thanked profusely.
 //
 // The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
 // =====================================================================================
@@ -1308,9 +1308,9 @@ void Hachibitto_main(void)
                               if (ucGameChoice >= 0) // Did the user select a game?
                               {
                                   FILE* file = fopen(gpFic[ucGameChoice].szName, "rb");
-                                  (void) fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file);
+                                  msx_last_file_size = fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file);
                                   fclose(file);
-                                  fdc_init(1, (msx_last_rom_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+                                  fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
                               }
                               BottomScreenKeypad();
                               SoundUnPause();
