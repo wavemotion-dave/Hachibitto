@@ -1,5 +1,5 @@
 // =====================================================================================
-// Copyright (c) 2021-2026 Dave Bernazzani (wavemotion-dave)
+// Copyright (c) 2026 Dave Bernazzani (wavemotion-dave)
 //
 // Copying and distribution of this emulator, its source code and associated
 // readme files, with or without modification, are permitted in any medium without
@@ -37,13 +37,13 @@ extern u8 disk_unsaved_data[];
 // ---------------------------------------------------------------------------
 // WD2793 Status Register Bit Definitions
 // ---------------------------------------------------------------------------
-#define ST_BUSY          0x01
+#define ST_BUSY          0x01   // Busy Status
 #define ST_INDEX_DRQ     0x02   // Index Pulse (Type I) / Data Request (Type II/III)
 #define ST_TRACK0        0x04   // 1 = AT track 0 (Type I) / Lost Data (Type II/III)
-#define ST_CRC_ERROR     0x08
+#define ST_CRC_ERROR     0x08   // 1 = CRC error. Not used.
 #define ST_RNF           0x10   // Seek Error (Type I) / Record Not Found (Type II/III)
 #define ST_HEAD_ENGAGED  0x20   // Head Engaged (Type I) / Record Type (Type II/III)
-#define ST_WRITE_PROT    0x40
+#define ST_WRITE_PROT    0x40   // Bit for write protect of the disk (not used)
 #define ST_NOT_READY     0x80   // 1 = Not Ready, 0 = Ready
 
 // ---------------------------------------------------------------------------
@@ -75,6 +75,7 @@ void fdc_debug(u8 bWrite, u8 addr, u8 data)
 
 // -------------------------------------------------------------------------------------------------------------------------
 // Read one track worth of sectors in proper sector order (0..N) and buffer that in our track buffer for easy read/write.
+// Disk sides are interleaved... that is, track 0, side 0 is followed by track 0, side 1 and then track 1, side 0, etc.
 // -------------------------------------------------------------------------------------------------------------------------
 void fdc_buffer_track(void)
 {

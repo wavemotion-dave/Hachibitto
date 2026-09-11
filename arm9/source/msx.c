@@ -932,6 +932,11 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
+    else // Unhandled port write...
+    {
+      //debug[15]++;
+      //debug[DX++ & 7] = Port;
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -989,64 +994,6 @@ u8 MSX_GuessROMType(u32 size)
     else type = KON8; 
     
     if (size == (64 * 1024)) type = ASC16;      // Big percentage of 64K mapper ROMs are ASCII16 so default to that and override below
-    
-    
-    // ----------------------------------------------------------------------
-    // Since mappers are hard to detect reliably, check a few special CRCs
-    // ----------------------------------------------------------------------
-    if (file_crc == 0x5dc45624) type = ASC8;   // Super Laydock
-    if (file_crc == 0xb885a464) type = ZEN8;   // Super Laydock    
-    if (file_crc == 0x7454ad5b) type = ASC16;  // Sorcery
-    if (file_crc == 0x3891bc0f) type = ASC16;  // Govellious
-    if (file_crc == 0x1d1ec602) type = ASC16;  // Eggerland 2
-    if (file_crc == 0x704ec575) type = ASC16;  // Toobin
-    if (file_crc == 0x885773f9) type = ASC16;  // Dragon Slayer 3
-    if (file_crc == 0x0521ca7a) type = ASC16;  // Dynamite Dan
-    if (file_crc == 0xab6cd62c) type = ASC16;  // King's Knight    
-    if (file_crc == 0x00c5d5b5) type = ASC16;  // Hydlyde III
-    if (file_crc == 0x2a019191) type = ASC8;   // R-Type 512k
-    if (file_crc == 0xa3a51fbb) type = ASC16;  // R-Type 512k
-    if (file_crc == 0x952bfaa4) type = SCC8;   // R-Type 512k
-    if (file_crc == 0xfbd3f05b) type = ASC16;  // Alien Attack 3.5
-    if (file_crc == 0xa6e924ab) type = ASC16;  // Aliens aka Alien 2
-    if (file_crc == 0xa6e924ab) type = ASC16;  // Aliens aka Alien 2
-    if (file_crc == 0xc6fc7bd7) type = ASC16;  // Aliens aka Alien 2
-    if (file_crc == 0x3ddcb524) type = ASC16;  // Aliens aka Alien 2    
-    if (file_crc == 0x1306ccca) type = ASC8;   // Auf Wiedershen Monty [1.7]
-    if (file_crc == 0xec036e37) type = ASC16;  // Gall Force
-    if (file_crc == 0xa29176e3) type = ASC16;  // Mecha 9    
-    if (file_crc == 0x03379ef8) type = ASC16;  // MSXDev Step Up 1.2
-    if (file_crc == 0x2f9bed70) type = ZEN16;  // Adventure Kid
-    if (file_crc == 0xab9fb4a4) type = ASC16;  // Astro Marine Corps
-    if (file_crc == 0x8cf0e6c0) type = ASC8;   // Bomber King
-    if (file_crc == 0xf2f2f0c8) type = ASC16;  // Borfestu (English Translation)
-    if (file_crc == 0x8801b31e) type = LIN64;  // Break In
-    if (file_crc == 0x79cf953d) type = ASC8;   // Death Wish III    
-    if (file_crc == 0x387c1de7) type = ASC16;  // Dragon Slayer III - Romantica
-    if (file_crc == 0x2526e568) type = ASC16;  // Dungeon Hunter
-    if (file_crc == 0x1d75c0b4) type = ASC16;  // Freedom Fighter (newest)
-    if (file_crc == 0xc570ea63) type = ASC16;  // Freedom Fighter
-    if (file_crc == 0xa5b0e901) type = ASC16;  // Game Over (Parts I and II)
-    if (file_crc == 0xb2e57a45) type = ASC16;  // Gremlins II
-    if (file_crc == 0x96b7faca) type = ASC16;  // MSX Harry Fox Special (JP)
-    if (file_crc == 0x92943e5b) type = ASC16;  // Hydlide 2 - Shrine of Darkness
-    if (file_crc == 0xb29edaec) type = ASC16;  // Hydlide 2 - Shrine of Darkness
-    if (file_crc == 0xa0fd57cf) type = ASC16;  // Hydlide 2 - Shrine of Darkness
-    if (file_crc == 0x41c82156) type = ZEN8;   // Hydlide III (Zenmia)
-    if (file_crc == 0xcb9eebfb) type = SCC8;   // Lex Flics (translated)
-    if (file_crc == 0xf5eb7cca) type = SCC8;   // Lazy Jones    
-    if (file_crc == 0xd6c395f8) type = SCC8;   // Monster Hunter
-    if (file_crc == 0x8183bae1) type = LIN64;  // Mutants from the Deep   
-    if (file_crc == 0xa78fdb26) type = ASC8;   // No Back Down   
-    if (file_crc == 0x454381e4) type = SCC8;   // PuzzyBox 1.0
-    if (file_crc == 0x31e3f039) type = LIN64;  // Stupid Martians
-    if (file_crc == 0x9195c34c) type = ZEN8;   // Super Boy III
-    if (file_crc == 0x73efe840) type = ASC16;  // Super Pierrot
-    if (file_crc == 0x41676177) type = LIN64;  // Tina's Island Adventure
-    if (file_crc == 0xc5c14bbd) type = KON8;   // The Hobbit
-    if (file_crc == 0xfea70207) type = ASC16;  // Vaxol
-    if (file_crc == 0x35899655) type = ASC8;   // Venom Strikes Back    
-    if (file_crc == 0x47273220) type = XBLAM;  // Cross Blaim
     
     return type;
 }

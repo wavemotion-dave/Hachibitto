@@ -879,7 +879,7 @@ ITCM_CODE void RefreshLine2(u8 uY) {
 /** Refresh line Y (0..191) of SCREEN3, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-ITCM_CODE void RefreshLine3(u8 uY)
+void RefreshLine3(u8 uY) // Purposely no ITCM_CODE as this is the least used Screen Mode and we need the ITCM space!
 {
   byte X,K,Offset;
   byte *P,*T;

@@ -25,10 +25,10 @@
 // For the jump instructions, the Cycle[] table builds in assuming the jump WILL be taken
 // which is true about 95% of the time. If the jump is not taken, we compensate ICount.
 // ----------------------------------------------------------------------------------------
-case JR_NZ:   if(CPU.AF.B.l&Z_FLAG) {CPU.ICount+=5; CPU.PC.W++;} else { M_JR; } break;
-case JR_NC:   if(CPU.AF.B.l&C_FLAG) {CPU.ICount+=5; CPU.PC.W++;} else { M_JR; } break;
-case JR_Z:    if(CPU.AF.B.l&Z_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
-case JR_C:    if(CPU.AF.B.l&C_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
+case JR_NZ:   if(CPU.AF.B.l&Z_FLAG) {CPU.ICount+=5; CPU.TotalCycles-=5; CPU.PC.W++;} else { M_JR; } break;
+case JR_NC:   if(CPU.AF.B.l&C_FLAG) {CPU.ICount+=5; CPU.TotalCycles-=5; CPU.PC.W++;} else { M_JR; } break;
+case JR_Z:    if(CPU.AF.B.l&Z_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.TotalCycles-=5; CPU.PC.W++;} break;
+case JR_C:    if(CPU.AF.B.l&C_FLAG) { M_JR; } else {CPU.ICount+=5; CPU.TotalCycles-=5; CPU.PC.W++;} break;
 
 case JP_NZ:   if(CPU.AF.B.l&Z_FLAG) CPU.PC.W+=2; else { M_JP; } break;
 case JP_NC:   if(CPU.AF.B.l&C_FLAG) CPU.PC.W+=2; else { M_JP; } break;
@@ -220,7 +220,7 @@ case POP_DE:   M_POP(DE);break;
 case POP_HL:   M_POP(HL);break;
 case POP_AF:   M_POP(AF);break;
 
-case DJNZ: if(--CPU.BC.B.h) { M_JR; } else {CPU.ICount+=5; CPU.PC.W++;} break;
+case DJNZ: if(--CPU.BC.B.h) { M_JR; } else {CPU.ICount+=5; CPU.TotalCycles-=5; CPU.PC.W++;} break;
 case JP:   M_JP;break;
 case JR:   M_JR;break;
 case CALL: M_CALL;break;

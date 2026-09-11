@@ -54,10 +54,10 @@ bool screenshotbmp(const char* filename) {
     while(REG_DISPCAPCNT & DCAP_ENABLE);
 
     // ----------------------------------------------------------------------------------------------
-    // Use the back-end 100K of the large cart buffer. In theory this might be used by some massive
+    // Use the back-end of the large cart buffer. In theory this might be used by some massive
     // game - and screenshot of such a game would break.
     // ----------------------------------------------------------------------------------------------
-    u8 *temp = (u8*)ROM_Memory+((MAX_CART_SIZE-100)*1024);
+    u8 *temp = (u8*)ROM_Memory+(MAX_CART_SIZE*1024);
 
     HEADER *header= (HEADER*)temp;
     INFOHEADER *infoheader = (INFOHEADER*)(temp + sizeof(HEADER));

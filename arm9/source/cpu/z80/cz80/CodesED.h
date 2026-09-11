@@ -189,6 +189,7 @@ case OTIR:
   {
     CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
     CPU.ICount+=5;
+    CPU.TotalCycles-=5;
   }
   break;
 
@@ -212,6 +213,7 @@ case OTDR:
   {
     CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
     CPU.ICount+=5;
+    CPU.TotalCycles-=5;
   }
   break;
 
@@ -232,6 +234,7 @@ case LDIR:
   {
     CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
     CPU.ICount+=5;
+    CPU.TotalCycles-=5;
   }
   break;
 
@@ -253,6 +256,7 @@ case LDDR:
   {
     CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
     CPU.ICount+=5;
+    CPU.TotalCycles-=5;
   }
   break;
 
