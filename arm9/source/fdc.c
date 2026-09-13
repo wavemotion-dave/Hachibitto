@@ -475,16 +475,6 @@ void fdc_write(u8 addr, u8 data)
     }
 }
 
-void fdc_setDrive(u8 drive)
-{
-    FDC.drive = drive;                      // Record the drive in use
-}
-
-void fdc_setSide(u8 side)
-{
-    FDC.side = side;                        // Record the side in use
-}
-
 void fdc_reset(u8 full_reset)
 {
     if (full_reset)

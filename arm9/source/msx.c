@@ -1513,6 +1513,7 @@ void msx_reset(void)
     msx_basic = 0x0000;
 
     MSX_InitialMemoryLayout(msx_last_file_size);
+    
     if (msx_mode == MSX_MODE_DISK) // .dsk based MSX
     {
         fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);

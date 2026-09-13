@@ -71,8 +71,6 @@ extern struct FDC_GEOMETRY_t    Geom;
 
 extern u8   fdc_read(u8 addr);
 extern void fdc_write(u8 addr, u8 data);
-extern void fdc_setSide(u8 side);
-extern void fdc_setDrive(u8 drive);
 extern void fdc_reset(u8 full_reset);
 extern void fdc_init(u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1);
 extern void LoopFDC(void);     // NEW: call once per scanline, like Loop9938()

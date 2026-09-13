@@ -1036,7 +1036,7 @@ void Hachibitto_main(void)
 {
   u16 iTx,  iTy;
   u16 SaveNow = 0, LoadNow = 0;
-  u32 ucDEUX;
+  u32 JoyStickMap;
   static u32 lastUN = 0;
   static u8 dampenClick = 0;
   u8 meta_key = 0;
@@ -1303,10 +1303,11 @@ void Hachibitto_main(void)
                               HachibittoChooseFile();
                               if (ucGameChoice >= 0) // Did the user select a game?
                               {
-                                  FILE* file = fopen(gpFic[ucGameChoice].szName, "rb");
-                                  msx_last_file_size = fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file);
-                                  fclose(file);
+                                  BottomScreenOptions();
+                                  DSPrint(11,13,6, "LOADING...");
+                                  msx_last_file_size = ReadFileCarefully(gpFic[ucGameChoice].szName, ROM_Memory, (MAX_CART_SIZE * 1024), 0);
                                   fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+                                  fdc_reset(false);
                               }
                               BottomScreenKeypad();
                               SoundUnPause();
@@ -1317,7 +1318,6 @@ void Hachibitto_main(void)
                           SaveNow = 0;
                           LoadNow = 0;
                   }
-
 
                   if (++dampenClick > 0)  // Make sure the key is pressed for an appreciable amount of time...
                   {
@@ -1346,7 +1346,7 @@ void Hachibitto_main(void)
       key_code = false;
       key_graph = false;
 
-      ucDEUX  = 0;
+      JoyStickMap  = 0;
       nds_key  = keysCurrent();     // Get any current keys pressed on the NDS
 
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
@@ -1421,9 +1421,9 @@ void Hachibitto_main(void)
           {
               if (nds_key & NDS_keyMap[i])
               {
-                  if (keyCoresp[myConfig.keymap[i]] < 0xFFFE0000)   // Normal key map
+                  if (keyCoresp[myConfig.keymap[i]] < 0xFFFE0000)   // Normal Joystick-type key map
                   {
-                      ucDEUX  |= keyCoresp[myConfig.keymap[i]];
+                      JoyStickMap  |= keyCoresp[myConfig.keymap[i]];
                   }
                   else // This is a keyboard maping... handle that here... just set the appopriate kbd_key
                   {
@@ -1500,7 +1500,7 @@ void Hachibitto_main(void)
       // ---------------------------------------------------------
       // Accumulate all bits above into the Joystick State var...
       // ---------------------------------------------------------
-      JoyState = ucDEUX;
+      JoyState = JoyStickMap;
 
       // --------------------------------------------------
       // Handle Auto-Fire if enabled in configuration...
@@ -1685,9 +1685,10 @@ void irqVBlank(void)
  ********************************************************************************/
 int main(int argc, char **argv)
 {
-    //  Init sound
+    // Init sound so we get an intro jingle...
     consoleDemoInit();
    
+    // Initialize the old FAT16 library for use with the SD card
     if  (!fatInitDefault()) {
        iprintf("Unable to initialize libfat!\n");
        return -1;
@@ -1707,15 +1708,21 @@ int main(int argc, char **argv)
         ROM_Memory = malloc(MAX_CART_SIZE * 1024);
     }
    
+    // ------------------------------------------
+    // Load the High Score table into memory...
     highscore_init();
+    // ------------------------------------------
    
+    // ---------------------------------------------------------------
+    // The main game action is on the top screen, keyboard on bottom
+    // ---------------------------------------------------------------
     lcdMainOnTop();
    
     //  Init timer for frame management
     TIMER2_DATA=0;
     TIMER2_CR=TIMER_ENABLE|TIMER_DIV_1024;
    
-    // Install the sound driver...
+    // Install the sound driver for emulated AY/SCC sound
     SoundPause();
     dsInstallSoundEmuFIFO();
    
@@ -1727,21 +1734,25 @@ int main(int argc, char **argv)
     irqSet(IRQ_VBLANK,  irqVBlank);
     irqEnable(IRQ_VBLANK);
    
-    // -----------------------------------------------------------------
-    // Grab the BIOS before we try to switch any directories around...
-    // -----------------------------------------------------------------
+    // -------------------------------------------
+    // Setup our DS VRAM - most banks go unused.
+    // -------------------------------------------
     useVRAM();
    
     // -----------------------------------------------------------------
     // And do an initial load of configuration... We'll match it up
-    // with the game that was selected later...
+    // with the game that was selected later... Mostly need globals.
     // -----------------------------------------------------------------
     LoadConfig();
    
+    // -----------------------------------------
     // Do an initial load of the Favorites file
+    // -----------------------------------------
     LoadFavorites();
    
+    // --------------------------------------------------
     //  Handle command line argument... mostly for TWL++
+    // --------------------------------------------------
     if  (argc > 1)
     {
         //  We want to start in the directory where the file is being launched...
@@ -1768,6 +1779,9 @@ int main(int argc, char **argv)
         chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
     }
    
+    // -----------------------------------------------------
+    // Make sure we have true-ish random number generation
+    // -----------------------------------------------------
     srand(time(NULL));
    
     //  ------------------------------------------------------------
