@@ -52,7 +52,7 @@ AY38910 myAY                __attribute__((section(".dtcm")));          // Decla
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
 // ---------------------------------------------------------------------
-u8  SCCPlusRAM[64*1024];                                               // Too big for .dtcm - lives in normal memory
+u8  SCCPlusRAM[0x10000];                                               // 64K for SCC Plus slotted RAM (mostly for Snatcher/SD)
 u8  sccplus_page[4]     __attribute__((section(".dtcm"))) = {0,1,2,3}; // Last byte written to each of the 4 select regs
 u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/BFFF: bit5=RAM mode, bit4=SCC+ compat
 
@@ -61,7 +61,7 @@ u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/B
 // --------------------------------------------------------------------------
 u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
-u32 msx_last_file_size   = 0;
+u32 msx_last_file_size  = 0;
 
 extern u8 DirectRegWrite9938(u8 Value);
 
@@ -114,9 +114,10 @@ uint8_t read_port_B5(void) {
     return val;
 }
 
-// ------------------------------------------------------------------
-// MSX IO Port Read - just VDP and Joystick to contend with...
-// ------------------------------------------------------------------
+// --------------------------------------------------------------------
+// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals 
+// including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
+// --------------------------------------------------------------------
 ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 {
   // MSX ports are 8-bit
@@ -540,11 +541,11 @@ void msx_slot_map_msx1(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
-    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
+    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE; // Until proven otherwise below...
 
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
-        case 0x00:  // Slot 0:  Maps to BIOS Rom
+        case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInSegment[0] = 0;
             bRAMInSegment[0] = 0;
             MemoryMap[0] = BIOS_Memory + 0x0000;
@@ -570,7 +571,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
                 MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
                 MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
             }
-            else
+            else // Other subslots have nothing in this page
             {
                 MemoryMap[0] = (u8 *)BIOS_Memory+0x8000;
                 MemoryMap[1] = (u8 *)BIOS_Memory+0x8000;
@@ -580,7 +581,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 
     switch ((Value>>2) & 0x03)  // [0x4000~0x7FFF]
     {
-        case 0x00:  // Slot 0:  Maps to BIOS Rom
+        case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInSegment[1] = 0;
             bRAMInSegment[1] = 0;
             MemoryMap[2] = BIOS_Memory + 0x4000;
@@ -598,7 +599,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[2] = (u8 *)(MSXRamPtr[2]);
             MemoryMap[3] = (u8 *)(MSXRamPtr[3]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF
+        case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInSegment[1] = 0;
             bRAMInSegment[1] = 0;
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
@@ -606,7 +607,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
                 MemoryMap[2] = fastdrom_cdx2 + 0x0000;
                 MemoryMap[3] = fastdrom_cdx2 + 0x2000;
             }
-            else
+            else // Other subslots have nothing in this page
             {
                 MemoryMap[2] = (u8 *)BIOS_Memory+0x8000;
                 MemoryMap[3] = (u8 *)BIOS_Memory+0x8000;
@@ -634,7 +635,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
             MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing ever maps here.
             bCartInSegment[2] = 0;
             bRAMInSegment[2] = 0;
             MemoryMap[4] = BIOS_Memory+0x8000;
@@ -656,13 +657,13 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
             MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
             break;
-        case 0x02:  // Slot 2 is RAM so we allow RAM writes now
+        case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 1;
             MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF (this is our expanded slot)
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing ever maps here.
             special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
@@ -687,7 +688,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
-        case 0x00:  // Slot 0:  Maps to BIOS Rom
+        case 0x00:  // Slot 0:  Maps to Main BIOS ROM - this is an expanded slot
             if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0-0 has main BIOS
             {
                 bCartInSegment[0] = 0;
@@ -702,7 +703,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
                 MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
             }
-            else // Nothing
+            else // Other subslots map nothing 
             {
                 bCartInSegment[0] = 0;
                 bRAMInSegment[0] = 0;
@@ -732,7 +733,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 
     switch ((Value>>2) & 0x03)  // [0x4000~0x7FFF]
     {
-        case 0x00:  // Slot 0:  Maps to BIOS Rom
+        case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 0-0 has main BIOS
             {
                 bCartInSegment[1] = 0;
@@ -747,7 +748,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[2] = fastdrom_cdx2 + 0x0000;
                 MemoryMap[3] = fastdrom_cdx2 + 0x2000;
             }
-            else // Nothing
+            else // Other subslots map nothing 
             {
                 bCartInSegment[1] = 0;
                 bRAMInSegment[1] = 0;
@@ -777,17 +778,17 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 
     switch ((Value>>4) & 0x03)  // [0x8000~0xBFFF]
     {
-        case 0x00:  // Slot 0:  Maps to nothing... 0xFF
+        case 0x00:  // Slot 0:  Maps to nothing... 0xFF (Expanded slot but nothing maps to this page)
             bCartInSegment[2] = 0;
             bRAMInSegment[2] = 0;
             MemoryMap[4] = BIOS_Memory+0x8000;
             MemoryMap[5] = BIOS_Memory+0x8000;
             break;
-        case 0x01:  // Slot 1:  Maps to Nothing (spare Cart slot)
-                bCartInSegment[2] = 0;
-                bRAMInSegment[2] = 0;
-                MemoryMap[4] = (u8 *)BIOS_Memory+0x8000;
-                MemoryMap[5] = (u8 *)BIOS_Memory+0x8000;
+        case 0x01:  // Slot 1:  Maps to Nothing
+            bCartInSegment[2] = 0;
+            bRAMInSegment[2] = 0;
+            MemoryMap[4] = (u8 *)BIOS_Memory+0x8000;
+            MemoryMap[5] = (u8 *)BIOS_Memory+0x8000;
             break;
         case 0x02:  // Slot 2:  Maps to Game Cart
             bCartInSegment[2] = 1;
@@ -812,11 +813,11 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             MemoryMap[6] = BIOS_Memory+0x8000;
             MemoryMap[7] = BIOS_Memory+0x8000;
             break;
-        case 0x01:  // Slot 1:  Maps to Nothing (spare Cart slot)
-                bCartInSegment[3] = 0;
-                bRAMInSegment[3] = 0;
-                MemoryMap[6] = (u8 *)BIOS_Memory+0x8000;
-                MemoryMap[7] = (u8 *)BIOS_Memory+0x8000;
+        case 0x01:  // Slot 1:  Maps to Nothing
+            bCartInSegment[3] = 0;
+            bRAMInSegment[3] = 0;
+            MemoryMap[6] = (u8 *)BIOS_Memory+0x8000;
+            MemoryMap[7] = (u8 *)BIOS_Memory+0x8000;
             break;
         case 0x02:  // Slot 2:  Maps to Game Cart
             bCartInSegment[3] = 1;
@@ -833,9 +834,9 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     }
 }
 
-// ----------------------------------------------------------------------
-// MSX IO Port Write - VDP and AY Sound Chip plus Slot Mapper $A8
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+// MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
+// -----------------------------------------------------------------------------------------------
 ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value)
 {
     // MSX ports are 8-bit
@@ -892,10 +893,10 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
 
         msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
     }
-    else if (Port >= 0xD0 && Port <= 0xD7)  // Floppy Drive Controller
+    else if (Port >= 0xD0 && Port <= 0xD4)  // Floppy Drive Controller
     {
-      //2 sides * 80 tracks * 9 sectors per track * 512 bytes per sector = 737280 Bytes (720kB)
-      fdc_write(Port & 0x07, Value);
+        //2 sides * 80 tracks * 9 sectors per track * 512 bytes per sector = 737280 Bytes (720kB)
+        fdc_write(Port & 0x07, Value);
     }
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
     {
@@ -908,8 +909,8 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     }
     else // Unhandled port write...
     {
-      //debug[15]++;
-      //debug[DX++ & 7] = Port;
+        //debug[15]++;
+        //debug[DX++ & 7] = Port;
     }
 }
 

@@ -176,8 +176,6 @@ extern u8 msx_sram_enabled;
 extern u8 last_mega_bank;
 extern u16 msx_block_size;
 extern u32 file_crc;
-extern u8 romBankMask;
-extern u8 key_shift_hold;
 extern u8 Port_PPI_A;
 extern u8 Port_PPI_B;
 extern u8 Port_PPI_C;

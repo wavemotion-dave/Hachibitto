@@ -47,7 +47,7 @@ u32 DX = 0;
 u32 DY = 0;
 
 volatile u32 dsVSyncCount = 0;
-u32 last_vsync_count = 0xFEEDBEEF;
+u32 last_vsync_count __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
 s8  temp_offset      __attribute__((section(".dtcm"))) = 0;
 u8  slide_dampen     __attribute__((section(".dtcm"))) = 0;
 u8  DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
@@ -1685,152 +1685,151 @@ void irqVBlank(void)
  ********************************************************************************/
 int main(int argc, char **argv)
 {
-  //  Init sound
-  consoleDemoInit();
-
-  if  (!fatInitDefault()) {
-     iprintf("Unable to initialize libfat!\n");
-     return -1;
-  }
-
-  // -----------------------------------------------------------------
-  // Allocate the Large DSi buffer for expanded RAM banking...
-  // -----------------------------------------------------------------
-  if (isDSiMode())
-  {
-      MAX_CART_SIZE = 4096;
-      ROM_Memory = malloc(MAX_CART_SIZE * 1024);
-  }
-  else // For older DS units... 1.25MB max
-  {
-      MAX_CART_SIZE = 1256;
-      ROM_Memory = malloc(MAX_CART_SIZE * 1024);
-  }
-
-  highscore_init();
-
-  lcdMainOnTop();
-
-  //  Init timer for frame management
-  TIMER2_DATA=0;
-  TIMER2_CR=TIMER_ENABLE|TIMER_DIV_1024;
-
-  // Install the sound driver...
-  SoundPause();
-  dsInstallSoundEmuFIFO();
-
-  //  Show the fade-away intro logo...
-  intro_logo();
-
-  SetYtrigger(190); //trigger 2 lines before vsync
-
-  irqSet(IRQ_VBLANK,  irqVBlank);
-  irqEnable(IRQ_VBLANK);
-
-  // -----------------------------------------------------------------
-  // Grab the BIOS before we try to switch any directories around...
-  // -----------------------------------------------------------------
-  useVRAM();
-
-  // -----------------------------------------------------------------
-  // And do an initial load of configuration... We'll match it up
-  // with the game that was selected later...
-  // -----------------------------------------------------------------
-  LoadConfig();
-
-  // Do an initial load of the Favorites file
-  LoadFavorites();
-
-  //  Handle command line argument... mostly for TWL++
-  if  (argc > 1)
-  {
-      //  We want to start in the directory where the file is being launched...
-      if  (strchr(argv[1], '/') != NULL)
-      {
-          static char  path[128];
-          strcpy(path,  argv[1]);
-          char  *ptr = &path[strlen(path)-1];
-          while (*ptr !=  '/') ptr--;
-          ptr++;
-          strcpy(cmd_line_file,  ptr);
-          *ptr=0;
-          chdir(path);
-      }
-      else
-      {
-          strcpy(cmd_line_file,  argv[1]);
-      }
-  }
-  else
-  {
-      cmd_line_file[0]=0; // No file passed on command line...
-      chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
-      chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
-  }
-
-  srand(time(NULL));
-
-  //  ------------------------------------------------------------
-  //  We run this loop forever until game exit is selected...
-  //  ------------------------------------------------------------
-  while(1)
-  {
-    HachibittoInit();
-
+    //  Init sound
+    consoleDemoInit();
+   
+    if  (!fatInitDefault()) {
+       iprintf("Unable to initialize libfat!\n");
+       return -1;
+    }
+   
+    // -----------------------------------------------------------------
+    // Allocate the Large DSi buffer for expanded RAM banking...
+    // -----------------------------------------------------------------
+    if (isDSiMode())
+    {
+        MAX_CART_SIZE = 4096; // 4MB is the max MSX cart size without tom-foolery
+        ROM_Memory = malloc(MAX_CART_SIZE * 1024);
+    }
+    else // For older DS units... 1.25MB max
+    {
+        MAX_CART_SIZE = 1256;
+        ROM_Memory = malloc(MAX_CART_SIZE * 1024);
+    }
+   
+    highscore_init();
+   
+    lcdMainOnTop();
+   
+    //  Init timer for frame management
+    TIMER2_DATA=0;
+    TIMER2_CR=TIMER_ENABLE|TIMER_DIV_1024;
+   
+    // Install the sound driver...
+    SoundPause();
+    dsInstallSoundEmuFIFO();
+   
+    //  Show the fade-away intro logo...
+    intro_logo();
+   
+    SetYtrigger(180); //trigger 12 lines before true DS vsync
+   
+    irqSet(IRQ_VBLANK,  irqVBlank);
+    irqEnable(IRQ_VBLANK);
+   
+    // -----------------------------------------------------------------
+    // Grab the BIOS before we try to switch any directories around...
+    // -----------------------------------------------------------------
+    useVRAM();
+   
+    // -----------------------------------------------------------------
+    // And do an initial load of configuration... We'll match it up
+    // with the game that was selected later...
+    // -----------------------------------------------------------------
+    LoadConfig();
+   
+    // Do an initial load of the Favorites file
+    LoadFavorites();
+   
+    //  Handle command line argument... mostly for TWL++
+    if  (argc > 1)
+    {
+        //  We want to start in the directory where the file is being launched...
+        if  (strchr(argv[1], '/') != NULL)
+        {
+            static char  path[128];
+            strcpy(path,  argv[1]);
+            char  *ptr = &path[strlen(path)-1];
+            while (*ptr !=  '/') ptr--;
+            ptr++;
+            strcpy(cmd_line_file,  ptr);
+            *ptr=0;
+            chdir(path);
+        }
+        else
+        {
+            strcpy(cmd_line_file,  argv[1]);
+        }
+    }
+    else
+    {
+        cmd_line_file[0]=0; // No file passed on command line...
+        chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
+        chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
+    }
+   
+    srand(time(NULL));
+   
+    //  ------------------------------------------------------------
+    //  We run this loop forever until game exit is selected...
+    //  ------------------------------------------------------------
     while(1)
     {
-      SoundPause();
-      //  Choose option
-      if  (cmd_line_file[0] != 0)
-      {
-          ucGameChoice=0;
-          ucGameAct=0;
-          strcpy(gpFic[ucGameAct].szName, cmd_line_file);
-          cmd_line_file[0] = 0;    // No more initial file...
-          ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys
-      }
-      else
-      {
-          HachibittoChangeOptions();
-      }
-
-      //  Run Machine
-      HachibittoInitCPU();
-      Hachibitto_main();
+        HachibittoInit();
+        
+        while(1)
+        {
+            SoundPause();
+            //  Choose option
+            if  (cmd_line_file[0] != 0)
+            {
+                ucGameChoice=0;
+                ucGameAct=0;
+                strcpy(gpFic[ucGameAct].szName, cmd_line_file);
+                cmd_line_file[0] = 0;    // No more initial file...
+                ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys
+            }
+            else
+            {
+                HachibittoChangeOptions();
+            }
+            
+            //  Run Machine
+            HachibittoInitCPU();
+            Hachibitto_main();
+        }
     }
-  }
-  return(0);
+    return(0);
 }
 
-// --------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------------
 // Used by the MSX handler to point to different 8K segments of memory as RAM and Carts are swapped in/out.
-// --------------------------------------------------------------------------------------------------------
-u8 *MemoryMap[8]        __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
+// This is one of the most important data structures in our system as it universally maps what to read/write.
+// ----------------------------------------------------------------------------------------------------------
+u8 *MemoryMap[8]    __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 // -------------------------------------
 // Some IO Port and Memory Map vars...
 // -------------------------------------
-u8 key_shift_hold   __attribute__((section(".dtcm"))) = 0;
 u8 Port_PPI_A       __attribute__((section(".dtcm"))) = 0x00;
 u8 Port_PPI_B       __attribute__((section(".dtcm"))) = 0x00;
 u8 Port_PPI_C       __attribute__((section(".dtcm"))) = 0x00;
-u8 romBankMask      __attribute__((section(".dtcm"))) = 0x00;
 
 // -------------------------------------
 // Our venerable Z80 CPU structure!
 // -------------------------------------
-Z80 CPU             __attribute__((section(".dtcm")));      // Put the entire CPU state into fast memory for speed!
+Z80 CPU             __attribute__((section(".dtcm")));          // Put the entire CPU state into fast memory for speed!
 
 // -----------------------------------------
 // Some keyboard/joystick mapping vars...
 // -----------------------------------------
-u8  JoyMode        __attribute__((section(".dtcm"))) = 0;           // Joystick Mode (1=Keypad, 0=Joystick)
-u32 JoyState       __attribute__((section(".dtcm"))) = 0;           // Joystick State for P1 and P2
+u8  JoyMode        __attribute__((section(".dtcm"))) = 0;       // Joystick Mode (1=Keypad, 0=Joystick)
+u32 JoyState       __attribute__((section(".dtcm"))) = 0;       // Joystick State for P1 and P2
 
 // ------------------------------------------------------------
 // The CRC32 of the currently loaded game - useful for configs.
 // ------------------------------------------------------------
-u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;  // Our global file CRC32 to uniquiely identify this game
+u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;   // Our global file CRC32 to uniquiely identify this game
 
 /*********************************************************************************
  * Keyboard Key Buffering Engine...
@@ -2028,7 +2027,6 @@ u8 loadrom(const char *filename)
         {
             fclose(handle); // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
 
-            romBankMask = 0x00;         // No bank mask until proven otherwise
             mapperMask = 0x00;          // No MSX mapper mask
 
             // Cache the first 256K of the ROM into fast VRAM for possible use...
