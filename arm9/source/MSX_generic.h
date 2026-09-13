@@ -40,9 +40,6 @@
 #define OVL_FULLKBD                 0
 #define OVL_ALPHAKBD                1
 
-#define SND_DRV_NORMAL              0
-#define SND_DRV_WAVE                1
-
 typedef struct {
   char szName[MAX_ROM_NAME+1];
   u8 uType;
@@ -83,7 +80,7 @@ struct __attribute__((__packed__)) Config_t
     u8  memWipe;
     u8  expansion;
     u8  yOffset;
-    u8  soundDriver;
+    u8  cpuBoost;
     u8  reserved1;
     u8  reserved2;
     u8  reserved3;

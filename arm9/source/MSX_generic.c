@@ -927,7 +927,7 @@ void SetDefaultGameConfig(void)
     myConfig.memWipe     = 1;                           // Default to CLEAR memory (helps with save states)
     myConfig.yOffset     = 0;                           // Default is no Y offset
     myConfig.expansion   = 0;                           // Default is no expansion
-    myConfig.soundDriver = SND_DRV_NORMAL;              // Default is normal sound driver (not Wave Direct)
+    myConfig.cpuBoost    = 0;                           // Run CPU at true speed
     myConfig.reserved1   = 0;
     myConfig.reserved2   = 0;
     myConfig.reserved3   = 0;
@@ -1037,6 +1037,7 @@ const struct options_t Option_Table[1][20] =
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
+        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
         {"EXPANSION",      {"NONE", "SCC+ CART"},                                                                                                                               &myConfig.expansion,      2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},

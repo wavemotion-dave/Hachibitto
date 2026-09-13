@@ -2078,7 +2078,7 @@ int mid_frame_interrupt=0;
 ITCM_CODE u32 LoopZ80()
 {
   // Execute 1 scanline worth of CPU instructions
-  u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + CPU.CycleDeficit;
+  u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + (myConfig.cpuBoost * 20) + CPU.CycleDeficit;
   CPU.CycleDeficit = ExecZ80(cycles_to_process);
 
   if (mid_frame_interrupt)
