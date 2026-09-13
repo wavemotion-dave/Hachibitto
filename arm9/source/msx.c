@@ -31,10 +31,10 @@ u8 mapperType               __attribute__((section(".dtcm"))) = 0;
 u8 mapperMask               __attribute__((section(".dtcm"))) = 0;
 u8 bCartInSegment[4]        __attribute__((section(".dtcm"))) = {0,0,0,0};
 u8 bRAMInSegment[4]         __attribute__((section(".dtcm"))) = {0,0,0,0};
-    
+
 u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
-    
+
 u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
 u8 msx_beeper_process       __attribute__((section(".dtcm"))) = 0;
 u8 beeperWasOn              __attribute__((section(".dtcm"))) = 0;
@@ -77,7 +77,7 @@ static uint8_t rtc_ram[4][16] = {
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 },
 
     // Bank 2: Palette Data + Valid MSX2 ROM Checksum in Reg 12/13
-    { 0x04, 0x04, 0x07, 0x05, 0x02, 0x02, 0x07, 0x07, 
+    { 0x04, 0x04, 0x07, 0x05, 0x02, 0x02, 0x07, 0x07,
       0x01, 0x01, 0x03, 0x03, 0x08, 0x05, 0x00, 0x00 },
 
     // Bank 3: Extended Flags
@@ -92,7 +92,7 @@ void write_port_B4(uint8_t data) {
 // WRITE PORT 0xB5: Writes Data into the current Bank & Register
 void write_port_B5(uint8_t data) {
     uint8_t val = data & 0x0F;
-    
+
     // Store data in current active bank
     rtc_ram[rtc_bank][rtc_reg] = val;
 
@@ -117,14 +117,14 @@ uint8_t read_port_B5(void) {
 // ------------------------------------------------------------------
 // MSX IO Port Read - just VDP and Joystick to contend with...
 // ------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port) 
+ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 {
   // MSX ports are 8-bit
-  Port &= 0x00FF; 
+  Port &= 0x00FF;
 
-  //98h~9Bh   Access to the VDP I/O ports.    
+  //98h~9Bh   Access to the VDP I/O ports.
   if      (Port == 0x98) return RdData9938();
-  else if (Port == 0x99) return RdCtrl9938(); 
+  else if (Port == 0x99) return RdCtrl9938();
   else if (Port == 0xB5) {return read_port_B5();}
   else if (Port == 0xA2)  // PSG Read... might be joypad data
   {
@@ -136,8 +136,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
           u8 joy1 = 0x00;
 
           // -------------------------------------------------------------
-          // Only port 1... not port 2. AY register 15 (PortB) bit 6 is 
-          // set to 0 for the port 1 joystick and that's the only one 
+          // Only port 1... not port 2. AY register 15 (PortB) bit 6 is
+          // set to 0 for the port 1 joystick and that's the only one
           // this emulator will respond to...
           // -------------------------------------------------------------
           if ((myAY.ayPortBOut & 0x40) == 0)
@@ -170,7 +170,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
       {
           // When reading PORTB of the PSG, just echo back the last value written (the MSX BIOS needs this as it will preserve the KANA LED bit)
           myAY.ayPortBIn = myAY.ayPortBOut;
-      }      
+      }
       return ay38910DataR(&myAY);
   }
   else if (Port == 0xA8) return Port_PPI_A;
@@ -189,7 +189,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
       //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
       //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
       // ----------------------------------------------------------
-      
+
       // For the full keyboard overlay... this is a bit of a hack for SHIFT and CTRL
       if (last_special_key != 0)
       {
@@ -201,11 +201,11 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
               }
           }
 
-          if (last_special_key == KBD_KEY_SHIFT) 
-          { 
+          if (last_special_key == KBD_KEY_SHIFT)
+          {
             key_shift = 1;
           }
-          else if (last_special_key == KBD_KEY_CTRL)  
+          else if (last_special_key == KBD_KEY_CTRL)
           {
             key_ctrl = 1;
           }
@@ -223,7 +223,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
               if (last_special_key_dampen == 20) last_special_key_dampen = 19;    // Start the SHIFT/CONTROL countdown... this should be enough time for it to register
           }
       }
-      
+
       u8 key1 = 0x00;   // Accumulate keys here...
 
       // -------------------------------------------------
@@ -274,7 +274,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == KBD_KEY_DEAD)  key1 |= 0x20;
                   if (kbd_key == 'A')           key1 |= 0x40;
                   if (kbd_key == 'B')           key1 |= 0x80;
-              }          
+              }
           }
           else if ((Port_PPI_C & 0x0F) == 3)  // Row 3
           {
@@ -288,7 +288,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == 'H')           key1 |= 0x20;
                   if (kbd_key == 'I')           key1 |= 0x40;
                   if (kbd_key == 'J')           key1 |= 0x80;
-              }          
+              }
           }
           else if ((Port_PPI_C & 0x0F) == 4)  // Row 4
           {
@@ -302,7 +302,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == 'P')           key1 |= 0x20;
                   if (kbd_key == 'Q')           key1 |= 0x40;
                   if (kbd_key == 'R')           key1 |= 0x80;
-              }          
+              }
           }
           else if ((Port_PPI_C & 0x0F) == 5)  // Row 5
           {
@@ -316,8 +316,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == 'X')           key1 |= 0x20;
                   if (kbd_key == 'Y')           key1 |= 0x40;
                   if (kbd_key == 'Z')           key1 |= 0x80;
-              }          
-          }      
+              }
+          }
           else if ((Port_PPI_C & 0x0F) == 6) // Row 6
           {
               if (kbd_key)
@@ -330,7 +330,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == KBD_KEY_F1)    key1 |= 0x20;
                   if (kbd_key == KBD_KEY_F2)    key1 |= 0x40;
                   if (kbd_key == KBD_KEY_F3)    key1 |= 0x80;
-              }          
+              }
               if (key_shift)  key1 |= 0x01;  // SHIFT
               if (key_ctrl)   key1 |= 0x02;  // CTRL
               if (key_graph)  key1 |= 0x04;  // GRAPH
@@ -349,9 +349,9 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == KBD_KEY_SEL)   key1 |= 0x40;
                   if (kbd_key == KBD_KEY_RET)   key1 |= 0x80;
 
-              }          
+              }
           }
-          else if ((Port_PPI_C & 0x0F) == 8) // Row 8  RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE          
+          else if ((Port_PPI_C & 0x0F) == 8) // Row 8  RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
           {
               if (kbd_key)
               {
@@ -363,7 +363,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == KBD_KEY_UP)    key1 |= 0x20;
                   if (kbd_key == KBD_KEY_DOWN)  key1 |= 0x40;
                   if (kbd_key == KBD_KEY_RIGHT) key1 |= 0x80;
-              }          
+              }
           }
       }
       return ~key1;
@@ -434,17 +434,17 @@ void msx_slot_map_msx1(unsigned char Value)
             bCartInSegment[1] = 0;
             bRAMInSegment[1] = 0;
             MemoryMap[2] = BIOS_Memory + 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000;                    
+            MemoryMap[3] = BIOS_Memory + 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             if (msx_mode == MSX_MODE_DISK)  // .dsk based MSX1 game so slide in the FDC Controller ROM
             {
                 bCartInSegment[1] = 1;
                 bRAMInSegment[1] = 0;
-                
+
                 MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;                
-                
+                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
+
                 break;
             }
             else
@@ -541,6 +541,7 @@ void msx_slot_map_msx1(unsigned char Value)
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
     special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
+
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -583,7 +584,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bCartInSegment[1] = 0;
             bRAMInSegment[1] = 0;
             MemoryMap[2] = BIOS_Memory + 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000;                    
+            MemoryMap[3] = BIOS_Memory + 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInSegment[1] = 1;
@@ -603,7 +604,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
                 MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;                
+                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
             }
             else
             {
@@ -661,7 +662,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. This is our expanded slot.
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF (this is our expanded slot)
             special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
@@ -683,7 +684,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
     special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
-    
+
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -697,7 +698,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             else if (((msx_subslot & 0x03) >> 0) == 1) // Subslot 0-1 has Extended BIOS
             {
                 bCartInSegment[0] = 0;
-                bRAMInSegment[0] = 0;                
+                bRAMInSegment[0] = 0;
                 MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
                 MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
             }
@@ -737,14 +738,14 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 bCartInSegment[1] = 0;
                 bRAMInSegment[1] = 0;
                 MemoryMap[2] = BIOS_Memory + 0x4000;
-                MemoryMap[3] = BIOS_Memory + 0x6000;                    
+                MemoryMap[3] = BIOS_Memory + 0x6000;
             }
             else if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 0-1 has disk ROM
             {
                 bCartInSegment[1] = 0;
                 bRAMInSegment[1] = 0;
                 MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;                
+                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
             }
             else // Nothing
             {
@@ -804,7 +805,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 
     switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
     {
-        case 0x00:  // Slot 0:  Maps to nothing... 0xFF
+        case 0x00:  // Slot 0:  Maps to nothing... 0xFF (this is our expanded slot)
             special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
             bCartInSegment[3] = 0;
             bRAMInSegment[3] = 0;
@@ -835,7 +836,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 // ----------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip plus Slot Mapper $A8
 // ----------------------------------------------------------------------
-ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value) 
+ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value)
 {
     // MSX ports are 8-bit
     Port &= 0x00FF;
@@ -861,7 +862,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
             case MACHINE_MSX1:
                 msx_slot_map_msx1(Value);
                 break;
-        }            
+        }
         Port_PPI_A = Value;
     }
     else if (Port == 0xA9)  // PPI - Register B
@@ -883,7 +884,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         {
             if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;   // Beeper ON
         }
-        
+
         // Set or clear the proper bit in PORTC
         u8 bit =  (Value & 0x0E) >> 1;
         if (Value & 1) Port_PPI_C |= (1 << bit);
@@ -900,7 +901,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         u8 page = Port-0xFC;
         u8 bank = Value & 7;
-        
+
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
@@ -920,7 +921,7 @@ u8 MSX_GuessROMType(u32 size)
 {
     u8 type = KON8;  // Default to Konami 8K mapper
     u32 guess[MAX_GUESS_MAPPER];
-    
+
     memset(guess, 0x00, sizeof(guess));
     for (int i=0; i<size - 3; i++)
     {
@@ -964,10 +965,10 @@ u8 MSX_GuessROMType(u32 size)
     if      ((guess[ASC16] > guess[KON8]) && (guess[ASC16] > guess[SCC8]) && (guess[ASC16] > guess[ASC8]))    type = ASC16;
     else if ((guess[ASC8]  > guess[KON8]) && (guess[ASC8]  > guess[SCC8]) && (guess[ASC8] >= guess[ASC16]))   type = ASC8;      // ASC8 wins "ties" over ASC16
     else if ((guess[SCC8]  > guess[KON8]) && (guess[SCC8]  > guess[ASC8]) && (guess[SCC8]  > guess[ASC16]))   type = SCC8;
-    else type = KON8; 
-    
+    else type = KON8;
+
     if (size == (64 * 1024)) type = ASC16;      // Big percentage of 64K mapper ROMs are ASCII16 so default to that and override below
-    
+
     return type;
 }
 
@@ -990,44 +991,42 @@ void msxWipeRAM(void)
 // -------------------------------------------------------------------------
 void MSX_InitialMemoryLayout(u32 romSize)
 {
-    msx_last_file_size = romSize;
-    
     // -------------------------------------
     // Make sure the MSX ports are clear
     // -------------------------------------
     Port_PPI_A = 0x00;
     Port_PPI_B = 0x00;
-    Port_PPI_C = 0x00;      
-    
+    Port_PPI_C = 0x00;
+
     msx_subslot = myConfig.machineType ? 0x00 : 0xFF;
-    
+
     // ---------------------------------------------
     // Start with reset memory - fill in MSX slots
     // ---------------------------------------------
     memset(RAM_Memory,  0x00, sizeof(RAM_Memory));
     memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
-    
+
     // -----------------------------------------
     // Setup RAM/ROM pointers back to defaults
     // -----------------------------------------
     memset(bRAMInSegment,  0, sizeof(bRAMInSegment));   // Default to no RAM in slot until told so
     memset(bCartInSegment, 0, sizeof(bCartInSegment));  // Default to no ROM in slot until told so
-    
+
     for (u8 i=0; i<8; i++)
     {
         MSXCartPtr[i] = BIOS_Memory+0x8000;             // Cart has nothing in it by default
         MSXRamPtr[i] = RAM_Memory + (0x2000 * i);       // RAM defaults to first 64K by default
     }
-    
+
     // ---------------------------------------------
     // Restore the MSX BIOS and point to it
     // ---------------------------------------------
     msx_restore_bios();
-    
+
     // -------------------------------------------------------------------------
-    // If we are a .dsk we can point to nothing for the cart and return here... 
+    // If we are a .dsk we can point to nothing for the cart and return here...
     // -------------------------------------------------------------------------
-    if (msx_mode == MSX_MODE_DISK) 
+    if (msx_mode == MSX_MODE_DISK)
     {
         if (myConfig.expansion)
         {
@@ -1042,7 +1041,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             //memcpy(SCCPlusRAM, ROM_Memory, (romSize > sizeof(SCCPlusRAM)) ? sizeof(SCCPlusRAM) : romSize);
 
             sccplus_mode = 0x00;
-            HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly            
+            HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly
             sccplus_page[0] = 0; sccplus_page[1] = 1;
             sccplus_page[2] = 2; sccplus_page[3] = 3;
             mapperMask = 0;
@@ -1055,7 +1054,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[4] = SCCPlusRAM + (2 * 0x2000);     // 8000-9FFF -> page 2
             MSXCartPtr[5] = SCCPlusRAM + (3 * 0x2000);     // A000-BFFF -> page 3
             MSXCartPtr[6] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
-            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped            
+            MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
         }
         else
         {
@@ -1069,7 +1068,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)BIOS_Memory+0x8000;       // Segment 7 Unmapped
             mapperType = 0;
         }
-        
+
         return; // Do not process .DSK games with the ROM handling below...
     }
     else // For ROMs we need a mapper type... User might have pre-selected one or we need to guess.
@@ -1085,10 +1084,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
         }
         else // User has selected a specific mapper... who are we to argue?!
         {
-            mapperType = myConfig.msxMapper;   
+            mapperType = myConfig.msxMapper;
         }
     }
-    
+
     // ------------------------------------------------------------
     // Setup the Z80 memory based on the MSX game ROM size loaded
     // ------------------------------------------------------------
@@ -1125,10 +1124,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
                 MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
-                MSXCartPtr[4] = (u8*)ROM_Memory+0xC000;        // Segment NA 
+                MSXCartPtr[4] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[5] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA              
+                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
         }
         else if (mapperType == AT8K) // Load the 16K rom at 0x8000 without Mirrors
         {
@@ -1136,10 +1135,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[2] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[3] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
                 MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA              
+                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
         }
         else // This game loads with MIRRORS active
         {
@@ -1149,21 +1148,21 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[2] = (u8*)ROM_Memory+0xC000;        // Segment NA
                 MSXCartPtr[3] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
                 MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA              
+                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
             }
             else    // Mirrors every 16K
             {
-                MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-                MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-                MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-                MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1               
+                MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
+                MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
+                MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
+                MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0
+                MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1
             }
         }
     }
@@ -1241,36 +1240,36 @@ void MSX_InitialMemoryLayout(u32 romSize)
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x4000;        // Segment 2 Mirror
             MSXCartPtr[1] = (u8*)ROM_Memory+0x6000;        // Segment 3 Mirror
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2 
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3 
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
             mapperMask = 0x07;
         }
         else if (mapperType == ASC8)
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0
             mapperMask = 0x07;
         }
         else if ((mapperType == ASC16) || (mapperType == ZEN16))
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1
             mapperMask = 0x03;
         }
         else if (mapperType == AT4K) // Mirror Page 1 to Page 0
@@ -1278,21 +1277,21 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Mirror of Segment 0
             MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Mirror of Segment 1
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2 
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3 
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x8000;        // Segment 4 
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x8000;        // Segment 4
             MSXCartPtr[7] = (u8*)ROM_Memory+0xA000;        // Segment 5
         }
         else // Load the rom at AT0K
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
             MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x4000;        // Segment 2 
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x6000;        // Segment 3 
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x8000;        // Segment 4 
-            MSXCartPtr[5] = (u8*)ROM_Memory+0xA000;        // Segment 5 
-            MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA 
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x4000;        // Segment 2
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x6000;        // Segment 3
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x8000;        // Segment 4
+            MSXCartPtr[5] = (u8*)ROM_Memory+0xA000;        // Segment 5
+            MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
             MSXCartPtr[7] = (u8*)ROM_Memory+0xE000;        // Segment NA
         }
     }
@@ -1330,7 +1329,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[5] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
-        }                
+        }
         else if (mapperType == ASC16 || mapperType == ZEN16)
         {
             MSXCartPtr[0] = (u8*)BIOS_Memory+0x8000;       // Segment Unmapped
@@ -1392,19 +1391,19 @@ void MSX_InitialMemoryLayout(u32 romSize)
                 mapperMask = (romSize <= (256 * 1024)) ? 0x0F:0x1F;
             else
                 mapperMask = (romSize <= (256 * 1024)) ? 0x1F:0x3F;
-        }        
+        }
         else if (romSize <= (1024 * 1024))
         {
             if (mapperType == ASC16 || mapperType == ZEN16)
                 mapperMask = 0x3F;
-            else 
+            else
                 mapperMask = 0x7F;
         }
         else if (romSize <= (2048 * 1024))
         {
             if (mapperType == ASC16 || mapperType == ZEN16)
                 mapperMask = 0x7F;
-            else 
+            else
                 mapperMask = 0xFF;
         }
         else // Must be 4096K...  really only the 16K banking works here...
@@ -1414,19 +1413,19 @@ void MSX_InitialMemoryLayout(u32 romSize)
 
         if (msx_sram_enabled) mapperMask = 0x3F;        // Override for SRAM which uses upper bits (4 or 5) to select
     }
-    else    
+    else
     {
         // Size not right for MSX support... we've already pre-filled 0xFF so nothing more to do here... System will not run.
     }
-    
+
     // Some mappers have 8K blocks, some have 16K blocks... sort that out here.
     msx_block_size = ((mapperType == ASC16 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS) ? 0x4000:0x2000);
 }
 
 // ------------------------------------------------------------------------------------
-// If the MSX Beeper is being used (rare but a few of the ZX Spectrum ports use it), 
+// If the MSX Beeper is being used (rare but a few of the ZX Spectrum ports use it),
 // then we need to service it here. We basically track the frequency at which the
-// game has hit the beeper and approximate that by using AY Channel A to produce the 
+// game has hit the beeper and approximate that by using AY Channel A to produce the
 // tone.  This is crude and doesn't sound quite right... but good enough.
 // ------------------------------------------------------------------------------------
 void BeeperOFF(void)
@@ -1488,7 +1487,7 @@ void msx_restore_bios(void)
     {
         memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
     }
-    
+
     MemoryMap[0] = BIOS_Memory + 0x0000;
     MemoryMap[1] = BIOS_Memory + 0x2000;
     MemoryMap[2] = BIOS_Memory + 0x4000;
@@ -1496,7 +1495,7 @@ void msx_restore_bios(void)
 
     MemoryMap[4] = BIOS_Memory + 0x8000;
     MemoryMap[5] = BIOS_Memory + 0xA000;
-    
+
     bRAMInSegment[3] = 1;
     MemoryMap[6] = RAM_Memory + 0xC000;
     MemoryMap[7] = RAM_Memory + 0xE000;
@@ -1509,19 +1508,14 @@ void msx_restore_bios(void)
 // ---------------------------------------------------------
 void msx_reset(void)
 {
-    if (msx_mode)
+    msx_init = 0x4000;
+    msx_basic = 0x0000;
+
+    MSX_InitialMemoryLayout(msx_last_file_size);
+    if (msx_mode == MSX_MODE_DISK) // .dsk based MSX
     {
-        MSX_InitialMemoryLayout(msx_last_file_size);
-        if (msx_mode == MSX_MODE_DISK) // .dsk based MSX 
-        {
-            fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
-            fdc_reset(true);
-        }
-    }
-    else
-    {
-        msx_init = 0x4000;
-        msx_basic = 0x0000;
+        fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
+        fdc_reset(true);
     }
 }
 
@@ -1529,7 +1523,7 @@ extern char szName[];
 void msxSaveEEPROM(void)
 {
     // Return to the original path
-    chdir(initial_path);    
+    chdir(initial_path);
 
     // Init filename = romname and SRM (SRAM) in place of ROM
     DIR* dir = opendir("sav");
@@ -1543,8 +1537,8 @@ void msxSaveEEPROM(void)
     szName[len-1] = 'm';
     szName[len-0] = 0;
 
-    FILE *handle = fopen(szName, "wb+");  
-    if (handle != NULL) 
+    FILE *handle = fopen(szName, "wb+");
+    if (handle != NULL)
     {
       fwrite(SRAM_Memory, sizeof(SRAM_Memory), 1, handle);
       fclose(handle);
@@ -1554,7 +1548,7 @@ void msxSaveEEPROM(void)
 void msxLoadEEPROM(void)
 {
     // Return to the original path
-    chdir(initial_path);    
+    chdir(initial_path);
 
     // Init filename = romname and SRM (SRAM) in place of ROM
     DIR* dir = opendir("sav");
@@ -1567,7 +1561,7 @@ void msxLoadEEPROM(void)
     szName[len-2] = 'r';
     szName[len-1] = 'm';
     szName[len-0] = 0;
-    
+
     if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0) == 0)
     {
       memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));

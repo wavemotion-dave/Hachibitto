@@ -96,16 +96,17 @@ struct __attribute__((__packed__)) Config_t
 
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression
 
-#define NORAM           0xFF
-
-#define MACHINE_MSX2_A  0x00
-#define MACHINE_MSX2_B  0x01
-#define MACHINE_MSX1    0x02
+#define NORAM                       0xFF
+            
+#define MACHINE_MSX2_A              0x00
+#define MACHINE_MSX2_B              0x01
+#define MACHINE_MSX1                0x02
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
 
 extern u8 special_ram_access;
+
 #define SPEC_RAM_SUBSLOT_ACTIVE     0x01
 #define SPEC_RAM_SRAM_ACTIVE        0x02
 #define SPEC_RAM_SCC_ENABLED        0x04
@@ -166,15 +167,11 @@ extern u8 bCartInSegment[4];
 extern u8 bRAMInSegment[4];
 extern u8 *MSXCartPtr[8];
 extern u8 *MemoryMap[8];
-
 extern AY38910 myAY;
 extern SCC     mySCC;
-
 extern u8 msx_scc_enable;
-
-extern u8 JoyMode;                      // Joystick / Paddle management
-extern u32 JoyState;                    // Joystick / Paddle management
-
+extern u8 JoyMode;
+extern u32 JoyState;
 extern u8 msx_sram_enabled;
 extern u8 last_mega_bank;
 extern u16 msx_block_size;
@@ -188,11 +185,6 @@ extern void ProcessBufferedKeys(void);
 extern u8 BufferedKeys[32];
 extern u8 BufferedKeysWriteIdx;
 extern u8 BufferedKeysReadIdx;
-
-// --------------------------------------------------
-// Some CPU and VDP and SGM stuff that we need
-// --------------------------------------------------
-extern void Loop9938(void);
 extern u8 lastBank;
 extern u8 key_shift;
 extern u8 key_ctrl;
@@ -202,6 +194,11 @@ extern u8 key_dia;
 extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;
 extern u8 msx_subslot;
+
+// --------------------------------------------------
+// Some CPU and VDP and SGM stuff that we need
+// --------------------------------------------------
+extern void Loop9938(void);
 extern void msxUpdateScreen(void);
 extern void getfile_crc(const char *path);
 extern void msxLoadState();

@@ -54,10 +54,10 @@ static inline void SCCPlus_MapWindow(u8 idx, u8 page)
 
 
 // ----------------------------------------------------------------
-// All memory fetches run through this except OP codes which are 
-// read directly from memory. 
+// All memory fetches run through this except OP codes which are
+// read directly from memory.
 // ----------------------------------------------------------------
-ITCM_CODE u8 cpu_readmem16(u16 address) 
+ITCM_CODE u8 cpu_readmem16(u16 address)
 {
     // Everything in this block is accessing high-memory...
     if (unlikely(special_ram_access))
@@ -73,14 +73,14 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
                 if (address >= 0x9800 && address <= 0x987F)
                 {
                     //TBD: this breaks Metal Gear 2 - Solid Snake. Leave it disabled for now...
-                    // return SCCRead(address, &mySCC); 
-                }                
+                    // return SCCRead(address, &mySCC);
+                }
             }
         }
         else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
         {
             if (bCartInSegment[2]) return SCCRead(address, &mySCC);
-        }        
+        }
         else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
         {
             if (myConfig.machineType != MACHINE_MSX1)
@@ -96,7 +96,7 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
             }
         }
     }
-    
+
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
     return *(MemoryMap[address>>13] + (address&0x1FFF));
 }
@@ -127,16 +127,16 @@ void HandleZemina8K(u32* src, u8 block, u16 address)
     else if (bCartInSegment[2] && (address >= 0x8000) && (address < 0xA000))
     {
         MSXCartPtr[4] = (u8*)src;  // Main ROM
-        MSXCartPtr[0] = (u8*)src;  // Mirror                            
+        MSXCartPtr[0] = (u8*)src;  // Mirror
         MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
     }
     else if (bCartInSegment[2] && (address >= 0xA000) && (address < 0xC000))
     {
         MSXCartPtr[5] = (u8*)src;  // Main ROM
-        MSXCartPtr[1] = (u8*)src;  // Mirror                            
+        MSXCartPtr[1] = (u8*)src;  // Mirror
         MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
     }
-}    
+}
 
 // -------------------------------------------------------------------------
 // The ZENMIA 16K Mapper:
@@ -154,7 +154,7 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
         // Mirrors
         MSXCartPtr[6] = (u8*)src;
         MSXCartPtr[7] = (u8*)src+0x2000;
-        if (bCartInSegment[3]) 
+        if (bCartInSegment[3])
         {
             MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
             MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
@@ -172,18 +172,18 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
             MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
         }
-        if (bCartInSegment[0]) 
+        if (bCartInSegment[0])
         {
             MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
             MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
-        }            
+        }
     }
-}    
+}
 
 ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 {
     // --------------------------------------------------------
-    // Konami 8K mapper with SCC 
+    // Konami 8K mapper with SCC
     //  Bank 1: 4000h - 5FFFh - mapped via writes to 5000h
     //  Bank 2: 6000h - 7FFFh - mapped via writes to 7000h
     //  Bank 3: 8000h - 9FFFh - mapped via writes to 9000h
@@ -203,7 +203,7 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     }
     else if (bCartInSegment[2] && (address == 0x9000))
     {
-        if ((value&0x3F) == 0x3F) 
+        if ((value&0x3F) == 0x3F)
         {
             special_ram_access |= SPEC_RAM_SCC_ENABLED;
             msx_scc_capable_game = true;           // SCC sound - set a flag so we process this special sound chip
@@ -251,7 +251,7 @@ void HandleAscii16K(u32* src, u8 block, u16 address)
             special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
             MSXCartPtr[4] = (u8*)src;
             MSXCartPtr[5] = (u8*)src+0x2000;
-            if (bCartInSegment[2]) 
+            if (bCartInSegment[2])
             {
                 MemoryMap[4] = MSXCartPtr[4];
                 MemoryMap[5] = MSXCartPtr[5];
@@ -273,7 +273,7 @@ void HandleXevious(u32* src, u8 block, u16 address)
     {
         MSXCartPtr[4] = (u8*)src;
         MSXCartPtr[5] = (u8*)src+0x2000;
-        if (bCartInSegment[2]) 
+        if (bCartInSegment[2])
         {
             MemoryMap[4] = MSXCartPtr[4];
             MemoryMap[5] = MSXCartPtr[5];
@@ -335,7 +335,7 @@ void HandleSCCPlusModeRegister(u8 value)
         special_ram_access &= ~SPEC_RAM_SCC_PLUS_ENABLED;
         special_ram_access |= SPEC_RAM_SCC_ENABLED;
     }
-    
+
     if (special_ram_access & (SPEC_RAM_SCC_ENABLED | SPEC_RAM_SCC_PLUS_ENABLED))
     {
         msx_scc_capable_game = true;
@@ -416,7 +416,7 @@ void SubslotWrite(u8 value)
 // write is much less common than reads...   We handle the MSX
 // Konami 8K, SCC and ASCII 8K mappers directly here for max speed.
 // ------------------------------------------------------------------
-ITCM_CODE void cpu_writemem16(u8 value,u16 address) 
+ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 {
     if (bRAMInSegment[address >> 14]) // RAM Exists... write it.
     {
@@ -429,7 +429,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 return;
             }
         }
-        
+
         *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
     }
     else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
@@ -440,7 +440,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
     else if (mapperMask)
     {
         // -------------------------------------------------------------
-        // Compute the block and offset of the new memory and we 
+        // Compute the block and offset of the new memory and we
         // can map it into place... this is fast since we are just
         // moving pointers around and not trying to copy memory blocks.
         // -------------------------------------------------------------
@@ -472,13 +472,13 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             else if (bCartInSegment[2] && (address == 0x8000))
             {
                 MSXCartPtr[4] = (u8*)src;  // Main ROM
-                MSXCartPtr[0] = (u8*)src;  // Mirror                            
+                MSXCartPtr[0] = (u8*)src;  // Mirror
                 MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             }
             else if (bCartInSegment[2] && (address == 0xA000))
             {
                 MSXCartPtr[5] = (u8*)src;  // Main ROM
-                MSXCartPtr[1] = (u8*)src;  // Mirror       
+                MSXCartPtr[1] = (u8*)src;  // Mirror
                 MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
             }
         }
@@ -489,7 +489,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             // 4000h~5FFFh (mirror: C000h~DFFFh)    6000h (mirrors: 6001h~67FFh)    0
             // 6000h~7FFFh (mirror: E000h~FFFFh)    6800h (mirrors: 6801h~68FFh)    0
             // 8000h~9FFFh (mirror: 0000h~1FFFh)    7000h (mirrors: 7001h~77FFh)    0
-            // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0     
+            // A000h~BFFFh (mirror: 2000h~3FFFh)    7800h (mirrors: 7801h~7FFFh)    0
             // -------------------------------------------------------------------------
             if (bCartInSegment[1] && ((address & 0xF800) == 0x6000))
             {
@@ -521,7 +521,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 {
                     special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
                     MSXCartPtr[4] = (u8*)src;  // Main ROM
-                    MSXCartPtr[0] = (u8*)src;  // Mirror    
+                    MSXCartPtr[0] = (u8*)src;  // Mirror
                     if (bCartInSegment[2])
                     {
                         MemoryMap[4] = MSXCartPtr[4];
@@ -529,7 +529,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                     if (bCartInSegment[0])
                     {
                         MemoryMap[0] = MSXCartPtr[0];
-                    }                            
+                    }
                 }
             }
             else if (bCartInSegment[1] && ((address & 0xF800) == 0x7800))
@@ -542,15 +542,15 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
                 {
                     special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
                     MSXCartPtr[5] = (u8*)src;  // Main ROM
-                    MSXCartPtr[1] = (u8*)src;  // Mirror                            
-                    if (bCartInSegment[2]) 
+                    MSXCartPtr[1] = (u8*)src;  // Mirror
+                    if (bCartInSegment[2])
                     {
                         MemoryMap[5] = MSXCartPtr[5];
                     }
                     if (bCartInSegment[0])
                     {
                         MemoryMap[1] = MSXCartPtr[1];
-                    }                            
+                    }
                 }
             }
         }
@@ -563,7 +563,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             {
                  SCC_LegacyWrite(value, address);
             }
-            
+
             HandleKonamiSCC8(src, block, address, value);
         }
         else if (mapperType == ASC16)
@@ -584,7 +584,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
         }
         else if (mapperType == SUPERLR)
         {
-            if (address <= 0x3FFF) 
+            if (address <= 0x3FFF)
             {
                 HandleSuperLodeRunner(src, block, address);
             }
@@ -594,14 +594,14 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             if (address == 0x4045)
             {
                 MSXCartPtr[4] = (u8*)src;          // Main ROM at 8000
-                MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000                  
-                if (bCartInSegment[2]) 
+                MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000
+                if (bCartInSegment[2])
                 {
                     MemoryMap[4] = MSXCartPtr[4];
                     MemoryMap[5] = MSXCartPtr[5];
                 }
             }
-        }                
+        }
     }
     else if (mapperType == SCCPLUS_RAM)
     {
@@ -612,7 +612,7 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 // -----------------------------------------------------------------
 // Reset a few key variables needed for proper Z80 interface use...
 // -----------------------------------------------------------------
-void Z80_Interface_Reset(void) 
+void Z80_Interface_Reset(void)
 {
   CPU.CycleDeficit      = 0;
   msx_scc_capable_game  = 0;

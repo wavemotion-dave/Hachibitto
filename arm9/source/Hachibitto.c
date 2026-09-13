@@ -266,10 +266,10 @@ s16 last_sample __attribute__((section(".dtcm"))) = 0;
 void SmoothStartSCC(mm_word len, mm_addr dest)
 {
     s32 combined_smoothed = last_sample;
-    
+
     ay38910Mixer(len*2, mixbuf1, &myAY);
     SCCMixer(len*4, mixbuf2, &mySCC);
-    
+
     s16 *p = (s16*)dest;
     int j = 0;
     for (int i = 0; i < len*2; i++)
@@ -292,7 +292,7 @@ void SmoothStartSCC(mm_word len, mm_addr dest)
         // which adds real arithmetic (subtract/shift/add) any time it's touched.
         if (combined > 32767)  combined = 32767;
         if (combined < -32768) combined = -32768;
-        
+
         // ---------------------------------------------------------------------
         // For any large steps we want to smooth this out so that we don't hear
         // the AY produce any sharp pops or clicks... this helps but costs CPU.
@@ -327,9 +327,9 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
                 bFirstSCCEnable = 0;
                 return len;
             }
-            
+
             ay38910Mixer(len*2, mixbuf1, &myAY);
-            
+
             // ---------------------------------------------------------------------
             // For any large steps we want to smooth this out so that we don't hear
             // the AY produce any sharp pops or clicks... this helps but costs CPU.
@@ -342,12 +342,12 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
                 s32 diff = (s32)*p - smoothed;
                 if (diff > MAX_STEP) diff = MAX_STEP;
                 else if (diff < -MAX_STEP) diff = -MAX_STEP;
-                
+
                 smoothed += diff;
                 *p++ = (s16)smoothed;
             }
             ay_smoothed = smoothed;
-            
+
             SCCMixer(len*4, mixbuf2, &mySCC);
             p = (s16*)dest;
             int j = 0;
@@ -419,7 +419,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         {
             ay38910Mixer(len*2, mixbuf1, &myAY);
             SCCMixer(len*4, mixbuf2, &mySCC);
-     
+
             s16 *p = (s16*)dest;
             int j=0;
             for (int i=0; i<len*2; i++)
@@ -450,71 +450,71 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 // -------------------------------------------------------------------------------------------
 void setupStream(void)
 {
-  //----------------------------------------------------------------
-  //  initialize maxmod with our small 5-effect soundbank
-  //----------------------------------------------------------------
-  mmInitDefaultMem((mm_addr)soundbank_bin);
-
-  mmLoadEffect(SFX_CLICKNOQUIT);
-  mmLoadEffect(SFX_KEYCLICK);
-  mmLoadEffect(SFX_MUS_INTRO);
-  mmLoadEffect(SFX_FLOPPY);
-
-  //----------------------------------------------------------------
-  //  open stream
-  //----------------------------------------------------------------
-  myStream.sampling_rate  = sample_rate;            // sample_rate for the CV to match the SN/AY drivers
-  myStream.buffer_length  = buffer_size;            // buffer length = (512+16)
-  myStream.callback       = (isDSiMode() ? OurSoundMixer_DSi : OurSoundMixer); // set callback function
-  myStream.format         = MM_STREAM_16BIT_STEREO; // format = stereo 16-bit
-  myStream.timer          = MM_TIMER0;              // use hardware timer 0
-  myStream.manual         = false;                  // use automatic filling
-  mmStreamOpen(&myStream);
-
-  //----------------------------------------------------------------
-  //  when using 'automatic' filling, your callback will be triggered
-  //  every time half of the wave buffer is processed.
-  //
-  //  so:
-  //  25000 (rate)
-  //  ----- = ~21 Hz for a full pass, and ~42hz for half pass
-  //  1200  (length)
-  //----------------------------------------------------------------
-  //  with 'manual' filling, you must call mmStreamUpdate
-  //  periodically (and often enough to avoid buffer underruns)
-  //----------------------------------------------------------------
+    //----------------------------------------------------------------
+    //  initialize maxmod with our small 5-effect soundbank
+    //----------------------------------------------------------------
+    mmInitDefaultMem((mm_addr)soundbank_bin);
+    
+    mmLoadEffect(SFX_CLICKNOQUIT);
+    mmLoadEffect(SFX_KEYCLICK);
+    mmLoadEffect(SFX_MUS_INTRO);
+    mmLoadEffect(SFX_FLOPPY);
+    
+    //----------------------------------------------------------------
+    //  open stream
+    //----------------------------------------------------------------
+    myStream.sampling_rate  = sample_rate;            // sample_rate for the CV to match the SN/AY drivers
+    myStream.buffer_length  = buffer_size;            // buffer length = (512+16)
+    myStream.callback       = (isDSiMode() ? OurSoundMixer_DSi : OurSoundMixer); // set callback function
+    myStream.format         = MM_STREAM_16BIT_STEREO; // format = stereo 16-bit
+    myStream.timer          = MM_TIMER0;              // use hardware timer 0
+    myStream.manual         = false;                  // use automatic filling
+    mmStreamOpen(&myStream);
+    
+    //----------------------------------------------------------------
+    //  when using 'automatic' filling, your callback will be triggered
+    //  every time half of the wave buffer is processed.
+    //
+    //  so:
+    //  25000 (rate)
+    //  ----- = ~21 Hz for a full pass, and ~42hz for half pass
+    //  1200  (length)
+    //----------------------------------------------------------------
+    //  with 'manual' filling, you must call mmStreamUpdate
+    //  periodically (and often enough to avoid buffer underruns)
+    //----------------------------------------------------------------
 }
 
 void sound_chip_reset()
 {
-  memset(mixbuf1, 0x00, sizeof(mixbuf1));
-  memset(mixbuf2, 0x00, sizeof(mixbuf2));
-  
-  msx_scc_capable_game = 0;
-  bFirstSCCEnable = 1;
-  SoundPause();
-
-  //  --------------------------------------------------------------------
-  //  The AY sound chip is for Super Game Module and MSX sound handling
-  //  --------------------------------------------------------------------
-  ay38910Reset(&myAY);             // Reset the "AY" sound chip
-  ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
-  ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
-  ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
-  
-  // -----------------------------------------------------------------
-  // The SCC sound chip is just for a few select Konami MSX1 games
-  // -----------------------------------------------------------------
-  SCCReset(&mySCC);
-
-  SCCWrite(0x00, 0x988A, &mySCC);
-  SCCWrite(0x00, 0x988B, &mySCC);
-  SCCWrite(0x00, 0x988C, &mySCC);
-  SCCWrite(0x00, 0x988D, &mySCC);
-  SCCWrite(0x00, 0x988E, &mySCC);
-  SCCWrite(0x00, 0x988F, &mySCC);
-
-  SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
+    memset(mixbuf1, 0x00, sizeof(mixbuf1));
+    memset(mixbuf2, 0x00, sizeof(mixbuf2));
+    
+    msx_scc_capable_game = 0;
+    bFirstSCCEnable = 1;
+    SoundPause();
+    
+    //  --------------------------------------------------------------------
+    //  The AY sound chip is for Super Game Module and MSX sound handling
+    //  --------------------------------------------------------------------
+    ay38910Reset(&myAY);             // Reset the "AY" sound chip
+    ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
+    ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
+    ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
+    
+    // -----------------------------------------------------------------
+    // The SCC sound chip is just for a few select Konami MSX1 games
+    // -----------------------------------------------------------------
+    SCCReset(&mySCC);
+    
+    SCCWrite(0x00, 0x988A, &mySCC);
+    SCCWrite(0x00, 0x988B, &mySCC);
+    SCCWrite(0x00, 0x988C, &mySCC);
+    SCCWrite(0x00, 0x988D, &mySCC);
+    SCCWrite(0x00, 0x988E, &mySCC);
+    SCCWrite(0x00, 0x988F, &mySCC);
+    
+    SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
 }
 
 // -----------------------------------------------------------------------
@@ -522,9 +522,9 @@ void sound_chip_reset()
 // -----------------------------------------------------------------------
 void dsInstallSoundEmuFIFO(void)
 {
-  sound_chip_reset();       // Reset the SN, AY and SCC chips
-  setupStream();            // Setup maxmod stream...
-  bStartSoundEngine = true; // Volume will 'unpause' after 1 frame in the main loop.
+    sound_chip_reset();       // Reset the SN, AY and SCC chips
+    setupStream();            // Setup maxmod stream...
+    bStartSoundEngine = true; // Volume will 'unpause' after 1 frame in the main loop.
 }
 
 //*****************************************************************************
@@ -537,45 +537,45 @@ void dsInstallSoundEmuFIFO(void)
 // --------------------------------------------------------------
 void ResetMSX(void)
 {
-  JoyMode=JOYMODE_JOYSTICK;             // Joystick mode key
-  JoyState = 0x00000000;                // Nothing pressed to start
-
-  Reset9938();                          // Reset the video chip
-
-  sound_chip_reset();                   // Reset the SN, AY and SCC chips
-
-  Z80_Interface_Reset();                // Reset the Z80 Interface
-  ResetZ80(&CPU);                       // Reset the Z80 CPU core
-
-  msx_reset();                          // Reset the MSX specific vars
-
-  disk_unsaved_data[0] = 0;             // No unsaved tape/disk data to start
-  disk_unsaved_data[1] = 0;             // No unsaved tape/disk data to start
-  msx_caps_lock = 0;                    // MSX CAPS lock off
-  msx_kana_lock = 0;                    // MSX KANA lock off
-
-  write_NV_counter=0;                   // Nothing to write for EEPROM yet
-
-  playingSFX = 0;                       // No sound effects playing yet
-
-  msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
-  msx_restore_bios();                   // Put the BIOS back in place and point to it
-
-  // -----------------------------------------------------------
-  // Timer 1 is used to time frame-to-frame of actual emulation
-  // -----------------------------------------------------------
-  TIMER1_CR = 0;
-  TIMER1_DATA=0;
-  TIMER1_CR=TIMER_ENABLE  | TIMER_DIV_1024;
-
-  // -----------------------------------------------------------
-  // Timer 2 is used to time once per second events
-  // -----------------------------------------------------------
-  TIMER2_CR=0;
-  TIMER2_DATA=0;
-  TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
-  timingFrames  = 0;
-  emuFps=0;
+    JoyMode=JOYMODE_JOYSTICK;             // Joystick mode key
+    JoyState = 0x00000000;                // Nothing pressed to start
+    
+    Reset9938();                          // Reset the video chip
+    
+    sound_chip_reset();                   // Reset the SN, AY and SCC chips
+    
+    Z80_Interface_Reset();                // Reset the Z80 Interface
+    ResetZ80(&CPU);                       // Reset the Z80 CPU core
+    
+    msx_reset();                          // Reset the MSX specific vars
+    
+    disk_unsaved_data[0] = 0;             // No unsaved tape/disk data to start
+    disk_unsaved_data[1] = 0;             // No unsaved tape/disk data to start
+    msx_caps_lock = 0;                    // MSX CAPS lock off
+    msx_kana_lock = 0;                    // MSX KANA lock off
+    
+    write_NV_counter=0;                   // Nothing to write for EEPROM yet
+    
+    playingSFX = 0;                       // No sound effects playing yet
+    
+    msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
+    msx_restore_bios();                   // Put the BIOS back in place and point to it
+    
+    // -----------------------------------------------------------
+    // Timer 1 is used to time frame-to-frame of actual emulation
+    // -----------------------------------------------------------
+    TIMER1_CR = 0;
+    TIMER1_DATA=0;
+    TIMER1_CR=TIMER_ENABLE  | TIMER_DIV_1024;
+    
+    // -----------------------------------------------------------
+    // Timer 2 is used to time once per second events
+    // -----------------------------------------------------------
+    TIMER2_CR=0;
+    TIMER2_DATA=0;
+    TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
+    timingFrames  = 0;
+    emuFps=0;
 }
 
 //*********************************************************************************
@@ -591,13 +591,13 @@ u8* getHeapEnd()   {return (u8*)sbrk(0);}
 u8* getHeapLimit() {return fake_heap_end;}
 
 int getMemUsed() { // returns the amount of used memory in bytes
-   struct mallinfo mi = mallinfo();
-   return mi.uordblks;
+    struct mallinfo mi = mallinfo();
+    return mi.uordblks;
 }
 
 int getMemFree() { // returns the amount of free memory in bytes
-   struct mallinfo mi = mallinfo();
-   return mi.fordblks + (getHeapLimit() - getHeapEnd());
+    struct mallinfo mi = mallinfo();
+    return mi.fordblks + (getHeapLimit() - getHeapEnd());
 }
 
 void ShowDebugZ80(void)
@@ -645,7 +645,8 @@ void ShowDebugZ80(void)
     sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "Mapper %d [%02X]", mapperType, mapperMask); DSPrint(0,idx++,7, tmp);
     extern u32 halt_counter;
-    sprintf(tmp, "Halt C %d", halt_counter); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Halt C %d", halt_counter & 0x1FFFF); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "%d Free", getMemFree()); DSPrint(0,idx++,7, tmp);
 
     idx = 6;
     for (u8 i=0; i< 16; i++)
@@ -690,14 +691,14 @@ void DisplayStatusLine(bool bForce)
             DSPrint(20,1,6, "   "); // Clear Disk icon
         }
     }
-    
+
     if (io_show_status == 0)
     {
         // SCC has a little cool graphic to go with it!
         DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
         DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
     }
-    
+
     if (write_NV_counter > 0)
     {
         --write_NV_counter;
@@ -708,7 +709,6 @@ void DisplayStatusLine(bool bForce)
         }
         DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
     }
-    
 
     if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
     {
@@ -718,14 +718,14 @@ void DisplayStatusLine(bool bForce)
 
         msx_kana_lock = (myAY.ayPortBOut & 0x80) ? 0:1;
         DSPrint(22,23,(msx_kana_lock ? 2:0), (msx_kana_lock ? "^":" "));
-        
+
         DSPrint(1,19,0, (key_shift ? "A":" "));
         DSPrint(2,19,(key_shift ? 2:0), (key_shift ? "A":" "));
-        
+
         DSPrint(1,15,0, (key_ctrl  ? "@":" "));
         DSPrint(2,15,(key_ctrl  ? 2:0), (key_ctrl  ? "@":" "));
-        
-        DSPrint(5,23,(key_graph ? 2:0), (key_graph ? "]":" "));        
+
+        DSPrint(5,23,(key_graph ? 2:0), (key_graph ? "]":" "));
     }
 }
 
@@ -768,62 +768,62 @@ void MiniMenuShow(bool bClearScreen, u8 sel)
 // ------------------------------------------------------------------------
 u8 MiniMenu(void)
 {
-  u8 retVal = MENU_CHOICE_NONE;
-  u8 menuSelection = 0;
-
-  SoundPause();
-  while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-
-  MiniMenuShow(true, menuSelection);
-
-  while (true)
-  {
-    nds_key = keysCurrent();
-    if (nds_key)
+    u8 retVal = MENU_CHOICE_NONE;
+    u8 menuSelection = 0;
+   
+    SoundPause();
+    while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
+   
+    MiniMenuShow(true, menuSelection);
+   
+    while (true)
     {
-        if (nds_key & KEY_UP)
-        {
-            menuSelection = (menuSelection > 0) ? (menuSelection-1):(mini_menu_items-1);
-            MiniMenuShow(false, menuSelection);
-        }
-        if (nds_key & KEY_DOWN)
-        {
-            menuSelection = (menuSelection+1) % mini_menu_items;
-            MiniMenuShow(false, menuSelection);
-        }
-        if (nds_key & KEY_A)
-        {
-            if      (menuSelection == 0) retVal = MENU_CHOICE_RESET_GAME;
-            else if (menuSelection == 1) retVal = MENU_CHOICE_END_GAME;
-            else if (menuSelection == 2) retVal = MENU_CHOICE_HI_SCORE;
-            else if (menuSelection == 3) retVal = MENU_CHOICE_GAME_OPTIONS;
-            else if (menuSelection == 4) retVal = MENU_CHOICE_DEFINE_KEYS;
-            else if (menuSelection == 5) retVal = MENU_CHOICE_SAVE_GAME;
-            else if (menuSelection == 6) retVal = MENU_CHOICE_LOAD_GAME;
-            else if (menuSelection == 7) retVal = MENU_CHOICE_SWAP_DISK;
-            else if (menuSelection == 8) retVal = MENU_CHOICE_NONE;
-            else retVal = MENU_CHOICE_NONE;
-            break;
-        }
-        if (nds_key & KEY_B)
-        {
-            retVal = MENU_CHOICE_NONE;
-            break;
-        }
-
-        while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
-        WAITVBL;WAITVBL;
+      nds_key = keysCurrent();
+      if (nds_key)
+      {
+          if (nds_key & KEY_UP)
+          {
+              menuSelection = (menuSelection > 0) ? (menuSelection-1):(mini_menu_items-1);
+              MiniMenuShow(false, menuSelection);
+          }
+          if (nds_key & KEY_DOWN)
+          {
+              menuSelection = (menuSelection+1) % mini_menu_items;
+              MiniMenuShow(false, menuSelection);
+          }
+          if (nds_key & KEY_A)
+          {
+              if      (menuSelection == 0) retVal = MENU_CHOICE_RESET_GAME;
+              else if (menuSelection == 1) retVal = MENU_CHOICE_END_GAME;
+              else if (menuSelection == 2) retVal = MENU_CHOICE_HI_SCORE;
+              else if (menuSelection == 3) retVal = MENU_CHOICE_GAME_OPTIONS;
+              else if (menuSelection == 4) retVal = MENU_CHOICE_DEFINE_KEYS;
+              else if (menuSelection == 5) retVal = MENU_CHOICE_SAVE_GAME;
+              else if (menuSelection == 6) retVal = MENU_CHOICE_LOAD_GAME;
+              else if (menuSelection == 7) retVal = MENU_CHOICE_SWAP_DISK;
+              else if (menuSelection == 8) retVal = MENU_CHOICE_NONE;
+              else retVal = MENU_CHOICE_NONE;
+              break;
+          }
+          if (nds_key & KEY_B)
+          {
+              retVal = MENU_CHOICE_NONE;
+              break;
+          }
+   
+          while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
+          WAITVBL;WAITVBL;
+      }
     }
-  }
-
-  while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
-  WAITVBL;WAITVBL;
-
-  BottomScreenKeypad();  // Could be generic or overlay...
-
-  SoundUnPause();
-
-  return retVal;
+   
+    while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
+    WAITVBL;WAITVBL;
+   
+    BottomScreenKeypad();  // Could be generic or overlay...
+   
+    SoundUnPause();
+   
+    return retVal;
 }
 
 
@@ -1148,7 +1148,7 @@ void Hachibitto_main(void)
                 if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
             }
         }
-        
+
         // And copy out XBuf[] to the DS VRAM!
         msxUpdateScreen();
 
@@ -1524,12 +1524,12 @@ void Hachibitto_main(void)
 // ----------------------------------------------------------------------------------------
 void useVRAM(void)
 {
-  vramSetBankD(VRAM_D_LCD );        // Not using this for video but 128K of faster RAM always useful!  Mapped at 0x06860000 -   Not currently used...
-  vramSetBankE(VRAM_E_LCD );        // Not using this for video but 64K of faster RAM always useful!   Mapped at 0x06880000 -   ..
-  vramSetBankF(VRAM_F_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06890000 -   ..
-  vramSetBankG(VRAM_G_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06894000 -   ..
-  vramSetBankH(VRAM_H_LCD );        // Not using this for video but 32K of faster RAM always useful!   Mapped at 0x06898000 -   ..
-  vramSetBankI(VRAM_I_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x068A0000 -   16K Used for the VDP Look Up Table
+    vramSetBankD(VRAM_D_LCD );        // Not using this for video but 128K of faster RAM always useful!  Mapped at 0x06860000 -   Not currently used...
+    vramSetBankE(VRAM_E_LCD );        // Not using this for video but 64K of faster RAM always useful!   Mapped at 0x06880000 -   ..
+    vramSetBankF(VRAM_F_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06890000 -   ..
+    vramSetBankG(VRAM_G_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06894000 -   ..
+    vramSetBankH(VRAM_H_LCD );        // Not using this for video but 32K of faster RAM always useful!   Mapped at 0x06898000 -   ..
+    vramSetBankI(VRAM_I_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x068A0000 -   16K Used for the VDP Look Up Table
 }
 
 /*********************************************************************************
@@ -1537,31 +1537,31 @@ void useVRAM(void)
  ********************************************************************************/
 void HachibittoInit(void)
 {
-  //  Init graphic mode (bitmap mode)
-  videoSetMode(MODE_0_2D  | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
-  videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE  | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
-  vramSetBankA(VRAM_A_MAIN_BG);
-  vramSetBankB(VRAM_B_MAIN_SPRITE);          // Once emulation of game starts, we steal this back for an additional 128K of VRAM at 0x6820000
-  vramSetBankC(VRAM_C_SUB_BG);
+    //  Init graphic mode (bitmap mode)
+    videoSetMode(MODE_0_2D  | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
+    videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE  | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
+    vramSetBankA(VRAM_A_MAIN_BG);
+    vramSetBankB(VRAM_B_MAIN_SPRITE);          // Once emulation of game starts, we steal this back for an additional 128K of VRAM at 0x6820000
+    vramSetBankC(VRAM_C_SUB_BG);
 
-  //  Stop blending effect of intro
-  REG_BLDCNT=0; REG_BLDCNT_SUB=0; REG_BLDY=0; REG_BLDY_SUB=0;
+    //  Stop blending effect of intro
+    REG_BLDCNT=0; REG_BLDCNT_SUB=0; REG_BLDY=0; REG_BLDY_SUB=0;
 
-  //  Render the top screen
-  bg0 = bgInit(0, BgType_Text8bpp,  BgSize_T_256x512, 31,0);
-  bg1 = bgInit(1, BgType_Text8bpp,  BgSize_T_256x512, 29,0);
-  bgSetPriority(bg0,1);bgSetPriority(bg1,0);
-  decompress(topscreenTiles,  bgGetGfxPtr(bg0), LZ77Vram);
-  decompress(topscreenMap,  (void*) bgGetMapPtr(bg0), LZ77Vram);
-  dmaCopy((void*) topscreenPal,(void*)  BG_PALETTE,256*2);
-  unsigned  short dmaVal =*(bgGetMapPtr(bg0)+51*32);
-  dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1),32*24*2);
+    //  Render the top screen
+    bg0 = bgInit(0, BgType_Text8bpp,  BgSize_T_256x512, 31,0);
+    bg1 = bgInit(1, BgType_Text8bpp,  BgSize_T_256x512, 29,0);
+    bgSetPriority(bg0,1);bgSetPriority(bg1,0);
+    decompress(topscreenTiles,  bgGetGfxPtr(bg0), LZ77Vram);
+    decompress(topscreenMap,  (void*) bgGetMapPtr(bg0), LZ77Vram);
+    dmaCopy((void*) topscreenPal,(void*)  BG_PALETTE,256*2);
+    unsigned  short dmaVal =*(bgGetMapPtr(bg0)+51*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1),32*24*2);
 
-  // Put up the options screen
-  BottomScreenOptions();
+    // Put up the options screen
+    BottomScreenOptions();
 
-  //  Find the files
-  HachibittoFindFiles();
+    //  Find the files
+    HachibittoFindFiles();
 }
 
 
@@ -1626,21 +1626,21 @@ void BottomScreenKeypad(void)
  ********************************************************************************/
 void HachibittoInitCPU(void)
 {
-  //  -----------------------------------------
-  //  Init Main Memory and VDP Video Memory
-  //  -----------------------------------------
-  memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
-  memset(VDP_Memory, 0x00, sizeof(VDP_Memory));
+    //  -----------------------------------------
+    //  Init Main Memory and VDP Video Memory
+    //  -----------------------------------------
+    memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
+    memset(VDP_Memory, 0x00, sizeof(VDP_Memory));
 
-  // -----------------------------------------------
-  // Init bottom screen do display correct overlay
-  // -----------------------------------------------
-  BottomScreenKeypad();
+    // -----------------------------------------------
+    // Init bottom screen do display correct overlay
+    // -----------------------------------------------
+    BottomScreenKeypad();
 
-  // -----------------------------------------------------
-  //  Load the correct Bios ROM for the given machine
-  // -----------------------------------------------------
-  msx_restore_bios();
+    // -----------------------------------------------------
+    //  Load the correct Bios ROM for the given machine
+    // -----------------------------------------------------
+    msx_restore_bios();
 }
 
 // -------------------------------------------------------------
@@ -1660,9 +1660,9 @@ void irqVBlank(void)
         temp_offset = 0;
         cyBG = 0;
     }
-    
+
     if (cyBG < 0) cyBG=0;
-    
+
     REG_BG2Y = cyBG;
     REG_BG3Y = cyBG;
 
@@ -1721,7 +1721,7 @@ int main(int argc, char **argv)
 
   //  Show the fade-away intro logo...
   intro_logo();
-  
+
   SetYtrigger(190); //trigger 2 lines before vsync
 
   irqSet(IRQ_VBLANK,  irqVBlank);
@@ -1810,27 +1810,25 @@ u8 *MemoryMap[8]        __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 // -------------------------------------
 // Some IO Port and Memory Map vars...
 // -------------------------------------
-u8 key_shift_hold       __attribute__((section(".dtcm"))) = 0;
+u8 key_shift_hold   __attribute__((section(".dtcm"))) = 0;
+u8 Port_PPI_A       __attribute__((section(".dtcm"))) = 0x00;
+u8 Port_PPI_B       __attribute__((section(".dtcm"))) = 0x00;
+u8 Port_PPI_C       __attribute__((section(".dtcm"))) = 0x00;
+u8 romBankMask      __attribute__((section(".dtcm"))) = 0x00;
 
 // -------------------------------------
 // Our venerable Z80 CPU structure!
 // -------------------------------------
-Z80 CPU __attribute__((section(".dtcm")));      // Put the entire CPU state into fast memory for speed!
+Z80 CPU             __attribute__((section(".dtcm")));      // Put the entire CPU state into fast memory for speed!
 
-// --------------------------------------------------
-// Some special ports for the MSX machine emu
-// --------------------------------------------------
-u8 Port_PPI_A __attribute__((section(".dtcm"))) = 0x00;
-u8 Port_PPI_B __attribute__((section(".dtcm"))) = 0x00;
-u8 Port_PPI_C __attribute__((section(".dtcm"))) = 0x00;
-
-u8 romBankMask          __attribute__((section(".dtcm"))) = 0x00;
-
+// -----------------------------------------
+// Some keyboard/joystick mapping vars...
+// -----------------------------------------
 u8  JoyMode        __attribute__((section(".dtcm"))) = 0;           // Joystick Mode (1=Keypad, 0=Joystick)
 u32 JoyState       __attribute__((section(".dtcm"))) = 0;           // Joystick State for P1 and P2
 
 // ------------------------------------------------------------
-// Some global vars to track what kind of cart/rom we have...
+// The CRC32 of the currently loaded game - useful for configs.
 // ------------------------------------------------------------
 u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;  // Our global file CRC32 to uniquiely identify this game
 
@@ -1887,54 +1885,55 @@ void ProcessBufferedKeys(void)
  ********************************************************************************/
 u8 msxInit(char *szGame)
 {
-  u8 RetFct,uBcl;
-  u16 uVide;
+    u8 RetFct,uBcl;
+    u16 uVide;
 
-  // We've got some debug data we can use for development... reset these.
-  memset(debug, 0x00, sizeof(debug));
+    // We've got some debug data we can use for development... reset these.
+    memset(debug, 0x00, sizeof(debug));
+    DX=DY=0;
 
-  // See if we have forced any specific modes on loading...
-  if (msx_mode) BottomScreenKeypad();  // Could Need to ensure the MSX layout is shown
+    // Put up the proper bottom keyboard overlay/graphic
+    BottomScreenKeypad();
 
-  // -----------------------------------------------------------------
-  // Change graphic mode to initiate emulation.
-  // Here we can claim back 128K of VRAM which is otherwise unused
-  // but we can use it for fast memory swaps and look-up-tables.
-  // -----------------------------------------------------------------
-  videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
-  vramSetBankA(VRAM_A_MAIN_BG_0x06000000);      // This is our top emulation screen (where the game is played)
-  vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000 which can be used in-game
-  REG_BG3CNT = BG_BMP8_256x256;
-  REG_BG3PA = (1<<8);
-  REG_BG3PB = 0;
-  REG_BG3PC = 0;
-  REG_BG3PD = (1<<8);
-  REG_BG3X = 0;
-  REG_BG3Y = 0;
+    // -----------------------------------------------------------------
+    // Change graphic mode to initiate emulation.
+    // Here we can claim back 128K of VRAM which is otherwise unused
+    // but we can use it for fast memory swaps and look-up-tables.
+    // -----------------------------------------------------------------
+    videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
+    vramSetBankA(VRAM_A_MAIN_BG_0x06000000);      // This is our top emulation screen (where the game is played)
+    vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000 which can be used in-game
+    REG_BG3CNT = BG_BMP8_256x256;
+    REG_BG3PA = (1<<8);
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = (1<<8);
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
 
-  // Init the page flipping buffer...
-  for (uBcl=0;uBcl<255;uBcl++)
-  {
+    // Init the page flipping buffer...
+    for (uBcl=0;uBcl<255;uBcl++)
+    {
      uVide=0;
      dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
-  }
+    }
 
-  write_NV_counter=0;
+    write_NV_counter=0;
 
-  // loadrom() will figure out how big and where to load it...
-  RetFct = loadrom(szGame);
+    // loadrom() will figure out how big and where to load it...
+    RetFct = loadrom(szGame);
 
-  // Wipe RAM area for the MSX
-  msxWipeRAM();
+    // Wipe RAM area for the MSX
+    msxWipeRAM();
 
-  if (RetFct)
-  {
+    if (RetFct)
+    {
     // Perform a standard system RESET
     ResetMSX();
-  }
+    }
 
-  // Return with result
-  return (RetFct);
+    // Return with result
+    return (RetFct);
 }
 
 /*********************************************************************************
@@ -1942,9 +1941,9 @@ u8 msxInit(char *szGame)
  ********************************************************************************/
 void msxRun(void)
 {
-  Z80_Interface_Reset();                // Reset the Z80 Interface module
-  ResetZ80(&CPU);                       // Reset the CZ80 core CPU
-  BottomScreenKeypad();                 // Show the game-related screen with keypad / keyboard
+    Z80_Interface_Reset();                // Reset the Z80 Interface module
+    ResetZ80(&CPU);                       // Reset the CZ80 core CPU
+    BottomScreenKeypad();                 // Show the game-related screen with keypad / keyboard
 }
 
 
@@ -2007,54 +2006,45 @@ void getfile_crc(const char *filename)
 /*******************************************************************************/
 u8 loadrom(const char *filename)
 {
-  u8 bOK = 0;
-  int romSize = 0;
+    u8 bOK = 0;
+    int romSize = 0;
 
-  FILE* handle = fopen(filename, "rb");
-  if (handle != NULL)
-  {
-    // Save the initial filename and file - we need it for save/restore of state
-    strcpy(initial_file, filename);
-    getcwd(initial_path, MAX_ROM_NAME);
-
-    // Get file size the 'fast' way - use fstat() instead of fseek() or ftell()
-    struct stat stbuf;
-    (void)fstat(fileno(handle), &stbuf);
-    romSize = stbuf.st_size;
-
-    if (romSize <= (MAX_CART_SIZE * 1024))  // Max size cart is 1MB/4MB - that's pretty huge...
+    FILE* handle = fopen(filename, "rb");
+    if (handle != NULL)
     {
-        fclose(handle); // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
+        // Save the initial filename and file - we need it for save/restore of state
+        strcpy(initial_file, filename);
+        getcwd(initial_path, MAX_ROM_NAME);
 
-        romBankMask = 0x00;         // No bank mask until proven otherwise
-        mapperMask = 0x00;          // No MSX mapper mask
+        // Get file size the 'fast' way - use fstat() instead of fseek() or ftell()
+        struct stat stbuf;
+        (void)fstat(fileno(handle), &stbuf);
+        romSize = stbuf.st_size;
 
-        // Cache the first 256K of the ROM into fast VRAM for possible use...
-        u8 *fastROM = (u8*) (0x06860000);
-        memcpy(fastROM, ROM_Memory, (256 * 1024));
+        // Save the last file size...
+        msx_last_file_size = romSize;
 
-        // ------------------------------------------------------------------------------
-        // For the MSX emulation, we setup the initial memory map based on ROM size
-        // ------------------------------------------------------------------------------
-        if (msx_mode)
+        if (romSize <= (MAX_CART_SIZE * 1024))  // Max size cart is 1MB/4MB - that's pretty huge...
         {
+            fclose(handle); // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
+
+            romBankMask = 0x00;         // No bank mask until proven otherwise
+            mapperMask = 0x00;          // No MSX mapper mask
+
+            // Cache the first 256K of the ROM into fast VRAM for possible use...
+            u8 *fastROM = (u8*) (0x06860000);
+            memcpy(fastROM, ROM_Memory, (256 * 1024));
+
+            // ------------------------------------------------------------------------------
+            // For the MSX emulation, we setup the initial memory map based on ROM size
+            // ------------------------------------------------------------------------------
             MSX_InitialMemoryLayout(romSize);
+            bOK = 1;
         }
-        bOK = 1;
+        else fclose(handle);
     }
-    else fclose(handle);
-  }
 
-  return bOK;
-}
-
-// --------------------------------------------------------------------------
-// Based on writes to Port53 and Port60 we configure the SGM handling of
-// memory... this includes 24K vs 32K of RAM (the latter is BIOS disabled).
-// --------------------------------------------------------------------------
-__attribute__ ((noinline)) void SetupSGM(void)
-{
-    return;
+    return bOK;
 }
 
 // -------------------------------------------------------------------------
@@ -2120,49 +2110,34 @@ ITCM_CODE u32 LoopZ80()
 
 
 // -----------------------------------------------------------------------
-// The code below is a handy set of debug tools that allows us to
-// write printf() like strings out to a file. Basically we accumulate
-// the strings into a large RAM buffer and then when the L+R shoulder
-// buttons are pressed and held, we will snapshot out the debug.log file.
-// The DS-Lite only gets a small 16K debug buffer but the DSi gets 4MB!
+// We steal 512K off the back end of the big ROM_Memory[] buffer for
+// debug use. If some giant cart is using that, debugging won't go well.
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  256
-u32     MAX_DEBUG_BUF_SIZE  = 0;
+u32     MAX_DEBUG_BUF_SIZE  = (512*1024);
 
-char *debug_buffer = 0;
+#define DEBUG_BUFFER     ((char*) (ROM_Memory + (750*1024)))
 u32  debug_len = 0;
 extern char szName[]; // Reuse buffer which has no other in-game use
 
 void debug_init()
 {
-    if (!debug_buffer)
-    {
-        if (isDSiMode())
-        {
-            MAX_DEBUG_BUF_SIZE = (1024*1024*2); // 2MB!!
-            debug_buffer = malloc(MAX_DEBUG_BUF_SIZE);
-        }
-        else
-        {
-            MAX_DEBUG_BUF_SIZE = (1024*16);     // 16K only
-            debug_buffer = (char*)SRAM_Memory;  // Steal the SRAM_Memory[] for debug
-        }
-    }
-    memset(debug_buffer, 0x00, MAX_DEBUG_BUF_SIZE);
-    DX=DY=0;
+    memset(DEBUG_BUFFER, 0x00, MAX_DEBUG_BUF_SIZE);
     debug_len = 0;
 }
 
 void debug_printf(const char * str, ...)
 {
+    if (debug_len >= (MAX_DEBUG_BUF_SIZE-MAX_DPRINTF_STR_SIZE)) return; // No more room!
+
     va_list ap = {0};
 
     va_start(ap, str);
     vsnprintf(szName, MAX_DPRINTF_STR_SIZE, str, ap);
     va_end(ap);
 
-    strcat(debug_buffer, szName);
+    strcat(DEBUG_BUFFER+debug_len, szName);
     debug_len += strlen(szName);
 }
 
@@ -2173,7 +2148,7 @@ void debug_save()
         FILE *fp = fopen("debug.log", "w");
         if (fp)
         {
-            fwrite(debug_buffer, 1, debug_len, fp);
+            fwrite(DEBUG_BUFFER, 1, debug_len, fp);
             fclose(fp);
         }
     }
