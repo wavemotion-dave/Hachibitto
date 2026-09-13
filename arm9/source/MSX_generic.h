@@ -153,7 +153,7 @@ extern u32 MAX_CART_SIZE;
 
 extern u8 *ROM_Memory;
 extern u8 RAM_Memory[0x20000];
-extern u8 BIOS_Memory[0x10000];
+extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x4000];
 extern u8 fastdrom_cdx2[0x4000];
 extern const unsigned char MSXBios_MSX2[];

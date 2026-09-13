@@ -241,60 +241,6 @@ void fdc_state_machine(void)
             }
             break;
 
-        case 0xF0: // Write Track (format - this is very Einstein specific)
-            if (FDC.wait_for_write == 0)
-            {
-                FDC.wait_for_write = 1;                 // Wait for the CPU to give us more data
-                FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;  // Pace next byte
-                if (FDC.write_track_allowed < 4)
-                {
-                    FDC.status |= (ST_BUSY | ST_INDEX_DRQ); // More data please!
-
-                    if (FDC.write_track_allowed == 2)
-                    {
-                        if (++FDC.write_track_byte_counter >= 78) // Allow runout gap of 78x of E5 which is enough....
-                        {
-                            FDC.status &= ~(ST_BUSY | ST_INDEX_DRQ); // Done, not busy, no more data needed.
-                            FDC.write_track_allowed = 4;             // And stop looking for more data
-                        }
-                    }
-                    else if (FDC.write_track_allowed == 1)
-                    {
-                        disk_unsaved_data[FDC.drive] = 1;
-                        FDC.track_dirty[FDC.drive] = 1;
-                        FDC.track_buffer[FDC.track_buffer_idx++] = FDC.data; // Store CPU byte into our FDC buffer
-
-                        if (++FDC.sector_byte_counter >= Geom.sectorSize)   // Did we cross a sector boundary?
-                        {
-                            FDC.sector_byte_counter = 0;        // And reset our counter
-                            if (++FDC.sector == Geom.sectors)   // Bump the sector count
-                            {
-                                fdc_flush_track();              // Write the buffer back out
-                                if (FDC.track < Geom.tracks) FDC.track++; else FDC.track=0;
-                                FDC.sector = Geom.startSector;
-                                FDC.write_track_allowed = 2;
-                            }
-                            else FDC.write_track_allowed = 0; // Look for 3x F5 followed by FB
-                            FDC.write_track_byte_counter=0;
-                        }
-                    }
-                    else
-                    {
-                        // We're looking for the magic bytes... three F5 bytes followed by an FB to signify start of actual data
-                        if (FDC.data == 0xF5) FDC.write_track_byte_counter++;
-                        else
-                        {
-                            if ((FDC.write_track_byte_counter==3) && (FDC.data == 0xFB))
-                            {
-                                FDC.write_track_allowed=1;
-                            }
-                            FDC.write_track_byte_counter=0;
-                        }
-                    }
-                }
-            }
-            break;
-
         case 0xC0: // Read Address
             FDC.status &= ~ST_BUSY;                        // Not handled yet... just clear busy
             break;
@@ -302,6 +248,9 @@ void fdc_state_machine(void)
             FDC.status = (FDC.track ? 0x00 : ST_TRACK0) | ST_HEAD_ENGAGED;
             break;
         case 0xE0: // Read Track
+            FDC.status &= ~ST_BUSY;                        // Not handled yet... just clear busy
+            break;
+        case 0xF0: // Write Track
             FDC.status &= ~ST_BUSY;                        // Not handled yet... just clear busy
             break;
         default: break;
@@ -331,11 +280,13 @@ u8 fdc_read(u8 addr)
             FDC.status &= ~ST_INDEX_DRQ;     // Clear Data Available flag
             FDC.wait_for_read = 0;           // Clock in next byte (or end sequence if we're read all there is)
             return FDC.data;                 // Return data to caller
-        case 4:
+        case 4: // IxxxRITW where I=~INTRQ (this is the important one!), R=~READY, I=~INDEX, W=~WRITEPROTECT
         {
-            u8 ret = 0x7f;
+            u8 ret = 0x77;
             if (FDC.status & ST_BUSY)      ret |= 0x80;
-            if (FDC.status & ST_INDEX_DRQ) ret &= ~0x40;
+            if (FDC.status & ST_TRACK0)    ret &= ~0x02;
+            if (FDC.status & ST_INDEX_DRQ) ret &= ~0x04;
+            if (FDC.status & ST_NOT_READY) ret |= 0x08;
             return ret;
         }
     }
@@ -371,7 +322,7 @@ void fdc_write(u8 addr, u8 data)
             FDC.status &= ~ST_INDEX_DRQ;
             FDC.wait_for_write = 0;
             break;
-        case 4: //  D4h      W    Drive (bit 1), Side (bit 4), Motor (bit 5)
+        case 4: //  D4h is Write-only. xxMSDDDD where Bit0 activates Drive A, Bit1 activates Drive B, etc.
             FDC.drive = (data & 0x01 ? 0:1);
             FDC.side  = (data & 0x10 ? 1:0);
             FDC.motor = (data & 0x20 ? 1:0);
@@ -460,16 +411,7 @@ void fdc_write(u8 addr, u8 data)
             }
             else if ((data&0xF0) == 0xF0) // Write Track (format)
             {
-                fdc_buffer_track();                                         // Get track into our buffer
-                FDC.sector = Geom.startSector;                              // We always start a track write at the first sector
-                FDC.track_buffer_idx = 0;                                   // From the top
-                FDC.track_buffer_end = (Geom.sectorSize*Geom.sectors);      // All bytes in the track
-                FDC.sector_byte_counter = 0;                                // Reset the sector write counter
-                FDC.wait_for_write = 1;                                     // Start the Write Process...
-                FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE; // Pace first byte
-                io_show_status = 5;                                         // Let the world know we are writing...
-                FDC.status |= ST_INDEX_DRQ;                                 // Accept data immediately
-                FDC.write_track_allowed = 0;                                // But wait for data from the CPU
+                // Not implemented yet... only for diagnostics use
             }
         }
     }

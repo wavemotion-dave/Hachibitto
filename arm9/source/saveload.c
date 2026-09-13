@@ -42,10 +42,10 @@ struct RomOffset Offsets[8];
 
 #define TYPE_ROM   0
 #define TYPE_RAM   1
-#define TYPE_BIOS  2
-#define TYPE_EXP   3
-#define TYPE_FDC   4
-#define TYPE_OTHER 5
+#define TYPE_SCC   2
+#define TYPE_BIOS  3
+#define TYPE_SRAM  4
+#define TYPE_OTHER 9
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
 
