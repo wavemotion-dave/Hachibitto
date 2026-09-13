@@ -52,7 +52,6 @@ static inline void SCCPlus_MapWindow(u8 idx, u8 page)
     MemoryMap[idx]  = MSXCartPtr[idx];
 }
 
-
 // ----------------------------------------------------------------
 // All memory fetches run through this except OP codes which are
 // read directly from memory.

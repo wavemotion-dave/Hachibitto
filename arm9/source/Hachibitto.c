@@ -116,7 +116,6 @@ int bg0, bg1, bg0b, bg1b;      // Some vars for NDS background screen handling
 volatile u16 vusCptVBL = 0;    // We use this as a basic timer for the Mario sprite... could be removed if another timer can be utilized
 u8 touch_debounce = 0;         // A bit of touch-screen debounce
 u8 key_debounce = 0;           // A bit of key debounce
-u8 playingSFX = 0;             // To prevent sound effects like disk/tape loading from happening too frequently
 
 // The DS/DSi has 12 keys that can be mapped
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
@@ -555,8 +554,6 @@ void ResetMSX(void)
     msx_kana_lock = 0;                    // MSX KANA lock off
     
     write_NV_counter=0;                   // Nothing to write for EEPROM yet
-    
-    playingSFX = 0;                       // No sound effects playing yet
     
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it

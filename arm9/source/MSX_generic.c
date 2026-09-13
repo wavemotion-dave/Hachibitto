@@ -24,21 +24,18 @@
 #include "CRC32.h"
 #include "printf.h"
 
-typedef enum {FT_NONE,FT_FILE,FT_DIR} FILE_TYPE;
-
-int countCV=0;
-int ucGameAct=0;
+int countMSX     = 0;
+int ucGameAct    = 0;
 int ucGameChoice = -1;
+u32 file_size    = 0;
 FI_MSX gpFic[MAX_ROMS];
 char szName[256];
 char szFile[256];
-u32 file_size = 0;
 char strBuf[40];
 
 struct Config_t AllConfigs[MAX_CONFIGS];
 struct Config_t myConfig __attribute((aligned(4))) __attribute__((section(".dtcm")));
 struct GlobalConfig_t myGlobalConfig;
-extern u32 file_crc;
 
 typedef struct
 {
@@ -158,126 +155,129 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
 /*********************************************************************************
  * Show A message with YES / NO
  ********************************************************************************/
-u8 showMessage(char *szCh1, char *szCh2) {
-  u16 iTx, iTy;
-  u8 uRet=ID_SHM_CANCEL;
-  u8 ucGau=0x00, ucDro=0x00,ucGauS=0x00, ucDroS=0x00, ucCho = ID_SHM_YES;
-
-  BottomScreenOptions();
-
-  DSPrint(16-strlen(szCh1)/2,10,6,szCh1);
-  DSPrint(16-strlen(szCh2)/2,12,6,szCh2);
-  DSPrint(8,14,6,("> YES <"));
-  DSPrint(20,14,6,("  NO   "));
-  while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-
-  while (uRet == ID_SHM_CANCEL)
-  {
-    WAITVBL;
-    if (keysCurrent() & KEY_TOUCH) {
-      touchPosition touch;
-      touchRead(&touch);
-      iTx = touch.px;
-      iTy = touch.py;
-      if ( (iTx>8*8) && (iTx<8*8+7*8) && (iTy>14*8-4) && (iTy<15*8+4) ) {
-        if (!ucGauS) {
-          DSPrint(8,14,6,("> YES <"));
-          DSPrint(20,14,6,("  NO   "));
-          ucGauS = 1;
+u8 showMessage(char *szCh1, char *szCh2)
+{
+    u16 iTx, iTy;
+    u8 uRet=ID_SHM_CANCEL;
+    u8 ucGau=0x00, ucDro=0x00,ucGauS=0x00, ucDroS=0x00, ucCho = ID_SHM_YES;
+    
+    BottomScreenOptions();
+    
+    DSPrint(16-strlen(szCh1)/2,10,6,szCh1);
+    DSPrint(16-strlen(szCh2)/2,12,6,szCh2);
+    DSPrint(8,14,6,("> YES <"));
+    DSPrint(20,14,6,("  NO   "));
+    while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
+    
+    while (uRet == ID_SHM_CANCEL)
+    {
+      WAITVBL;
+      if (keysCurrent() & KEY_TOUCH) {
+        touchPosition touch;
+        touchRead(&touch);
+        iTx = touch.px;
+        iTy = touch.py;
+        if ( (iTx>8*8) && (iTx<8*8+7*8) && (iTy>14*8-4) && (iTy<15*8+4) ) {
+          if (!ucGauS) {
+            DSPrint(8,14,6,("> YES <"));
+            DSPrint(20,14,6,("  NO   "));
+            ucGauS = 1;
+            if (ucCho == ID_SHM_YES) {
+              uRet = ucCho;
+            }
+            else {
+              ucCho  = ID_SHM_YES;
+            }
+          }
+        }
+        else
+          ucGauS = 0;
+        if ( (iTx>20*8) && (iTx<20*8+7*8) && (iTy>14*8-4) && (iTy<15*8+4) ) {
+          if (!ucDroS) {
+            DSPrint(8,14,6,("  YES  "));
+            DSPrint(20,14,6,("> NO  <"));
+            ucDroS = 1;
+            if (ucCho == ID_SHM_NO) {
+              uRet = ucCho;
+            }
+            else {
+              ucCho = ID_SHM_NO;
+            }
+          }
+        }
+        else
+          ucDroS = 0;
+      }
+      else {
+        ucDroS = 0;
+        ucGauS = 0;
+      }
+    
+      if (keysCurrent() & KEY_LEFT){
+        if (!ucGau) {
+          ucGau = 1;
           if (ucCho == ID_SHM_YES) {
-            uRet = ucCho;
+            ucCho = ID_SHM_NO;
+            DSPrint(8,14,6,("  YES  "));
+            DSPrint(20,14,6,("> NO  <"));
           }
           else {
             ucCho  = ID_SHM_YES;
+            DSPrint(8,14,6,("> YES <"));
+            DSPrint(20,14,6,("  NO   "));
           }
+          WAITVBL;
         }
       }
-      else
-        ucGauS = 0;
-      if ( (iTx>20*8) && (iTx<20*8+7*8) && (iTy>14*8-4) && (iTy<15*8+4) ) {
-        if (!ucDroS) {
-          DSPrint(8,14,6,("  YES  "));
-          DSPrint(20,14,6,("> NO  <"));
-          ucDroS = 1;
-          if (ucCho == ID_SHM_NO) {
-            uRet = ucCho;
+      else {
+        ucGau = 0;
+      }
+      if (keysCurrent() & KEY_RIGHT) {
+        if (!ucDro) {
+          ucDro = 1;
+          if (ucCho == ID_SHM_YES) {
+            ucCho  = ID_SHM_NO;
+            DSPrint(8,14,6,("  YES  "));
+            DSPrint(20,14,6,("> NO  <"));
           }
           else {
-            ucCho = ID_SHM_NO;
+            ucCho  = ID_SHM_YES;
+            DSPrint(8,14,6,("> YES <"));
+            DSPrint(20,14,6,("  NO   "));
           }
+          WAITVBL;
         }
       }
-      else
-        ucDroS = 0;
-    }
-    else {
-      ucDroS = 0;
-      ucGauS = 0;
-    }
-
-    if (keysCurrent() & KEY_LEFT){
-      if (!ucGau) {
-        ucGau = 1;
-        if (ucCho == ID_SHM_YES) {
-          ucCho = ID_SHM_NO;
-          DSPrint(8,14,6,("  YES  "));
-          DSPrint(20,14,6,("> NO  <"));
-        }
-        else {
-          ucCho  = ID_SHM_YES;
-          DSPrint(8,14,6,("> YES <"));
-          DSPrint(20,14,6,("  NO   "));
-        }
-        WAITVBL;
+      else {
+        ucDro = 0;
+      }
+      if (keysCurrent() & KEY_A) {
+        uRet = ucCho;
       }
     }
-    else {
-      ucGau = 0;
-    }
-    if (keysCurrent() & KEY_RIGHT) {
-      if (!ucDro) {
-        ucDro = 1;
-        if (ucCho == ID_SHM_YES) {
-          ucCho  = ID_SHM_NO;
-          DSPrint(8,14,6,("  YES  "));
-          DSPrint(20,14,6,("> NO  <"));
-        }
-        else {
-          ucCho  = ID_SHM_YES;
-          DSPrint(8,14,6,("> YES <"));
-          DSPrint(20,14,6,("  NO   "));
-        }
-        WAITVBL;
-      }
-    }
-    else {
-      ucDro = 0;
-    }
-    if (keysCurrent() & KEY_A) {
-      uRet = ucCho;
-    }
-  }
-  while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-
-  BottomScreenKeypad();  // Could be generic or overlay...
-
-  return uRet;
+    while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
+    
+    BottomScreenKeypad();  // Could be generic or overlay...
+    
+    return uRet;
 }
 
-void HachibittoModeNormal(void) {
-  REG_BG3CNT = BG_BMP8_256x256;
-  REG_BG3PA = (1<<8);
-  REG_BG3PB = 0;
-  REG_BG3PC = 0;
-  REG_BG3PD = (1<<8);
-  REG_BG3X = 0;
-  REG_BG3Y = 0;
+void HachibittoModeNormal(void)
+{
+    REG_BG3CNT = BG_BMP8_256x256;
+    REG_BG3PA = (1<<8);
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = (1<<8);
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
 }
 
 //*****************************************************************************
 // Put the top screen in refocused bitmap mode
 //*****************************************************************************
-void HachibittoInitScreenUp(void) {
+void HachibittoInitScreenUp(void)
+{
   videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
   vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
   vramSetBankB(VRAM_B_MAIN_SPRITE);
@@ -287,30 +287,31 @@ void HachibittoInitScreenUp(void) {
 // ----------------------------------------------------------------------------
 // This stuff handles the 'random' screen snapshot at the top screen...
 // ----------------------------------------------------------------------------
-void showRandomPreviewSnaps(void) {
-  u16 *pusEcran=(u16*) bgGetMapPtr(bg1);
-  u32 uX,uY;
-
-  if (vusCptVBL>=5*60) {
-    u8 uEcran = rand() % 6;
-    vusCptVBL = 0;
-    if (uEcran>2) {
-      uEcran-=3;
-      for (uY=24;uY<33;uY++) {
-        for (uX=0;uX<12;uX++) {
-          *(pusEcran + (15+uX) + ((10+uY-24)<<5)) = *(bgGetMapPtr(bg0) + (uY+uEcran*9)*32 + uX+12);
+void ShowRandomPreviewSnaps(void)
+{
+    u16 *pusEcran=(u16*) bgGetMapPtr(bg1);
+    u32 uX,uY;
+    
+    if (vusCptVBL>=5*60) {
+      u8 uEcran = rand() % 6;
+      vusCptVBL = 0;
+      if (uEcran>2) {
+        uEcran-=3;
+        for (uY=24;uY<33;uY++) {
+          for (uX=0;uX<12;uX++) {
+            *(pusEcran + (15+uX) + ((10+uY-24)<<5)) = *(bgGetMapPtr(bg0) + (uY+uEcran*9)*32 + uX+12);
+          }
+        }
+      }
+      else
+      {
+        for (uY=24;uY<33;uY++) {
+          for (uX=0;uX<12;uX++) {
+            *(pusEcran + (15+uX) + ((10+uY-24)<<5)) = *(bgGetMapPtr(bg0) + (uY+uEcran*9)*32 + uX);
+          }
         }
       }
     }
-    else
-    {
-      for (uY=24;uY<33;uY++) {
-        for (uX=0;uX<12;uX++) {
-          *(pusEcran + (15+uX) + ((10+uY-24)<<5)) = *(bgGetMapPtr(bg0) + (uY+uEcran*9)*32 + uX);
-        }
-      }
-    }
-  }
 }
 
 // --------------------------------------------------------------
@@ -402,50 +403,50 @@ void ToggleFavorite(char *name)
 static char szName2[40];
 void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
 {
-  u16 ucBcl,ucGame;
-  u8 maxLen;
-
-  DSPrint(30,5,0,(NoDebGame>0 ? "<" : " "));
-  DSPrint(30,22,0,(NoDebGame+16<countCV ? ">" : " "));
-  sprintf(szName,"%03d/%03d FILES AVAILABLE     ",ucSel+1+NoDebGame,countCV);
-  DSPrint(4,4,0, szName);
-  
-  for (ucBcl=0;ucBcl<16; ucBcl++)
-  {
-    ucGame= ucBcl+NoDebGame;
-    if (ucGame < countCV)
+    u16 ucBcl,ucGame;
+    u8 maxLen;
+    
+    DSPrint(30,5,0,(NoDebGame>0 ? "<" : " "));
+    DSPrint(30,22,0,(NoDebGame+16<countMSX ? ">" : " "));
+    sprintf(szName,"%03d/%03d FILES AVAILABLE     ",ucSel+1+NoDebGame,countMSX);
+    DSPrint(4,4,0, szName);
+    
+    for (ucBcl=0;ucBcl<16; ucBcl++)
     {
-      maxLen=strlen(gpFic[ucGame].szName);
-      strcpy(szName,gpFic[ucGame].szName);
-      if (maxLen>28) szName[30]='\0';
-      if (gpFic[ucGame].uType == DIRECTORY)
+      ucGame= ucBcl+NoDebGame;
+      if (ucGame < countMSX)
       {
-        szName[26] = 0; // Needs to be 2 chars shorter with brackets
-        sprintf(szName2, "[%s]",szName);
-        sprintf(szName,"%-30s",szName2);
-        DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 :  0),szName);
-        DSPrint(0,6+ucBcl,0,(char*)" ");
-      }
-      else
-      {
-        sprintf(szName,"%-30s",strupr(szName));
-        DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),szName);
-        
-        if (IsFavorite(gpFic[ucGame].szName))
+        maxLen=strlen(gpFic[ucGame].szName);
+        strcpy(szName,gpFic[ucGame].szName);
+        if (maxLen>28) szName[30]='\0';
+        if (gpFic[ucGame].uType == DIRECTORY)
         {
-            DSPrint(0,6+ucBcl,(IsFavorite(gpFic[ucGame].szName) == 1) ? 0:2,(char*)"@");
+          szName[26] = 0; // Needs to be 2 chars shorter with brackets
+          sprintf(szName2, "[%s]",szName);
+          sprintf(szName,"%-30s",szName2);
+          DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 :  0),szName);
+          DSPrint(0,6+ucBcl,0,(char*)" ");
         }
         else
         {
-            DSPrint(0,6+ucBcl,0,(char*)" ");
-        }       
+          sprintf(szName,"%-30s",strupr(szName));
+          DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),szName);
+          
+          if (IsFavorite(gpFic[ucGame].szName))
+          {
+              DSPrint(0,6+ucBcl,(IsFavorite(gpFic[ucGame].szName) == 1) ? 0:2,(char*)"@");
+          }
+          else
+          {
+              DSPrint(0,6+ucBcl,0,(char*)" ");
+          }       
+        }
+      }
+      else
+      {
+          DSPrint(0,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),"                                ");
       }
     }
-    else
-    {
-        DSPrint(0,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),"                                ");
-    }
-  }
 }
 
 
@@ -455,18 +456,18 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
 // -------------------------------------------------------------------------
 int msxFilescmp (const void *c1, const void *c2)
 {
-  FI_MSX *p1 = (FI_MSX *) c1;
-  FI_MSX *p2 = (FI_MSX *) c2;
-
-  if (p1->szName[0] == '.' && p2->szName[0] != '.')
-      return -1;
-  if (p2->szName[0] == '.' && p1->szName[0] != '.')
-      return 1;
-  if ((p1->uType == DIRECTORY) && !(p2->uType == DIRECTORY))
-      return -1;
-  if ((p2->uType == DIRECTORY) && !(p1->uType == DIRECTORY))
-      return 1;
-  return strcasecmp (p1->szName, p2->szName);
+    FI_MSX *p1 = (FI_MSX *) c1;
+    FI_MSX *p2 = (FI_MSX *) c2;
+    
+    if (p1->szName[0] == '.' && p2->szName[0] != '.')
+        return -1;
+    if (p2->szName[0] == '.' && p1->szName[0] != '.')
+        return 1;
+    if ((p1->uType == DIRECTORY) && !(p2->uType == DIRECTORY))
+        return -1;
+    if ((p2->uType == DIRECTORY) && !(p1->uType == DIRECTORY))
+        return 1;
+    return strcasecmp (p1->szName, p2->szName);
 }
 
 /*********************************************************************************
@@ -474,65 +475,65 @@ int msxFilescmp (const void *c1, const void *c2)
  ********************************************************************************/
 void HachibittoFindFiles(void)
 {
-  u32 uNbFile;
-  DIR *dir;
-  struct dirent *pent;
-
-  uNbFile=0;
-  countCV=0;
-
-  dir = opendir(".");
-  while (((pent=readdir(dir))!=NULL) && (uNbFile<MAX_ROMS))
-  {
-    strcpy(szFile,pent->d_name);
-
-    if(pent->d_type == DT_DIR)
+    u32 uNbFile;
+    DIR *dir;
+    struct dirent *pent;
+    
+    uNbFile=0;
+    countMSX=0;
+    
+    dir = opendir(".");
+    while (((pent=readdir(dir))!=NULL) && (uNbFile<MAX_ROMS))
     {
-      if (!((szFile[0] == '.') && (strlen(szFile) == 1)))
+      strcpy(szFile,pent->d_name);
+    
+      if(pent->d_type == DT_DIR)
       {
-        // Do not include the [sav] directory
-        if (strcasecmp(szFile, "sav") != 0)
+        if (!((szFile[0] == '.') && (strlen(szFile) == 1)))
         {
+          // Do not include the [sav] directory
+          if (strcasecmp(szFile, "sav") != 0)
+          {
+              strcpy(gpFic[uNbFile].szName,szFile);
+              gpFic[uNbFile].uType = DIRECTORY;
+              uNbFile++;
+              countMSX++;
+          }
+        }
+      }
+      else {
+        if ((strlen(szFile)>4) && (strlen(szFile)<(MAX_ROM_NAME-4)) && (szFile[0] != '.') && (szFile[0] != '_'))  // For MAC don't allow underscore files
+        {
+          if ( (strcasecmp(strrchr(szFile, '.'), ".rom") == 0) )  {
             strcpy(gpFic[uNbFile].szName,szFile);
-            gpFic[uNbFile].uType = DIRECTORY;
+            gpFic[uNbFile].uType = MSXROM;
             uNbFile++;
-            countCV++;
+            countMSX++;
+          }
+          if ( (strcasecmp(strrchr(szFile, '.'), ".bin") == 0) )  {
+            strcpy(gpFic[uNbFile].szName,szFile);
+            gpFic[uNbFile].uType = MSXROM;
+            uNbFile++;
+            countMSX++;
+          }
+          if ( (strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) )  {
+            strcpy(gpFic[uNbFile].szName,szFile);
+            gpFic[uNbFile].uType = MSXROM;
+            uNbFile++;
+            countMSX++;
+          }
         }
       }
     }
-    else {
-      if ((strlen(szFile)>4) && (strlen(szFile)<(MAX_ROM_NAME-4)) && (szFile[0] != '.') && (szFile[0] != '_'))  // For MAC don't allow underscore files
-      {
-        if ( (strcasecmp(strrchr(szFile, '.'), ".rom") == 0) )  {
-          strcpy(gpFic[uNbFile].szName,szFile);
-          gpFic[uNbFile].uType = MSXROM;
-          uNbFile++;
-          countCV++;
-        }
-        if ( (strcasecmp(strrchr(szFile, '.'), ".bin") == 0) )  {
-          strcpy(gpFic[uNbFile].szName,szFile);
-          gpFic[uNbFile].uType = MSXROM;
-          uNbFile++;
-          countCV++;
-        }
-        if ( (strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) )  {
-          strcpy(gpFic[uNbFile].szName,szFile);
-          gpFic[uNbFile].uType = MSXROM;
-          uNbFile++;
-          countCV++;
-        }
-      }
+    closedir(dir);
+    
+    // ----------------------------------------------
+    // If we found any files, go sort the list...
+    // ----------------------------------------------
+    if (countMSX)
+    {
+        qsort (gpFic, countMSX, sizeof(FI_MSX), msxFilescmp);
     }
-  }
-  closedir(dir);
-
-  // ----------------------------------------------
-  // If we found any files, go sort the list...
-  // ----------------------------------------------
-  if (countCV)
-  {
-    qsort (gpFic, countCV, sizeof(FI_MSX), msxFilescmp);
-  }
 }
 
 
@@ -541,240 +542,240 @@ void HachibittoFindFiles(void)
 // ----------------------------------------------------------------
 u8 HachibittoChooseFile(void)
 {
-  bool bDone=false;
-  u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
-  s16 uLenFic=0, ucFlip=0, ucFlop=0;
-
-  // Show the menu...
-  while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B))!=0);
-  unsigned short dmaVal =  *(bgGetMapPtr(bg0b) + 24*32);
-  dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
-  
-  DSPrint(3,23,0,"A=LOAD, SELECT=FAV, B=EXIT");
-
-  HachibittoFindFiles();
-
-  ucGameChoice = -1;
-
-  nbRomPerPage = (countCV>=16 ? 16 : countCV);
-  uNbRSPage = (countCV>=5 ? 5 : countCV);
-
-  if (ucGameAct>countCV-nbRomPerPage)
-  {
-    firstRomDisplay=countCV-nbRomPerPage;
-    romSelected=ucGameAct-countCV+nbRomPerPage;
-  }
-  else
-  {
-    firstRomDisplay=ucGameAct;
-    romSelected=0;
-  }
-  dsDisplayFiles(firstRomDisplay,romSelected);
-
-  // -----------------------------------------------------
-  // Until the user selects a file or exits the menu...
-  // -----------------------------------------------------
-  while (!bDone)
-  {
-    if (keysCurrent() & KEY_UP)
+    bool bDone=false;
+    u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
+    s16 uLenFic=0, ucFlip=0, ucFlop=0;
+    
+    // Show the menu...
+    while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B))!=0);
+    unsigned short dmaVal =  *(bgGetMapPtr(bg0b) + 24*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
+    
+    DSPrint(3,23,0,"A=LOAD, SELECT=FAV, B=EXIT");
+    
+    HachibittoFindFiles();
+    
+    ucGameChoice = -1;
+    
+    nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
+    uNbRSPage = (countMSX>=5 ? 5 : countMSX);
+    
+    if (ucGameAct>countMSX-nbRomPerPage)
     {
-      if (!ucHaut)
-      {
-        ucGameAct = (ucGameAct>0 ? ucGameAct-1 : countCV-1);
-        if (romSelected>uNbRSPage) { romSelected -= 1; }
-        else {
-          if (firstRomDisplay>0) { firstRomDisplay -= 1; }
-          else {
-            if (romSelected>0) { romSelected -= 1; }
-            else {
-              firstRomDisplay=countCV-nbRomPerPage;
-              romSelected=nbRomPerPage-1;
-            }
-          }
-        }
-        ucHaut=0x01;
-        dsDisplayFiles(firstRomDisplay,romSelected);
-      }
-      else {
-
-        ucHaut++;
-        if (ucHaut>10) ucHaut=0;
-      }
-      uLenFic=0; ucFlip=-50; ucFlop=0;
+      firstRomDisplay=countMSX-nbRomPerPage;
+      romSelected=ucGameAct-countMSX+nbRomPerPage;
     }
     else
     {
-      ucHaut = 0;
+      firstRomDisplay=ucGameAct;
+      romSelected=0;
     }
-    if (keysCurrent() & KEY_DOWN)
+    dsDisplayFiles(firstRomDisplay,romSelected);
+    
+    // -----------------------------------------------------
+    // Until the user selects a file or exits the menu...
+    // -----------------------------------------------------
+    while (!bDone)
     {
-      if (!ucBas) {
-        ucGameAct = (ucGameAct< countCV-1 ? ucGameAct+1 : 0);
-        if (romSelected<uNbRSPage-1) { romSelected += 1; }
-        else {
-          if (firstRomDisplay<countCV-nbRomPerPage) { firstRomDisplay += 1; }
+      if (keysCurrent() & KEY_UP)
+      {
+        if (!ucHaut)
+        {
+          ucGameAct = (ucGameAct>0 ? ucGameAct-1 : countMSX-1);
+          if (romSelected>uNbRSPage) { romSelected -= 1; }
           else {
-            if (romSelected<nbRomPerPage-1) { romSelected += 1; }
+            if (firstRomDisplay>0) { firstRomDisplay -= 1; }
             else {
-              firstRomDisplay=0;
-              romSelected=0;
+              if (romSelected>0) { romSelected -= 1; }
+              else {
+                firstRomDisplay=countMSX-nbRomPerPage;
+                romSelected=nbRomPerPage-1;
+              }
             }
           }
+          ucHaut=0x01;
+          dsDisplayFiles(firstRomDisplay,romSelected);
         }
-        ucBas=0x01;
-        dsDisplayFiles(firstRomDisplay,romSelected);
-      }
-      else
-      {
-        ucBas++;
-        if (ucBas>10) ucBas=0;
-      }
-      uLenFic=0; ucFlip=-50; ucFlop=0;
-    }
-    else {
-      ucBas = 0;
-    }
-
-    // -------------------------------------------------------------
-    // Left and Right on the D-Pad will scroll 1 page at a time...
-    // -------------------------------------------------------------
-    if (keysCurrent() & KEY_RIGHT)
-    {
-      if (!ucSBas)
-      {
-        ucGameAct = (ucGameAct< countCV-nbRomPerPage ? ucGameAct+nbRomPerPage : countCV-nbRomPerPage);
-        if (firstRomDisplay<countCV-nbRomPerPage) { firstRomDisplay += nbRomPerPage; }
-        else { firstRomDisplay = countCV-nbRomPerPage; }
-        if (ucGameAct == countCV-nbRomPerPage) romSelected = 0;
-        ucSBas=0x01;
-        dsDisplayFiles(firstRomDisplay,romSelected);
-      }
-      else
-      {
-        ucSBas++;
-        if (ucSBas>10) ucSBas=0;
-      }
-      uLenFic=0; ucFlip=-50; ucFlop=0;
-    }
-    else {
-      ucSBas = 0;
-    }
-
-    // -------------------------------------------------------------
-    // Left and Right on the D-Pad will scroll 1 page at a time...
-    // -------------------------------------------------------------
-    if (keysCurrent() & KEY_LEFT)
-    {
-      if (!ucSHaut)
-      {
-        ucGameAct = (ucGameAct> nbRomPerPage ? ucGameAct-nbRomPerPage : 0);
-        if (firstRomDisplay>nbRomPerPage) { firstRomDisplay -= nbRomPerPage; }
-        else { firstRomDisplay = 0; }
-        if (ucGameAct == 0) romSelected = 0;
-        if (romSelected > ucGameAct) romSelected = ucGameAct;
-        ucSHaut=0x01;
-        dsDisplayFiles(firstRomDisplay,romSelected);
-      }
-      else
-      {
-        ucSHaut++;
-        if (ucSHaut>10) ucSHaut=0;
-      }
-      uLenFic=0; ucFlip=-50; ucFlop=0;
-    }
-    else {
-      ucSHaut = 0;
-    }
-
-    // The SELECT key will toggle favorites
-    if (keysCurrent() & KEY_SELECT)
-    {
-        if (gpFic[ucGameAct].uType != DIRECTORY)
-        {
-            ToggleFavorite(gpFic[ucGameAct].szName);
-            dsDisplayFiles(firstRomDisplay,romSelected);
-            SaveFavorites();
-            while (keysCurrent() & KEY_SELECT)
-            {
-                WAITVBL;
-            }
-        }
-    }
+        else {
     
-    // -------------------------------------------------------------------------
-    // The B key will exit out of the ROM selection without picking a new game
-    // -------------------------------------------------------------------------
-    if ( keysCurrent() & KEY_B )
-    {
-      bDone=true;
-      while (keysCurrent() & KEY_B);
-    }
-
-    // -------------------------------------------------------------------
-    // Any of these keys will pick the current ROM and try to load it...
-    // -------------------------------------------------------------------
-    if (keysCurrent() & KEY_A || keysCurrent() & KEY_Y || keysCurrent() & KEY_X)
-    {
-      if (gpFic[ucGameAct].uType != DIRECTORY)
+          ucHaut++;
+          if (ucHaut>10) ucHaut=0;
+        }
+        uLenFic=0; ucFlip=-50; ucFlop=0;
+      }
+      else
+      {
+        ucHaut = 0;
+      }
+      if (keysCurrent() & KEY_DOWN)
+      {
+        if (!ucBas) {
+          ucGameAct = (ucGameAct< countMSX-1 ? ucGameAct+1 : 0);
+          if (romSelected<uNbRSPage-1) { romSelected += 1; }
+          else {
+            if (firstRomDisplay<countMSX-nbRomPerPage) { firstRomDisplay += 1; }
+            else {
+              if (romSelected<nbRomPerPage-1) { romSelected += 1; }
+              else {
+                firstRomDisplay=0;
+                romSelected=0;
+              }
+            }
+          }
+          ucBas=0x01;
+          dsDisplayFiles(firstRomDisplay,romSelected);
+        }
+        else
+        {
+          ucBas++;
+          if (ucBas>10) ucBas=0;
+        }
+        uLenFic=0; ucFlip=-50; ucFlop=0;
+      }
+      else {
+        ucBas = 0;
+      }
+    
+      // -------------------------------------------------------------
+      // Left and Right on the D-Pad will scroll 1 page at a time...
+      // -------------------------------------------------------------
+      if (keysCurrent() & KEY_RIGHT)
+      {
+        if (!ucSBas)
+        {
+          ucGameAct = (ucGameAct< countMSX-nbRomPerPage ? ucGameAct+nbRomPerPage : countMSX-nbRomPerPage);
+          if (firstRomDisplay<countMSX-nbRomPerPage) { firstRomDisplay += nbRomPerPage; }
+          else { firstRomDisplay = countMSX-nbRomPerPage; }
+          if (ucGameAct == countMSX-nbRomPerPage) romSelected = 0;
+          ucSBas=0x01;
+          dsDisplayFiles(firstRomDisplay,romSelected);
+        }
+        else
+        {
+          ucSBas++;
+          if (ucSBas>10) ucSBas=0;
+        }
+        uLenFic=0; ucFlip=-50; ucFlop=0;
+      }
+      else {
+        ucSBas = 0;
+      }
+    
+      // -------------------------------------------------------------
+      // Left and Right on the D-Pad will scroll 1 page at a time...
+      // -------------------------------------------------------------
+      if (keysCurrent() & KEY_LEFT)
+      {
+        if (!ucSHaut)
+        {
+          ucGameAct = (ucGameAct> nbRomPerPage ? ucGameAct-nbRomPerPage : 0);
+          if (firstRomDisplay>nbRomPerPage) { firstRomDisplay -= nbRomPerPage; }
+          else { firstRomDisplay = 0; }
+          if (ucGameAct == 0) romSelected = 0;
+          if (romSelected > ucGameAct) romSelected = ucGameAct;
+          ucSHaut=0x01;
+          dsDisplayFiles(firstRomDisplay,romSelected);
+        }
+        else
+        {
+          ucSHaut++;
+          if (ucSHaut>10) ucSHaut=0;
+        }
+        uLenFic=0; ucFlip=-50; ucFlop=0;
+      }
+      else {
+        ucSHaut = 0;
+      }
+    
+      // The SELECT key will toggle favorites
+      if (keysCurrent() & KEY_SELECT)
+      {
+          if (gpFic[ucGameAct].uType != DIRECTORY)
+          {
+              ToggleFavorite(gpFic[ucGameAct].szName);
+              dsDisplayFiles(firstRomDisplay,romSelected);
+              SaveFavorites();
+              while (keysCurrent() & KEY_SELECT)
+              {
+                  WAITVBL;
+              }
+          }
+      }
+      
+      // -------------------------------------------------------------------------
+      // The B key will exit out of the ROM selection without picking a new game
+      // -------------------------------------------------------------------------
+      if ( keysCurrent() & KEY_B )
       {
         bDone=true;
-        ucGameChoice = ucGameAct;
-        WAITVBL;
+        while (keysCurrent() & KEY_B);
       }
-      else
+    
+      // -------------------------------------------------------------------
+      // Any of these keys will pick the current ROM and try to load it...
+      // -------------------------------------------------------------------
+      if (keysCurrent() & KEY_A || keysCurrent() & KEY_Y || keysCurrent() & KEY_X)
       {
-        chdir(gpFic[ucGameAct].szName);
-        HachibittoFindFiles();
-        ucGameAct = 0;
-        nbRomPerPage = (countCV>=16 ? 16 : countCV);
-        uNbRSPage = (countCV>=5 ? 5 : countCV);
-        if (ucGameAct>countCV-nbRomPerPage) {
-          firstRomDisplay=countCV-nbRomPerPage;
-          romSelected=ucGameAct-countCV+nbRomPerPage;
-        }
-        else {
-          firstRomDisplay=ucGameAct;
-          romSelected=0;
-        }
-        dsDisplayFiles(firstRomDisplay,romSelected);
-        while (keysCurrent() & KEY_A);
-      }
-    }
-
-    // --------------------------------------------
-    // If the filename is too long... scroll it.
-    // --------------------------------------------
-    if (strlen(gpFic[ucGameAct].szName) > 32)
-    {
-      ucFlip++;
-      if (ucFlip >= 25)
-      {
-        ucFlip = 0;
-        uLenFic++;
-        if ((uLenFic+30)>strlen(gpFic[ucGameAct].szName))
+        if (gpFic[ucGameAct].uType != DIRECTORY)
         {
-          ucFlop++;
-          if (ucFlop >= 15)
-          {
-            uLenFic=0;
-            ucFlop = 0;
-          }
-          else
-            uLenFic--;
+          bDone=true;
+          ucGameChoice = ucGameAct;
+          WAITVBL;
         }
-        strncpy(szName,gpFic[ucGameAct].szName+uLenFic,30);
-        szName[30] = '\0';
-        DSPrint(1,6+romSelected,2,szName);
+        else
+        {
+          chdir(gpFic[ucGameAct].szName);
+          HachibittoFindFiles();
+          ucGameAct = 0;
+          nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
+          uNbRSPage = (countMSX>=5 ? 5 : countMSX);
+          if (ucGameAct>countMSX-nbRomPerPage) {
+            firstRomDisplay=countMSX-nbRomPerPage;
+            romSelected=ucGameAct-countMSX+nbRomPerPage;
+          }
+          else {
+            firstRomDisplay=ucGameAct;
+            romSelected=0;
+          }
+          dsDisplayFiles(firstRomDisplay,romSelected);
+          while (keysCurrent() & KEY_A);
+        }
       }
+    
+      // --------------------------------------------
+      // If the filename is too long... scroll it.
+      // --------------------------------------------
+      if (strlen(gpFic[ucGameAct].szName) > 32)
+      {
+        ucFlip++;
+        if (ucFlip >= 25)
+        {
+          ucFlip = 0;
+          uLenFic++;
+          if ((uLenFic+30)>strlen(gpFic[ucGameAct].szName))
+          {
+            ucFlop++;
+            if (ucFlop >= 15)
+            {
+              uLenFic=0;
+              ucFlop = 0;
+            }
+            else
+              uLenFic--;
+          }
+          strncpy(szName,gpFic[ucGameAct].szName+uLenFic,30);
+          szName[30] = '\0';
+          DSPrint(1,6+romSelected,2,szName);
+        }
+      }
+      ShowRandomPreviewSnaps();
+      swiWaitForVBlank();
     }
-    showRandomPreviewSnaps();
-    swiWaitForVBlank();
-  }
-
-  // Wait for key to be released before returning
-  while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
-  
-  return 0x01;
+    
+    // Wait for key to be released before returning
+    while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
+    
+    return 0x01;
 }
 
 // ---------------------------------------------------------------------------
@@ -1143,7 +1144,7 @@ void HachibittoGameOptions(bool bIsGlobal)
                 break;
             }
         }
-        showRandomPreviewSnaps();
+        ShowRandomPreviewSnaps();
         swiWaitForVBlank();
     }
 
@@ -1327,7 +1328,7 @@ void HachibittoChangeKeymap(void)
             ;
         WAITVBL
     }
-    showRandomPreviewSnaps();
+    ShowRandomPreviewSnaps();
     swiWaitForVBlank();
   }
   while (keysCurrent() & KEY_B);
@@ -1587,7 +1588,7 @@ void HachibittoChangeOptions(void)
         NoGameSelected(ucY);
       }
     }
-    showRandomPreviewSnaps();
+    ShowRandomPreviewSnaps();
     swiWaitForVBlank();
   }
   while (keysCurrent()  & (KEY_START | KEY_A));

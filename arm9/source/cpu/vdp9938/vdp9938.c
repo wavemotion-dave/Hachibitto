@@ -1567,7 +1567,10 @@ ITCM_CODE byte RdCtrl9938(void)
 void RefereshPreviousLines(void)
 {
     int refresh_line = CurLine-1;
-    if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+    if (!myConfig.cpuBoost)
+    {
+        if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+    }
     refresh_line = CurLine;
     if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
 }
