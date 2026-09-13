@@ -2122,26 +2122,26 @@ ITCM_CODE u32 LoopZ80()
 
 
 // -----------------------------------------------------------------------
-// We steal 512K off the back end of the big ROM_Memory[] buffer for
+// We steal 256K off the back end of the big ROM_Memory[] buffer for
 // debug use. If some giant cart is using that, debugging won't go well.
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  256
-u32     MAX_DEBUG_BUF_SIZE  = (512*1024);
+u32     MAX_DEBUG_BUF_SIZE  = (256*1024);
 
-#define DEBUG_BUFFER     ((char*) (ROM_Memory + (750*1024)))
+#define DEBUG_BUFFER     ((char*) (ROM_Memory + MAX_CART_SIZE - MAX_DEBUG_BUF_SIZE))
 u32  debug_len = 0;
 extern char szName[]; // Reuse buffer which has no other in-game use
 
 void debug_init()
 {
-    memset(DEBUG_BUFFER, 0x00, MAX_DEBUG_BUF_SIZE);
     debug_len = 0;
 }
 
 void debug_printf(const char * str, ...)
 {
     if (debug_len >= (MAX_DEBUG_BUF_SIZE-MAX_DPRINTF_STR_SIZE)) return; // No more room!
+    if (debug_len == 0) DEBUG_BUFFER[debug_len] = 0;
 
     va_list ap = {0};
 
