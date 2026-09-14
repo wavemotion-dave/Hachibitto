@@ -108,8 +108,8 @@ void fdc_flush_track(void)
             FILE *fp = fopen(initial_file, "rb+"); // Open file for read/write
             if (fp)
             {
-                fseek(fp, file_offset, SEEK_SET);
-                fwrite(FDC.track_buffer, track_len, 1, fp);
+                fseek(fp, file_offset, SEEK_SET);           // Seek to the right spot
+                fwrite(FDC.track_buffer, track_len, 1, fp); // And write out the track (~4K write)
                 fclose(fp);
             }
         }

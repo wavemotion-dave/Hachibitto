@@ -93,7 +93,7 @@ struct __attribute__((__packed__)) Config_t
 
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression
 
-#define NORAM                       0xFF
+#define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
             
 #define MACHINE_MSX2_A              0x00
 #define MACHINE_MSX2_B              0x01
@@ -160,8 +160,8 @@ extern const unsigned char MSXBios_MSX2[];
 extern const unsigned char MSXBios_MSX2EXT[];
 extern const unsigned char MSXBios_MSX1[];
 
-extern u8 bCartInSegment[4];
-extern u8 bRAMInSegment[4];
+extern u8 bCartInPage[4];
+extern u8 bRAMInPage[4];
 extern u8 *MSXCartPtr[8];
 extern u8 *MemoryMap[8];
 extern AY38910 myAY;

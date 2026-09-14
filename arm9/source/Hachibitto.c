@@ -208,14 +208,8 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_F3,
     META_KBD_F4,
     META_KBD_F5,
-    META_KBD_PANUP8,
-    META_KBD_PANUP12,
-    META_KBD_PANUP16,
-    META_KBD_PANUP20,
-    META_KBD_PANDN8,
-    META_KBD_PANDN12,
-    META_KBD_PANDN16,
-    META_KBD_PANDN20,
+    META_KBD_PANUP,
+    META_KBD_PANDN,
     META_KBD_SHOWTOP,
     META_KBD_SHOWBOT,
 };
@@ -1460,14 +1454,8 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F3)        kbd_key = KBD_KEY_F3;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F4)        kbd_key = KBD_KEY_F4;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F5)        kbd_key = KBD_KEY_F5;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP8)    {temp_offset = -8;  slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP12)   {temp_offset = -12; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP16)   {temp_offset = -16; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP20)   {temp_offset = -20; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN8)    {temp_offset =  8;  slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN12)   {temp_offset =  12; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN16)   {temp_offset =  16; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN20)   {temp_offset =  20; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP)     {temp_offset = -myConfig.yOffset; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN)     {temp_offset =  myConfig.yOffset; slide_dampen = 15;}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWTOP)   {myConfig.yOffset = 0;}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWBOT)   {myConfig.yOffset = 20;}
 
@@ -1650,15 +1638,16 @@ void irqVBlank(void)
     dsVSyncCount++;
 
     int cyBG = ((s16)myConfig.yOffset+temp_offset) << 8;
-
+    
+    // ---------------------------------------------------------------------
+    // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
+    // ---------------------------------------------------------------------
     if (!(VDP[9] & 0x80))
     {
         slide_dampen = 0;
         temp_offset = 0;
         cyBG = 0;
     }
-
-    if (cyBG < 0) cyBG=0;
 
     REG_BG2Y = cyBG;
     REG_BG3Y = cyBG;
