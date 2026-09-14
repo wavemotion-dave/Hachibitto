@@ -919,24 +919,24 @@ void SetDefaultGameConfig(void)
 
     MapPlayer1();                // Default to Player 1 mapping
 
-    myConfig.msxMapper   = GUESS;                       // MSX mapper takes its best guess
-    myConfig.machineType = MACHINE_MSX2_A;              // Default machine is MSX2 with Slot 3 Expanded
-    myConfig.autoFire    = 0;                           // Default to no auto-fire on either button
-    myConfig.keyboard    = OVL_FULLKBD;                 // Default to normal full MSX keyboard
-    myConfig.maxSprites  = 0;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
-    myConfig.dpad        = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
-    myConfig.memWipe     = 1;                           // Default to CLEAR memory (helps with save states)
-    myConfig.yOffset     = 0;                           // Default is no Y offset
-    myConfig.expansion   = 0;                           // Default is no expansion
-    myConfig.cpuBoost    = 0;                           // Run CPU at true speed
-    myConfig.reserved1   = 0;
-    myConfig.reserved2   = 0;
-    myConfig.reserved3   = 0;
-    myConfig.reserved4   = 0;
-    myConfig.reserved5   = 0;
-    myConfig.reserved6   = 0;
-    myConfig.reserved7   = 0;
-    myConfig.reserved8   = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
+    myConfig.msxMapper    = GUESS;                       // MSX mapper takes its best guess
+    myConfig.machineType  = MACHINE_MSX2_A;              // Default machine is MSX2 with Slot 3 Expanded
+    myConfig.autoFire     = 0;                           // Default to no auto-fire on either button
+    myConfig.keyboard     = OVL_FULLKBD;                 // Default to normal full MSX keyboard
+    myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
+    myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
+    myConfig.memWipe      = 1;                           // Default to CLEAR memory (helps with save states)
+    myConfig.yOffset      = 0;                           // Default is no Y offset
+    myConfig.expansion    = 0;                           // Default is no expansion
+    myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
+    myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines 
+    myConfig.reserved2    = 0;
+    myConfig.reserved3    = 0;
+    myConfig.reserved4    = 0;
+    myConfig.reserved5    = 0;
+    myConfig.reserved6    = 0;
+    myConfig.reserved7    = 0;
+    myConfig.reserved8    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
 
     // ----------------------------------------------------------------------------------
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
@@ -1034,11 +1034,12 @@ const struct options_t Option_Table[1][20] =
                             "RESERVED","RESERVED", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                                                              &myConfig.msxMapper,      17},
         {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                 &myConfig.machineType,    3},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
-        {"MAX SPRITES",    {"4/8 PER LINE)", "32 PER LINE"},                                                                                                                    &myConfig.maxSprites,     2},
+        {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
-        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
+        {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
+        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},        
         {"EXPANSION",      {"NONE", "SCC+ CART"},                                                                                                                               &myConfig.expansion,      2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
@@ -1136,6 +1137,10 @@ void HachibittoGameOptions(bool bIsGlobal)
             }
             if (keysCurrent() & KEY_START)  // Save Options
             {
+                if (myConfig.cpuBoost && (myConfig.splitRefresh == 2))
+                {
+                    //TODO: myConfig.splitRefresh = 1; // Cap at 1 for boosted CPU
+                }
                 SaveConfig(TRUE);
             }
             if ((keysCurrent() & KEY_B) || (keysCurrent() & KEY_A))  // Exit options

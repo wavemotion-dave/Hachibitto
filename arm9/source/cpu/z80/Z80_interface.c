@@ -188,43 +188,70 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     //  Bank 3: 8000h - 9FFFh - mapped via writes to 9000h
     //  Bank 4: A000h - BFFFh - mapped via writes to B000h
     // --------------------------------------------------------
-    if (bCartInSegment[1] && (address == 0x5000))
+    if (bCartInSegment[1] && ((address & 0xF800) == 0x5000))
     {
         MSXCartPtr[2] = (u8*)src;  // Main ROM
         MSXCartPtr[6] = (u8*)src;  // Mirror
         MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+        
+        if (bCartInSegment[3])
+        {
+            MemoryMap[6] = MSXCartPtr[6];
+        }        
     }
-    else if (bCartInSegment[1] && (address == 0x7000))
+    else if (bCartInSegment[1] && ((address & 0xF800) == 0x7000))
     {
         MSXCartPtr[3] = (u8*)src;  // Main ROM
         MSXCartPtr[7] = (u8*)src;  // Mirror
         MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        
+        if (bCartInSegment[3])
+        {
+            MemoryMap[7] = MSXCartPtr[7];
+        }
     }
-    else if (bCartInSegment[2] && (address == 0x9000))
+    else if (bCartInSegment[2] && ((address & 0xF800) == 0x9000))
     {
+        // -------------------------------------------------------------------
+        // A value of 0x3F will enable SCC but it also still performs banking 
+        // logic directly below (it will always map in the last bank).
+        // -------------------------------------------------------------------
         if ((value&0x3F) == 0x3F)
         {
-            special_ram_access |= SPEC_RAM_SCC_ENABLED;
-            msx_scc_capable_game = true;           // SCC sound - set a flag so we process this special sound chip
-            return;
+            special_ram_access |= SPEC_RAM_SCC_ENABLED;  // SCC Registers are now "in view"
+            msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
+        }
+        else
+        {
+            special_ram_access &= ~SPEC_RAM_SCC_ENABLED; // SCC Registers are no longer "in view"
         }
 
         MSXCartPtr[4] = (u8*)src;  // Main ROM
         MSXCartPtr[0] = (u8*)src;  // Mirror
         MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+        
+        if (bCartInSegment[0])
+        {
+            MemoryMap[0] = MSXCartPtr[0];
+        }
     }
-    else if (bCartInSegment[2] && (address == 0xB000))
+    else if (bCartInSegment[2] && ((address & 0xF800) == 0xB000))
     {
         MSXCartPtr[5] = (u8*)src;  // Main ROM
         MSXCartPtr[1] = (u8*)src;  // Mirror
         MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+        
+        if (bCartInSegment[0])
+        {
+            MemoryMap[1] = MSXCartPtr[1];
+        }
     }
 }
 
 // -------------------------------------------------------------------------
 // The ASCII 16K Mapper:
-// 4000h~7FFFh  via writes to 6000h
-// 8000h~BFFFh  via writes to 7000h or 77FFh
+// 4000h~7FFFh  via writes to 6000h to 67FFh
+// 8000h~BFFFh  via writes to 7000h to 77FFh
 // -------------------------------------------------------------------------
 void HandleAscii16K(u32* src, u8 block, u16 address)
 {
@@ -456,25 +483,25 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
         // ---------------------------------------------------------------------------------
         if (mapperType == KON8)
         {
-            if (bCartInSegment[1] && (address == 0x4000))
+            if (bCartInSegment[1] && ((address & 0xF000) == 0x4000))
             {
                 MSXCartPtr[2] = (u8*)src;  // Main ROM
                 MSXCartPtr[6] = (u8*)src;  // Mirror
                 MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
             }
-            else if (bCartInSegment[1] && (address == 0x6000))
+            else if (bCartInSegment[1] && ((address & 0xF000) == 0x6000))
             {
                 MSXCartPtr[3] = (u8*)src;  // Main ROM
                 MSXCartPtr[7] = (u8*)src;  // Mirror
                 MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
             }
-            else if (bCartInSegment[2] && (address == 0x8000))
+            else if (bCartInSegment[2] && ((address & 0xF000) == 0x8000))
             {
                 MSXCartPtr[4] = (u8*)src;  // Main ROM
                 MSXCartPtr[0] = (u8*)src;  // Mirror
                 MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             }
-            else if (bCartInSegment[2] && (address == 0xA000))
+            else if (bCartInSegment[2] && ((address & 0xF000) == 0xA000))
             {
                 MSXCartPtr[5] = (u8*)src;  // Main ROM
                 MSXCartPtr[1] = (u8*)src;  // Mirror
@@ -555,15 +582,17 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
         }
         else if (mapperType == SCC8)
         {
-            // ----------------------------------------------------
-            // Are we writing to the SCC chip memory mapped area?
-            // ----------------------------------------------------
+            // -----------------------------------------------------------------------------------
+            // Are we writing to the SCC chip memory mapped area and are the registers "in view"?
+            // -----------------------------------------------------------------------------------
             if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
             {
                  SCC_LegacyWrite(value, address);
             }
-
-            HandleKonamiSCC8(src, block, address, value);
+            else // We only handle bank switching if the SCC registers were not accessed above...
+            {
+                HandleKonamiSCC8(src, block, address, value);
+            }
         }
         else if (mapperType == ASC16)
         {

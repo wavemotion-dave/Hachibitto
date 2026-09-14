@@ -680,7 +680,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 // Memory         Slot 0-0   Slot 0-1    Slot 0-2    Slot 0-3     Slot 1      Slot 2      Slot 3
 // C000h~FFFFh     ---        ---         ---         ---          ---        Cartridge   16K RAM
 // 8000h~BFFFh     ---        ---         ---         ---          ---        Cartridge   16K RAM
-// 4000h~7FFFh     Main-ROM   Disk-ROM    ---         ---          ---        Cartridge   16K RAM
+// 4000h~7FFFh     Main-ROM   ---         ---         ---          Disk-ROM   Cartridge   16K RAM
 // 0000h~3FFFh     Main-ROM   Ext-ROM     ---         ---          ---        Cartridge   16K RAM
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeB(unsigned char Value)
@@ -742,13 +742,6 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[2] = BIOS_Memory + 0x4000;
                 MemoryMap[3] = BIOS_Memory + 0x6000;
             }
-            else if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 0-1 has disk ROM
-            {
-                bCartInSegment[1] = 0;
-                bRAMInSegment[1] = 0;
-                MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
-            }
             else // Other subslots map nothing 
             {
                 bCartInSegment[1] = 0;
@@ -757,11 +750,11 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[3] = Unmapped_Memory;
             }
             break;
-        case 0x01:  // Slot 1:  Maps to Nothing
+        case 0x01:  // Slot 1:  Maps to Disk Controller
             bCartInSegment[1] = 0;
             bRAMInSegment[1] = 0;
-            MemoryMap[2] = Unmapped_Memory;
-            MemoryMap[3] = Unmapped_Memory;
+            MemoryMap[2] = fastdrom_cdx2 + 0x0000;
+            MemoryMap[3] = fastdrom_cdx2 + 0x2000;
             break;
         case 0x02:  // Slot 2:  Maps to Game Cart
             bCartInSegment[1] = 1;
@@ -903,6 +896,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         u8 page = Port-0xFC;
         u8 bank = Value & 7;
+        debug[page] = bank;
 
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
@@ -1354,14 +1348,14 @@ void MSX_InitialMemoryLayout(u32 romSize)
         }
         else if (mapperType == XEVIOUS)
         {
-            MSXCartPtr[0] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[1] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;     // Segment 0 default
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;     // Segment 0 default
-            MSXCartPtr[4] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[5] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[6] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[7] = (u8*)Unmapped_Memory;       // Segment Unmapped
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[4] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }
         else if (mapperType == XBLAM)        // Just for Cross Blaim
         {
@@ -1374,16 +1368,16 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
         }
-        else if (mapperType == SUPERLR)        // Just for Super Lode Runner
+        else if (mapperType == SUPERLR)        // Just for Super Lode Runner (TODO: not working yet... strange cart, doesn't have to be visible to react!)
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x4000;        // Segment 0 default
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }
 
         // ---------------------------------------------------------------------

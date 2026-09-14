@@ -638,7 +638,7 @@ void ShowDebugZ80(void)
     DSPrint(0,idx++,7, tmp);
 
     idx++;
-    sprintf(tmp, "SCR %02X   A8=%02X", ScrMode, Port_PPI_A); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "S%d  A8=%02X %02X", ScrMode, Port_PPI_A, msx_subslot); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "Mapper %d [%02X]", mapperType, mapperMask); DSPrint(0,idx++,7, tmp);
     extern u32 halt_counter;
@@ -2082,7 +2082,7 @@ ITCM_CODE u32 LoopZ80()
   {
       if (--mid_frame_interrupt == 0)
       {
-          RefereshPreviousLines();
+          RefereshPreviousLine();
       }
   }
 

@@ -78,7 +78,7 @@ extern void RefreshLine5(u8 uY);
 extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
-extern void RefereshPreviousLines(void);
+extern void RefereshPreviousLine(void);
 extern void ScanColorSprites(uint8_t Y);
 extern void vdp_9938_write_palette(u8 index, u8 color_grb);
 extern void WrCtrl9938(byte value);

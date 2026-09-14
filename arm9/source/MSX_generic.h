@@ -24,7 +24,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0008
+#define CONFIG_VER                  0x0009
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -81,7 +81,7 @@ struct __attribute__((__packed__)) Config_t
     u8  expansion;
     u8  yOffset;
     u8  cpuBoost;
-    u8  reserved1;
+    u8  splitRefresh;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;

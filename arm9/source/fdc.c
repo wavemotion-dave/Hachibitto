@@ -82,7 +82,9 @@ void fdc_buffer_track(void)
     u16 track_len = Geom.sectorSize*Geom.sectors;
     u8 *diskPtr = (FDC.drive == 0) ? Geom.disk0 : Geom.disk1;
     if (diskPtr)
+    {
         memcpy(FDC.track_buffer, diskPtr + (((Geom.sides * FDC.track) + FDC.side) * track_len), track_len);
+    }
     FDC.track_dirty[FDC.drive] = 0;
 }
 
@@ -96,7 +98,21 @@ void fdc_flush_track(void)
         u16 track_len = Geom.sectorSize*Geom.sectors;
         u8 *diskPtr = (FDC.drive == 0) ? Geom.disk0 : Geom.disk1;
         if (diskPtr)
-            memcpy(diskPtr + (((Geom.sides * FDC.track) + FDC.side) * track_len), FDC.track_buffer, track_len);
+        {
+            int file_offset = (((Geom.sides * FDC.track) + FDC.side) * track_len);
+            memcpy(diskPtr + file_offset, FDC.track_buffer, track_len);
+            
+            // ------------------------------------------------------------------------------------------------
+            // And here we actually write the disk back to the file storage... we only re-write the one track.
+            // ------------------------------------------------------------------------------------------------
+            FILE *fp = fopen(initial_file, "rb+"); // Open file for read/write
+            if (fp)
+            {
+                fseek(fp, file_offset, SEEK_SET);
+                fwrite(FDC.track_buffer, track_len, 1, fp);
+                fclose(fp);
+            }
+        }
         FDC.track_dirty[FDC.drive] = 0;
     }
 }
@@ -222,7 +238,7 @@ void fdc_state_machine(void)
                 FDC.track_buffer[FDC.track_buffer_idx++] = FDC.data; // Store CPU byte into our FDC buffer
                 if (FDC.track_buffer_idx >= FDC.track_buffer_end)
                 {
-                    FDC.status &= ~ST_BUSY;              // Done. No longer busy.
+                    FDC.status &= ~ST_BUSY;               // Done. No longer busy.
                     FDC.wait_for_write = 2;               // Don't write more FDC data
                     FDC.sector_byte_counter = 0;          // And reset our counter
                     fdc_flush_track();                    // Write the buffer back out
@@ -407,16 +423,19 @@ void fdc_write(u8 addr, u8 data)
             }
             else if ((data&0xF0) == 0xE0) // Read Track
             {
-                // Not implemented yet... only for diagnostics use
+                // Not implemented yet... Games generally read by sector.
             }
             else if ((data&0xF0) == 0xF0) // Write Track (format)
             {
-                // Not implemented yet... only for diagnostics use
+                // Not implemented yet... Games generally write by sector.
             }
         }
     }
 }
 
+// ---------------------------------------------------------------
+// Reset the floppy drive controller... get ready for activity...
+// ---------------------------------------------------------------
 void fdc_reset(u8 full_reset)
 {
     if (full_reset)
@@ -430,6 +449,11 @@ void fdc_reset(u8 full_reset)
     FDC.wait_for_write = 2;                              // Not storing any data
 }
 
+// ---------------------------------------------------------------------------------------
+// This sets up the geometry of up to 2 disk drives... Callers should have already read
+// the .DSK file into a flat memory array of bytes which is passed into this routine.
+// Note, the two drives must have identical geometry (sides, tracks, sectors, etc).
+// ---------------------------------------------------------------------------------------
 void fdc_init(u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1)
 {
     Geom.drives     = drives;                           // Number of drives (must be 1 or 2)

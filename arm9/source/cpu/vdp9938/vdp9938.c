@@ -1564,15 +1564,17 @@ ITCM_CODE byte RdCtrl9938(void)
 
 
 // A bit of a hack for split screen scrolling games
-void RefereshPreviousLines(void)
+void RefereshPreviousLine(void)
 {
     int refresh_line = CurLine-1;
-    if (!myConfig.cpuBoost)
+    if (myConfig.splitRefresh == 2)
     {
         if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
     }
-    refresh_line = CurLine;
-    if ((refresh_line >= VDP9938_START_LINE) && (refresh_line < VDP9938_END_LINE)) RefreshLine(refresh_line - VDP9938_START_LINE);
+    if (myConfig.splitRefresh)
+    {
+        if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE)) RefreshLine(CurLine - VDP9938_START_LINE);
+    }
 }
 
 
