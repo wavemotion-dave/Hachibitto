@@ -154,16 +154,19 @@ extern u32 MAX_CART_SIZE;
 extern u8 *ROM_Memory;
 extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
-extern u8 SRAM_Memory[0x4000];
+extern u8 SRAM_Memory[0x10000];
 extern u8 fastdrom_cdx2[0x4000];
-extern const unsigned char MSXBios_MSX2[];
-extern const unsigned char MSXBios_MSX2EXT[];
-extern const unsigned char MSXBios_MSX1[];
+extern const unsigned char MSXBios_MSX2[0x8000];
+extern const unsigned char MSXBios_MSX2EXT[0x4000];
+extern const unsigned char MSXBios_MSX1[0x8000];
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
 extern u8 *MSXCartPtr[8];
+extern u8 *MSXRamPtr[8];
 extern u8 *MemoryMap[8];
+extern u8  sccplus_page[4];
+extern u8  sccplus_mode;
 extern AY38910 myAY;
 extern SCC     mySCC;
 extern u8 msx_scc_enable;
@@ -189,6 +192,16 @@ extern u8 key_dia;
 extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;
 extern u8 msx_subslot;
+extern u8 XPalReal0;
+extern u8 ALatch;
+extern u32 frame_number;
+extern u8 CurrentEpochSaved;
+extern u8 msx_irq_pending;
+extern u8 palette_latch;
+extern uint8_t OccBuf[320];
+extern u16 nibbleLUT16[256];
+extern u8 screen7LUT[256];
+
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need

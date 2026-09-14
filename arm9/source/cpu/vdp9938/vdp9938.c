@@ -18,10 +18,6 @@
 //#define DEBUG_REFRESH(x) debug[x]++;
 #define DEBUG_REFRESH(x)
 
-u8 XPal[256] __attribute__((section(".dtcm"))) = {0};
-
-u8 XPalReal0 __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
-
 volatile u8 bufferZone1[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
 u8 XBuf[256*212] ALIGN(32) = {0};   // VDP9938 screen is 256x212
 volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
@@ -29,6 +25,8 @@ volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we r
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
+u8 XPal[256]            __attribute__((section(".dtcm"))) = {0};
+u8 XPalReal0            __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 u8 ALatch               __attribute__((section(".dtcm"))) = 0;
 u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
@@ -40,9 +38,9 @@ u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
-static uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
-static u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
-static u8 screen7LUT[256]       __attribute__((section(".dtcm")));
+uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
+u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
+u8 screen7LUT[256]       __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
 {    
@@ -1708,12 +1706,12 @@ void Reset9938(void)
     
     memset(OccBuf,0,sizeof(OccBuf));
 
-    VDP[0] = 0x02;                      // Graphic mode enabled
-    VDP[1] = 0xE0;                      // 16K VRAM, IRQ enable, high-res mode
-    VDP[2] = 0x00;                      // Name table for text modes
-    VDP[3] = 0x00;                      // Color table
-    VDP[4] = 0x00;                      // Pattern generator
-    VDP[5] = 0x00;                      // Sprite attribute table
+    VDP[0] = 0x00;                      // Graphic mode enabled
+    VDP[1] = 0x10;                      // 16K VRAM, IRQ enable, high-res mode
+    VDP[2] = 0xFF;                      // Name table for text modes
+    VDP[3] = 0xFF;                      // Color table
+    VDP[4] = 0xFF;                      // Pattern generator
+    VDP[5] = 0xFF;                      // Sprite attribute table
     VDP[6] = 0x00;                      // Sprite generator table
     VDP[7] = 0x00;                      // FG/BG colors
 

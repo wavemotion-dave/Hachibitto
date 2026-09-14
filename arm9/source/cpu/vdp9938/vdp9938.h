@@ -53,6 +53,7 @@
 extern byte VDP_Memory[0x20000];
 extern u8 VDP[64];
 extern u16 VAddr;
+extern u8 XPal[256];
 
 typedef struct {
   void (*Refresh)(u8 uY);

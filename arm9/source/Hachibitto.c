@@ -69,7 +69,7 @@ u32 MAX_CART_SIZE = 1256;                                     // 1.25MB of ROM C
 u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]                ALIGN(32) = {0};        // To hold our BIOS and related OS memory - always in the lower 32K memory region
-u8 SRAM_Memory[0x4000]                ALIGN(32) = {0};        // SRAM up to 16K for the few carts which use it (e.g. MSX Deep Dungeon II, Hydlide II, etc)
+u8 SRAM_Memory[0x10000]               ALIGN(32) = {0};        // SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
 
 u8 io_show_status = 0;  // Used to indicate a RD/WR status for various disk/tape activities
 
@@ -1113,32 +1113,14 @@ void Hachibitto_main(void)
             timingFrames = 0;
         }
 
-        // -------------------------------------------------------------
-        // Vertical Sync reduces tearing but costs CPU time so this
-        // is configurable - default to '1' on DSi and '0' on DS-LITE
-        // -------------------------------------------------------------
-        if (isDSiMode())
+        // -----------------------------------------------------
+        // Vertical Sync reduces tearing but costs CPU time...
+        // -----------------------------------------------------
+        while (dsVSyncCount == last_vsync_count)
         {
-            while (dsVSyncCount == last_vsync_count)
-            {
-                if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
-            }
-            last_vsync_count = dsVSyncCount;
+            if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
         }
-        else // DS uses timer... best we can do!
-        {
-            // ----------------------------------------------------------------------
-            // Time 1 frame... 546 (NTSC) or 646 (PAL) ticks of Timer2
-            // This is how we time frame-to frame to keep the game running at 60FPS
-            // We also allow running the game faster/slower than 100% so we use the
-            // GAME_SPEED_XXX[] array to handle that.
-            // ----------------------------------------------------------------------
-            while (TIMER2_DATA < (546*(timingFrames+1)))
-            {
-                if (skip_render) break;                   // If not drawing the frame, push on!
-                if (myGlobalConfig.showFPS == 2) break;   // If Full Speed, break out...
-            }
-        }
+        last_vsync_count = dsVSyncCount;
 
         // And copy out XBuf[] to the DS VRAM!
         msxUpdateScreen();

@@ -23,14 +23,9 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-
-extern u8 SCCPlusRAM[];
-extern u8 sccplus_page[4];
-extern u8 sccplus_mode;
-
 static inline void SCCPlus_MapWindow(u8 idx, u8 page)
 {
-    MSXCartPtr[idx] = SCCPlusRAM + ((page & 0x07) * 0x2000);
+    MSXCartPtr[idx] = SRAM_Memory + ((page & 0x07) * 0x2000);
     MemoryMap[idx]  = MSXCartPtr[idx];
 }
 

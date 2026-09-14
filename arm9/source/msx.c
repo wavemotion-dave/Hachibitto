@@ -29,8 +29,8 @@
 // ---------------------------------------
 u8 mapperType               __attribute__((section(".dtcm"))) = 0;
 u8 mapperMask               __attribute__((section(".dtcm"))) = 0;
-u8 bCartInPage[4]        __attribute__((section(".dtcm"))) = {0,0,0,0};
-u8 bRAMInPage[4]         __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bCartInPage[4]           __attribute__((section(".dtcm"))) = {0,0,0,0};
+u8 bRAMInPage[4]            __attribute__((section(".dtcm"))) = {0,0,0,0};
 
 u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
@@ -40,20 +40,18 @@ u8 msx_beeper_process       __attribute__((section(".dtcm"))) = 0;
 u8 beeperWasOn              __attribute__((section(".dtcm"))) = 0;
 u8 msx_sram_enabled         __attribute__((section(".dtcm"))) = 0;
 u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
-u8  msx_scc_capable_game    __attribute__((section(".dtcm"))) = 0;
-u8  special_ram_access      __attribute__((section(".dtcm"))) = 0;
-
+u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
+u8 special_ram_access       __attribute__((section(".dtcm"))) = 0;
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 
-u8 Unmapped_Memory[0x2000]; // Full of 0xFF values
+static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
 // ---------------------------------------------------------------------
-u8  SCCPlusRAM[0x10000];                                               // 64K for SCC Plus slotted RAM (mostly for Snatcher/SD)
 u8  sccplus_page[4]     __attribute__((section(".dtcm"))) = {0,1,2,3}; // Last byte written to each of the 4 select regs
 u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/BFFF: bit5=RAM mode, bit4=SCC+ compat
 
@@ -1041,8 +1039,8 @@ void MSX_InitialMemoryLayout(u32 romSize)
             // the four windows as the power-on default (mirrors how a real
             // flash cart boots before any bank-select writes happen).
             // ---------------------------------------------------------------
-            memset(SCCPlusRAM, 0xFF, sizeof(SCCPlusRAM));
-            //memcpy(SCCPlusRAM, ROM_Memory, (romSize > sizeof(SCCPlusRAM)) ? sizeof(SCCPlusRAM) : romSize);
+            memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
+            //memcpy(SRAM_Memory, ROM_Memory, (romSize > sizeof(SRAM_Memory)) ? sizeof(SRAM_Memory) : romSize);
 
             sccplus_mode = 0x00;
             HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly
@@ -1053,10 +1051,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
 
             MSXCartPtr[0] = (u8*)Unmapped_Memory;       // Segment Unmapped
             MSXCartPtr[1] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[2] = SCCPlusRAM + (0 * 0x2000);  // 4000-5FFF -> page 0
-            MSXCartPtr[3] = SCCPlusRAM + (1 * 0x2000);  // 6000-7FFF -> page 1
-            MSXCartPtr[4] = SCCPlusRAM + (2 * 0x2000);  // 8000-9FFF -> page 2
-            MSXCartPtr[5] = SCCPlusRAM + (3 * 0x2000);  // A000-BFFF -> page 3
+            MSXCartPtr[2] = SRAM_Memory + (0 * 0x2000);  // 4000-5FFF -> page 0
+            MSXCartPtr[3] = SRAM_Memory + (1 * 0x2000);  // 6000-7FFF -> page 1
+            MSXCartPtr[4] = SRAM_Memory + (2 * 0x2000);  // 8000-9FFF -> page 2
+            MSXCartPtr[5] = SRAM_Memory + (3 * 0x2000);  // A000-BFFF -> page 3
             MSXCartPtr[6] = (u8*)Unmapped_Memory;       // Segment Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;       // Segment Unmapped
         }
