@@ -87,6 +87,8 @@ extern byte RdData9938(void);
 extern byte RdCtrl9938(void);
 extern void Reset9938(void);
 extern void RebuildLutTablehh(void);
+extern void CheckNewMode(void);
+
 // When CPU writes to Port 0x9A:
 extern u8 palette_latch;
 extern void write_port_9A(uint8_t data);
@@ -100,6 +102,11 @@ extern u8 *SprGen,*SprTab;                     // VDP tables (sprites)
 extern u8 ScrMode;                             // Current screen mode
 extern u8 FGColor,BGColor;                     // Colors
 extern u32 ColTabM, ChrGenM;                   // Color and Character Masks
+extern u32 ChrTabM;
+extern u32 ColTabM;
+extern u32 ChrGenM;
+extern u32 SprTabM;
+
 
 /** WrData9938() *********************************************/
 /** Write a value V to the VDP Data Port.                   **/

@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0001  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0002  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -116,10 +116,10 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = MemoryMap[i] - ROM_Memory;
             }
-            else if ((MemoryMap[i] >= fastdrom_cdx2) && (MemoryMap[i] < fastdrom_cdx2+(sizeof(fastdrom_cdx2))))
+            else if ((MemoryMap[i] >= MSXBios_DISK) && (MemoryMap[i] < MSXBios_DISK+(sizeof(MSXBios_DISK))))
             {
                 Offsets[i].type = TYPE_FDC;
-                Offsets[i].offset = MemoryMap[i] - fastdrom_cdx2;
+                Offsets[i].offset = MemoryMap[i] - MSXBios_DISK;
             }
             else if ((MemoryMap[i] >= RAM_Memory) && (MemoryMap[i] < RAM_Memory+(sizeof(RAM_Memory))))
             {
@@ -147,8 +147,7 @@ void msxSaveState(void)
                 Offsets[i].offset = (u32)MemoryMap[i];
             }
         }
-        //if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
-        if (retVal) retVal = fwrite(MemoryMap, sizeof(MemoryMap),1, handle);
+        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
 
         // We need to save off the MSX Cart offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
@@ -158,14 +157,18 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = MSXCartPtr[i] - ROM_Memory;
             }
+            else if ((MSXCartPtr[i] >= SRAM_Memory) && (MSXCartPtr[i] < SRAM_Memory+(sizeof(SRAM_Memory))))
+            {
+                Offsets[i].type = TYPE_SRAM;
+                Offsets[i].offset = MSXCartPtr[i] - SRAM_Memory;
+            }
             else
             {
                 Offsets[i].type = TYPE_OTHER;
                 Offsets[i].offset = (u32)MSXCartPtr[i];
             }
         }
-        //if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
-        if (retVal) retVal = fwrite(MSXCartPtr, sizeof(MSXCartPtr),1, handle);
+        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
 
         // We need to save off the MSX RAM offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
@@ -181,8 +184,7 @@ void msxSaveState(void)
                 Offsets[i].offset = (u32)MSXRamPtr[i];
             }
         }
-        //if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
-        if (retVal) retVal = fwrite(MSXRamPtr, sizeof(MSXRamPtr),1, handle);
+        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
 
         // Write VDP
         if (retVal) retVal = fwrite(VDP,                    sizeof(VDP),                    1, handle);
@@ -199,6 +201,10 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&CurLine,               sizeof(CurLine),                1, handle);
         if (retVal) retVal = fwrite(&ColTabM,               sizeof(ColTabM),                1, handle);
         if (retVal) retVal = fwrite(&ChrGenM,               sizeof(ChrGenM),                1, handle);
+        if (retVal) retVal = fwrite(&ChrTabM,               sizeof(ChrTabM),                1, handle);
+        if (retVal) retVal = fwrite(&ColTabM,               sizeof(ColTabM),                1, handle);
+        if (retVal) retVal = fwrite(&ChrGenM,               sizeof(ChrGenM),                1, handle);
+        if (retVal) retVal = fwrite(&SprTabM,               sizeof(SprTabM),                1, handle);
         if (retVal) retVal = fwrite(XPal,                   sizeof(XPal),                   1, handle);
 
         // These are pointers into VDP Memory... save them as offsets...
@@ -331,12 +337,69 @@ void msxLoadState(void)
             // Write CZ80 CPU
             retVal = fread(&CPU, sizeof(CPU), 1, handle);
 
-            if (retVal) retVal = fread(MemoryMap, sizeof(MemoryMap),1, handle);
-
-            if (retVal) retVal = fread(MSXCartPtr, sizeof(MSXCartPtr),1, handle);
-
-            if (retVal) retVal = fread(MSXRamPtr, sizeof(MSXRamPtr),1, handle);
-
+            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
+            for (u8 i=0; i<8; i++)
+            {
+                if (Offsets[i].type == TYPE_ROM)
+                {
+                    MemoryMap[i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_FDC)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_DISK + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_RAM)
+                {
+                    MemoryMap[i] = (u8 *) (RAM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_SRAM)
+                {
+                    MemoryMap[i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_BIOS)
+                {
+                    MemoryMap[i] = (u8 *) (BIOS_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_EBIOS)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset);
+                }
+                else // TYPE_OTHER - this is just a pointer to memory
+                {
+                    MemoryMap[i] = (u8 *) (Offsets[i].offset);
+                }
+            }
+            
+            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
+            for (u8 i=0; i<8; i++)
+            {
+                if (Offsets[i].type == TYPE_ROM)
+                {
+                    MSXCartPtr[i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_SRAM)
+                {
+                    MSXCartPtr[i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                }
+                else // TYPE_OTHER - this is just a pointer to memory
+                {
+                    MSXCartPtr[i] = (u8 *) (Offsets[i].offset);
+                }
+            }
+            
+            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
+            for (u8 i=0; i<8; i++)
+            {
+                if (Offsets[i].type == TYPE_RAM)
+                {
+                    MSXRamPtr[i] = (u8 *) (RAM_Memory + Offsets[i].offset);
+                }
+                else // TYPE_OTHER - this is just a pointer to memory
+                {
+                    MSXRamPtr[i] = (u8 *) (Offsets[i].offset);
+                }
+            }
+            
             // Write VDP
             if (retVal) retVal = fread(VDP,                    sizeof(VDP),                    1, handle);
             if (retVal) retVal = fread(VDPStatus,              sizeof(VDPStatus),              1, handle);
@@ -352,19 +415,23 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&CurLine,               sizeof(CurLine),                1, handle);
             if (retVal) retVal = fread(&ColTabM,               sizeof(ColTabM),                1, handle);
             if (retVal) retVal = fread(&ChrGenM,               sizeof(ChrGenM),                1, handle);
+            if (retVal) retVal = fread(&ChrTabM,               sizeof(ChrTabM),                1, handle);
+            if (retVal) retVal = fread(&ColTabM,               sizeof(ColTabM),                1, handle);
+            if (retVal) retVal = fread(&ChrGenM,               sizeof(ChrGenM),                1, handle);
+            if (retVal) retVal = fread(&SprTabM,               sizeof(SprTabM),                1, handle);
             if (retVal) retVal = fread(XPal,                   sizeof(XPal),                   1, handle);
 
             // These are pointers into VDP Memory... save them as offsets...
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
-            ChrGen = pSvg + VDP_Memory;
+            ChrGen = VDP_Memory + pSvg;
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
-            ChrTab = pSvg + VDP_Memory;
+            ChrTab = VDP_Memory + pSvg;
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
-            ColTab = pSvg + VDP_Memory;
+            ColTab = VDP_Memory + pSvg;
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
-            SprGen = pSvg + VDP_Memory;
+            SprGen = VDP_Memory + pSvg;
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
-            SprTab = pSvg + VDP_Memory;
+            SprTab = VDP_Memory + pSvg;
 
             // Write sound chip data
             if (retVal) retVal = fread(&myAY,                  sizeof(myAY),                   1, handle);
@@ -430,7 +497,7 @@ void msxLoadState(void)
 
     // Recalculate a few things...
     VPAGE=VDP_Memory+((int)VDP[14]<<14);
-    RebuildLutTablehh();
+    CheckNewMode(); // This will rebuild any lookup tables as needed
 
     restoreCompressedMem();
 

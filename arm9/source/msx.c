@@ -442,8 +442,8 @@ void msx_slot_map_msx1(unsigned char Value)
                 bCartInPage[1] = 1;
                 bRAMInPage[1] = 0;
 
-                MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
+                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
 
                 break;
             }
@@ -603,8 +603,8 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[1] = 0;
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
-                MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-                MemoryMap[3] = fastdrom_cdx2 + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
+                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             }
             else // Other subslots have nothing in this page
             {
@@ -751,8 +751,8 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
         case 0x01:  // Slot 1:  Maps to Disk Controller
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = fastdrom_cdx2 + 0x0000;
-            MemoryMap[3] = fastdrom_cdx2 + 0x2000;
+            MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
+            MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             break;
         case 0x02:  // Slot 2:  Maps to Game Cart
             bCartInPage[1] = 1;
@@ -971,11 +971,18 @@ u8 MSX_GuessROMType(u32 size)
  ********************************************************************************/
 void msxWipeRAM(void)
 {
-  for (int i=0; i<sizeof(RAM_Memory); i++)
-  {
-      u8 randbyte = rand() & 0xFF;
-      RAM_Memory[i] = (myConfig.memWipe ? 0x00 : randbyte);
-  }
+    // Clear main RAM with either 0x00 or a random byte depending on config...
+    for (int i=0; i<sizeof(RAM_Memory); i++)
+    {
+        u8 randbyte = rand() & 0xFF;
+        RAM_Memory[i] = (myConfig.memWipe ? 0x00 : randbyte);
+    }
+  
+    // SRAM memory gets 0xFF
+    for (int i=0; i<sizeof(SRAM_Memory); i++)
+    {
+        SRAM_Memory[i] = 0xFF;
+    }
 }
 
 

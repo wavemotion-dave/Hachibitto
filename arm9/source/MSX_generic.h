@@ -115,6 +115,7 @@ extern u16 msx_init;
 extern u16 msx_basic;
 extern u8 skip_render;
 extern u16 timingFrames;
+extern s8 temp_offset;
 
 extern FI_MSX gpFic[MAX_ROMS];
 extern int ucGameAct;
@@ -155,7 +156,7 @@ extern u8 *ROM_Memory;
 extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x10000];
-extern u8 fastdrom_cdx2[0x4000];
+extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_MSX2[0x8000];
 extern const unsigned char MSXBios_MSX2EXT[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];

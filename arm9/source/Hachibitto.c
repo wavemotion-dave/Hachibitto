@@ -52,6 +52,7 @@ s8  temp_offset      __attribute__((section(".dtcm"))) = 0;
 u8  slide_dampen     __attribute__((section(".dtcm"))) = 0;
 u8  DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
 u8  bFirstSCCEnable  __attribute__((section(".dtcm"))) = 1;
+u8  skip_render      __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // All emulated systems have ROM, RAM and possibly BIOS or SRAM. So we create generic buffers
@@ -95,7 +96,6 @@ u8 key_graph __attribute__((section(".dtcm"))) = false;
 // ---------------------------------------------------------------------------
 // Some timing and frame rate comutations to keep the emulation on pace...
 // ---------------------------------------------------------------------------
-u16 emuFps          __attribute__((section(".dtcm"))) = 0;
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;
 
@@ -243,8 +243,8 @@ void SoundUnPause(void)
 mm_ds_system sys   __attribute__((section(".dtcm")));
 mm_stream myStream __attribute__((section(".dtcm")));
 
-s16 mixbuf1[2048+32];      // When we have AY sound and SCC possible... so 8 channels.
-s16 mixbuf2[2048+32];      // into a single output so we render to mix buffers first.
+s16 mixbuf1[buffer_size+4] __attribute__((section(".dtcm")));      // When we have AY sound and SCC possible... so 8 channels.
+s16 mixbuf2[buffer_size+4] __attribute__((section(".dtcm")));      // into a single output so we render to mix buffers first.
 
 static s32 ay_smoothed __attribute__((section(".dtcm"))) = 0;
 const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
@@ -261,16 +261,14 @@ void SmoothStartSCC(mm_word len, mm_addr dest)
     s32 combined_smoothed = last_sample;
 
     ay38910Mixer(len*2, mixbuf1, &myAY);
-    SCCMixer(len*4, mixbuf2, &mySCC);
+    SCCMixer(len*2, mixbuf2, &mySCC);
 
     s16 *p = (s16*)dest;
-    int j = 0;
     for (int i = 0; i < len*2; i++)
     {
         // >>1 instead of /2 - signed division makes GCC emit sign-correction
         // code even for a constant divisor of 2; a plain shift is one instruction.
-        s32 scc_sample = ((s32)mixbuf2[j] + (s32)mixbuf2[j+1]) >> 1;
-        j += 2;
+        s32 scc_sample = ((s32)mixbuf2[i]);
 
         // Same cost as the old >>1 attenuation - just a different shift amount,
         // so this loudness fix is free relative to what you had.
@@ -341,15 +339,11 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
             }
             ay_smoothed = smoothed;
 
-            SCCMixer(len*4, mixbuf2, &mySCC);
+            SCCMixer(len*2, mixbuf2, &mySCC);
             p = (s16*)dest;
-            int j = 0;
             for (int i = 0; i < len*2; i++)
             {
-                // >>1 instead of /2 - signed division makes GCC emit sign-correction
-                // code even for a constant divisor of 2; a plain shift is one instruction.
-                s32 scc_sample = ((s32)mixbuf2[j] + (s32)mixbuf2[j+1]) >> 1;
-                j += 2;
+                s32 scc_sample = ((s32)mixbuf2[i]);
 
                 // Same cost as the old >>1 attenuation - just a different shift amount,
                 // so this loudness fix is free relative to what you had.
@@ -363,7 +357,7 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
                 // cost at all, not an actual conditional jump. Cheaper than a soft-knee,
                 // which adds real arithmetic (subtract/shift/add) any time it's touched.
                 if (combined > 32767)  combined = 32767;
-                if (combined < -32768) combined = -32768;
+                else if (combined < -32768) combined = -32768;
 
                 *p++ = (s16)combined;
             }
@@ -411,23 +405,21 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
         {
             ay38910Mixer(len*2, mixbuf1, &myAY);
-            SCCMixer(len*4, mixbuf2, &mySCC);
+            SCCMixer(len*2, mixbuf2, &mySCC);
 
             s16 *p = (s16*)dest;
-            int j=0;
             for (int i=0; i<len*2; i++)
             {
                 // ------------------------------------------------------------------------
                 // We normalize the samples and mix them carefully to minimize clipping...
                 // ------------------------------------------------------------------------
-                s32 combined = (mixbuf1[i]) + ((mixbuf2[j] + mixbuf2[j+1])/2) + 32768;
-                j+=2;
+                s32 combined = (mixbuf1[i]) + (mixbuf2[i]) + 32768;
                 if (combined >  32767) combined = 32767;
                 *p++ = (s16)combined;
             }
             p--; last_sample = *p;
         }
-        else  // Pretty simple... just AY
+        else  // Pretty simple... just AY so mix directly to destination buffer
         {
             ay38910Mixer(len*2, dest, &myAY);
             last_sample = ((s16*)dest)[len*2 - 1];
@@ -498,14 +490,8 @@ void sound_chip_reset()
     // -----------------------------------------------------------------
     // The SCC sound chip is just for a few select Konami MSX1 games
     // -----------------------------------------------------------------
+    memset(&mySCC, 0x00, sizeof(mySCC));
     SCCReset(&mySCC);
-    
-    SCCWrite(0x00, 0x988A, &mySCC);
-    SCCWrite(0x00, 0x988B, &mySCC);
-    SCCWrite(0x00, 0x988C, &mySCC);
-    SCCWrite(0x00, 0x988D, &mySCC);
-    SCCWrite(0x00, 0x988E, &mySCC);
-    SCCWrite(0x00, 0x988F, &mySCC);
     
     SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
 }
@@ -566,7 +552,7 @@ void ResetMSX(void)
     TIMER2_DATA=0;
     TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
     timingFrames  = 0;
-    emuFps=0;
+    skip_render = 0;
 }
 
 //*********************************************************************************
@@ -1053,7 +1039,6 @@ void Hachibitto_main(void)
   TIMER2_DATA=0;
   TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
   timingFrames  = 0;
-  emuFps=0;
 
   // Force the sound engine to turn on when we start emulation
   bStartSoundEngine = true;
@@ -1085,7 +1070,7 @@ void Hachibitto_main(void)
             TIMER1_CR = 0;
             TIMER1_DATA = 0;
             TIMER1_CR=TIMER_ENABLE | TIMER_DIV_1024;
-            emuFps = emuActFrames;
+            u16 emuFps = emuActFrames;
             if (myGlobalConfig.showFPS)
             {
                 if (emuFps == 61) emuFps=60;
@@ -1436,8 +1421,8 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F3)        kbd_key = KBD_KEY_F3;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F4)        kbd_key = KBD_KEY_F4;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F5)        kbd_key = KBD_KEY_F5;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP)     {temp_offset = -myConfig.yOffset; slide_dampen = 15;}
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN)     {temp_offset =  myConfig.yOffset; slide_dampen = 15;}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANUP)     {if (VDP[9] & 0x80) {temp_offset = -myConfig.yOffset; slide_dampen = 15;}}
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_PANDN)     {if (VDP[9] & 0x80) {temp_offset =  (20-myConfig.yOffset); slide_dampen = 15;}}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWTOP)   {myConfig.yOffset = 0;}
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHOWBOT)   {myConfig.yOffset = 20;}
 
@@ -1626,8 +1611,6 @@ void irqVBlank(void)
     // ---------------------------------------------------------------------
     if (!(VDP[9] & 0x80))
     {
-        slide_dampen = 0;
-        temp_offset = 0;
         cyBG = 0;
     }
 
@@ -1934,7 +1917,6 @@ void msxRun(void)
  * reduce visual tearing and other artifacts. It's not strictly necessary
  * and that does slow down the loop a bit... but DSi can handle it.
  ********************************************************************************/
-u8 skip_render = 0;
 ITCM_CODE void msxUpdateScreen(void)
 {
     if (DelayFirstOutput)

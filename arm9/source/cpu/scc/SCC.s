@@ -25,6 +25,16 @@
 ;@      register behavior are implemented, same as the original
 ;@      driver - sccTestReg is storage only, matching the prior
 ;@      sccTestReg's level of support.
+;@    - sccKeyOnW (0xAF, channel enable/"key on" mask) now actually enforces
+;@      the enable bits: disabling a channel immediately zeroes its cached
+;@      volume, and the VolW handlers force volume to 0 for a channel whose
+;@      enable bit is clear instead of storing a raw linear pass-through.
+;@      Previously the mask byte landed in sccChControl (via SCCWrite's
+;@      generic register shadow-store) but was never used to silence
+;@      anything - only to pick between the log-curve table and a raw
+;@      value - so a disabled channel with leftover freq/volume data would
+;@      still play, which is what caused boot-time buzzing/static in a
+;@      couple of games before their real player init took over.
 ;@    - Per-channel volume is no longer applied by self-modifying the
 ;@      mixer's own instructions (the old vol0-vol4 code-patch trick).
 ;@      SCCWrite now stores the precomputed volume into the existing
@@ -315,55 +325,79 @@ sccCh4FreqHW:
 ;@----------------------------------------------------------------------------
 sccCh0VolW:
 ;@----------------------------------------------------------------------------
-	ands r0,r0,#0x0F
-	ldrbne r1,[r2,#sccChControl]
-	andsne r1,r1,#0x01
+	ldrb r1,[r2,#sccChControl]
+	ands r1,r1,#0x01		;@ channel 0 enabled?
+	andne r0,r0,#0x0F
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
+	moveq r0,#0			;@ disabled -> force silence, ignore raw nibble
 	strb r0,[r2,#sccCh0Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh1VolW:
 ;@----------------------------------------------------------------------------
-	ands r0,r0,#0x0F
-	ldrbne r1,[r2,#sccChControl]
-	andsne r1,r1,#0x02
+	ldrb r1,[r2,#sccChControl]
+	ands r1,r1,#0x02		;@ channel 1 enabled?
+	andne r0,r0,#0x0F
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
+	moveq r0,#0			;@ disabled -> force silence, ignore raw nibble
 	strb r0,[r2,#sccCh1Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh2VolW:
 ;@----------------------------------------------------------------------------
-	ands r0,r0,#0x0F
-	ldrbne r1,[r2,#sccChControl]
-	andsne r1,r1,#0x04
+	ldrb r1,[r2,#sccChControl]
+	ands r1,r1,#0x04		;@ channel 2 enabled?
+	andne r0,r0,#0x0F
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
+	moveq r0,#0			;@ disabled -> force silence, ignore raw nibble
 	strb r0,[r2,#sccCh2Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh3VolW:
 ;@----------------------------------------------------------------------------
-	ands r0,r0,#0x0F
-	ldrbne r1,[r2,#sccChControl]
-	andsne r1,r1,#0x08
+	ldrb r1,[r2,#sccChControl]
+	ands r1,r1,#0x08		;@ channel 3 enabled?
+	andne r0,r0,#0x0F
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
+	moveq r0,#0			;@ disabled -> force silence, ignore raw nibble
 	strb r0,[r2,#sccCh3Volume]	;@ plain data write - mixer reads it live
 	bx lr
 ;@----------------------------------------------------------------------------
 sccCh4VolW:
 ;@----------------------------------------------------------------------------
-	ands r0,r0,#0x0F
-	ldrbne r1,[r2,#sccChControl]
-	andsne r1,r1,#0x10
+	ldrb r1,[r2,#sccChControl]
+	ands r1,r1,#0x10		;@ channel 4 enabled?
+	andne r0,r0,#0x0F
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
+	moveq r0,#0			;@ disabled -> force silence, ignore raw nibble
 	strb r0,[r2,#sccCh4Volume]	;@ plain data write - mixer reads it live
+	bx lr				;@ NOTE: previously fell through into sccKeyOnW with
+					;@ no return - now that sccKeyOnW does real work below,
+					;@ that fallthrough would misfire on every Ch4 volume
+					;@ write, so this now returns explicitly.
 ;@----------------------------------------------------------------------------
-sccKeyOnW:
+sccKeyOnW:				;@ 0xAF - channel enable/"key on" mask, bit0-4 = ch0-ch4
 ;@----------------------------------------------------------------------------
+	tst r0,#0x01			;@ the raw mask byte itself already landed in
+	moveq r1,#0			;@ sccChControl via SCCWrite's generic register
+	strbeq r1,[r2,#sccCh0Volume]	;@ shadow-store above - this just enforces it:
+	tst r0,#0x02			;@ any channel whose enable bit just went to 0
+	moveq r1,#0			;@ is silenced immediately, regardless of whatever
+	strbeq r1,[r2,#sccCh1Volume]	;@ frequency/volume it was left holding. A channel
+	tst r0,#0x04			;@ that stays (or becomes) enabled keeps its last
+	moveq r1,#0			;@ computed volume - the game is expected to write
+	strbeq r1,[r2,#sccCh2Volume]	;@ a fresh volume when it wants that channel to
+	tst r0,#0x08			;@ actually sound again, same convention real SCC
+	moveq r1,#0			;@ music drivers use (set up freq/wave/volume, then
+	strbeq r1,[r2,#sccCh3Volume]	;@ toggle the enable bit as a cheap note on/off gate).
+	tst r0,#0x10
+	moveq r1,#0
+	strbeq r1,[r2,#sccCh4Volume]
 	bx lr
 ;@----------------------------------------------------------------------------
 	.end

@@ -988,9 +988,9 @@ ITCM_CODE void CommitLine(u8 Y)
     const u8 * restrict src = (const u8*)(LineScratch + LS_BASE);
     for (int i=0; i<16;i++)
     {
-        *dst++ = (XPal[src[0]] << 0) | (XPal[src[1]] << 8) | (XPal[src[2]] << 16) | (XPal[src[3]] << 24);
-        *dst++ = (XPal[src[4]] << 0) | (XPal[src[5]] << 8) | (XPal[src[6]] << 16) | (XPal[src[7]] << 24);
-        *dst++ = (XPal[src[8]] << 0) | (XPal[src[9]] << 8) | (XPal[src[10]] << 16) | (XPal[src[11]] << 24);
+        *dst++ = (XPal[src[0]]  << 0) | (XPal[src[1]]  << 8) | (XPal[src[2]]  << 16) | (XPal[src[3]]  << 24);
+        *dst++ = (XPal[src[4]]  << 0) | (XPal[src[5]]  << 8) | (XPal[src[6]]  << 16) | (XPal[src[7]]  << 24);
+        *dst++ = (XPal[src[8]]  << 0) | (XPal[src[9]]  << 8) | (XPal[src[10]] << 16) | (XPal[src[11]] << 24);
         *dst++ = (XPal[src[12]] << 0) | (XPal[src[13]] << 8) | (XPal[src[14]] << 16) | (XPal[src[15]] << 24);
         src += 16;
     }
@@ -1615,27 +1615,55 @@ void Loop9938(void)
   /* If refreshing display area, call scanline handler */
   if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE))
   {
+      u8 scan_sprites = 0;
+      
+      // ---------------------------------------------------------------
+      // On the DS-Lite/Phat, we have to frameskip every other frame...
+      // ---------------------------------------------------------------
       if (timingFrames & (isDSiMode() ? 0:1))
       {
+          skip_render  = 1; // This whole frame is skipped
+          scan_sprites = 1; // But we still need to scan sprites
+      }
+      else
+      {
+          // ---------------------------------------------------------------
+          // We can only show 192 lines... so only refresh the line if the
+          // line will actually be one of the ones rendered to the DS LCD.
+          // ---------------------------------------------------------------
+          int first_visible_line = VDP9938_START_LINE+myConfig.yOffset+temp_offset;
+          
+          if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+192)))
+          {
+              RefreshLine(CurLine - VDP9938_START_LINE);
+          }
+          else
+          {
+              scan_sprites = 1; // We still need to scan sprites
+          }
+      }
+
+      // ----------------------------------------------------------
+      // If we are not rendering this scanline for whatever reason 
+      // directly above, we still scan the spites on the line...
+      // ----------------------------------------------------------
+      if (scan_sprites)
+      {
           unsigned int tmp;
-          skip_render=1;
           if (ScrMode < 4)
             ScanSprites(CurLine - VDP9938_START_LINE, &tmp);    // Skip rendering - but still scan sprites for the 5th sprite flag
           else 
             ScanColorSprites(CurLine - VDP9938_START_LINE);     // Skip rendering - but still scan sprites for the 9th sprite flag
       }
-      else
-      {
-          RefreshLine(CurLine - VDP9938_START_LINE);
-      }
 
       // ---------------------------------------------------------------------
       // Some programs require that we handle collisions more frequently
-      // than just end of frame. So we check every 64 scanlines (or 255 if
+      // than just end of frame. So we check every 92 scanlines (or never if
       // we are the older DS-Lite/Phat). This is somewhat CPU intensive so
       // we are careful how often we run it - especially on older hardware.
+      // CheckSprites() is always called when the frame ends further below.
       // ---------------------------------------------------------------------
-      if ((CurLine % (isDSiMode() ? 64:255)) == 0)
+      if ((CurLine % (isDSiMode() ? 92:999)) == 0)
       {
           if(!(VDPStatus[0]&VDP9938_STAT_OVRLAP)) // If not already in collision...
           {

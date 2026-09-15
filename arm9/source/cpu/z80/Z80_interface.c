@@ -23,12 +23,6 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-static inline void SCCPlus_MapWindow(u8 idx, u8 page)
-{
-    MSXCartPtr[idx] = SRAM_Memory + ((page & 0x07) * 0x2000);
-    MemoryMap[idx]  = MSXCartPtr[idx];
-}
-
 // ----------------------------------------------------------------
 // All memory fetches run through this except OP codes which are
 // read directly from memory.
@@ -189,11 +183,11 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     }
     else if (bCartInPage[2] && ((address & 0xF800) == 0x9000))
     {
-        // -------------------------------------------------------------------
-        // A value of 0x3F will enable SCC but it also still performs banking 
-        // logic directly below (it will always map in the last bank).
-        // -------------------------------------------------------------------
-        if ((value&0x3F) == 0x3F)
+        // -----------------------------------------------------------------------
+        // Bit 5 is the only bit that is required to map SCC registers into view.
+        // And yes, the banking logic below is still always called...
+        // -----------------------------------------------------------------------
+        if (value&0x20)
         {
             special_ram_access |= SPEC_RAM_SCC_ENABLED;  // SCC Registers are now "in view"
             msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
@@ -263,6 +257,9 @@ void HandleAscii16K(u32* src, u8 block, u16 address)
     }
 }
 
+// ---------------------------------------------------------------------
+// Xevious and a few other related games have special cart mapping...
+// ---------------------------------------------------------------------
 void HandleXevious(u32* src, u8 block, u16 address)
 {
     if (bCartInPage[1] && (address >= 0x6000) && (address <= 0x67FF))
@@ -284,6 +281,11 @@ void HandleXevious(u32* src, u8 block, u16 address)
     }
 }
 
+// ---------------------------------------------------------------------
+// Lode Runner maps with writes to 0x0000 but it's even more unusual
+// in that it doesn't care if the cart is mapped into view as it will
+// respond to any write to 0x0000 no matter what.
+// ---------------------------------------------------------------------
 void HandleSuperLodeRunner(u32* src, u8 block, u16 address)
 {
     MSXCartPtr[4] = (u8*)src;
@@ -310,8 +312,19 @@ static inline u8 SCCPlus_WindowIsRAM(u8 winIdx)
     /* winIdx == 5 */               return (sccplus_mode & 0x04) ? 1 : 0; // Bit2: Bank3
 }
 
+// ----------------------------------------------------------------
+// Map the SCC+ 64K of special cart-based RAM into place.
+// ----------------------------------------------------------------
+static inline void SCCPlus_MapWindow(u8 idx, u8 page)
+{
+    MSXCartPtr[idx] = SRAM_Memory + ((page & 0x07) * 0x2000);
+    MemoryMap[idx]  = MSXCartPtr[idx];
+}
+
+// -----------------------------------------------------------------
 // No more "magic value" trick - just records the page and remaps.
 // Only reached when the relevant window is NOT in forced-RAM mode.
+// -----------------------------------------------------------------
 void HandleSCCPlusBankSelect(u16 address, u8 value)
 {
     switch (address & 0xF000)
