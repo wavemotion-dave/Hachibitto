@@ -67,7 +67,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
 // same 'first byte' register with ports 0x9A and 0x99
 // and so that is handled here by reuse of ALatch. They 
 // do use separate flip-flops however.
-ITCM_CODE void write_port_9A(uint8_t data)
+void write_port_9A(uint8_t data)
 {
     if (!palette_latch) 
     {
@@ -756,7 +756,7 @@ ITCM_CODE void ScanColorSprites(uint8_t Y)
 /** 256 horizontal pixels and so we must deal with the border **/
 /** (backdrop) here which is always the background color.     **/
 /***************************************************************/
-ITCM_CODE void RefreshLine0(u8 Y)
+void RefreshLine0(u8 Y)
 {
   register byte *T,K,Offset;
   register byte *P,FC,BC;
@@ -815,7 +815,7 @@ ITCM_CODE void RefreshLine0(u8 Y)
 /** Refresh line Y (0..191) of SCREEN1, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-ITCM_CODE void RefreshLine1(u8 uY)
+void RefreshLine1(u8 uY)
 {
   register byte K=0,Offset,FC,BC;
   register u8 *T;
@@ -861,7 +861,8 @@ ITCM_CODE void RefreshLine1(u8 uY)
 /** Refresh line Y (0..191) of SCREEN2, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-ITCM_CODE void RefreshLine2(u8 uY) {
+ITCM_CODE void RefreshLine2(u8 uY) 
+{
   u32 *P;
   register byte FC,BC;
   register byte K,*T;
@@ -1211,21 +1212,6 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 ITCM_CODE void RefreshLine7(register u8 uY)
 {
     DEBUG_REFRESH(7);
-    
-    // ---------------------------------------------------------------------
-    // Mode 7 is a beast and we just need a bit more headroom... so we
-    // render 7 of 8 frames to give us that little bit of extra bandwidth
-    // if we have SCC plus enabled - the combo of Screen 7 plus tons of 
-    // channels of sound are just a bit too much...
-    // ---------------------------------------------------------------------
-    if (special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED)
-    {
-        if (!(frame_number & 7)) // Skip the 8th frame...
-        {
-            skip_render = 1;
-            return;
-        }
-    }
     
     if (!ScreenON)
     {

@@ -105,9 +105,8 @@ extern struct GlobalConfig_t myGlobalConfig;
 extern u8 special_ram_access;
 
 #define SPEC_RAM_SUBSLOT_ACTIVE     0x01
-#define SPEC_RAM_SRAM_ACTIVE        0x02
-#define SPEC_RAM_SCC_ENABLED        0x04
-#define SPEC_RAM_SCC_PLUS_ENABLED   0x08
+#define SPEC_RAM_SCC_ENABLED        0x02
+#define SPEC_RAM_SCC_PLUS_ENABLED   0x04
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -140,12 +139,13 @@ extern u8 msx_kana_lock;
 #define XBLAM           8
 #define SUPERLR         9
 #define XEVIOUS         10
-#define RES1            11
-#define RES2            12
-#define AT0K            13
-#define AT4K            14
-#define AT8K            15
-#define LIN64           16
+#define ASC8SRAM8       11
+#define ASC8SRAM2       12
+#define ASC16SRAM8      13
+#define AT0K            14
+#define AT4K            15
+#define AT8K            16
+#define LIN64           17
 #define SCCPLUS_RAM     88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
@@ -173,7 +173,6 @@ extern SCC     mySCC;
 extern u8 msx_scc_enable;
 extern u8 JoyMode;
 extern u32 JoyState;
-extern u8 msx_sram_enabled;
 extern u8 last_mega_bank;
 extern u16 msx_block_size;
 extern u32 file_crc;

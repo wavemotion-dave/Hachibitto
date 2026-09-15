@@ -33,12 +33,9 @@ typedef struct {
 #define Zemina25in1         0xFF
 #define Zemina26in1         0xFF
 #define Zemina126in1        0xFF
-#define ASC8SRAM8           0xFF
-#define ASC8SRAM2           0xFF
 #define KoeiSRAM32          0xFF
 #define PLAIN_8K            0xFF
 #define PLAIN_16K           0xFF
-#define ASC16SRAM8          0xFF
 #define NettouYakyuu        0xFF
 #define NEO8                0xFF
 #define NEO16               0xFF
@@ -8650,7 +8647,7 @@ const ROM_DB_t ROM_DB[] =
   {"e679da4af05aa32843d2f4518b9ceb0df63df990", SPEC_NONE,  MIRRORED},
   {"e67bcb7644e945f784238f9105f854fcab8192e2", SPEC_NONE,  MIRRORED},
   {"e67f5e14b41ec9311434d1b77a7ce0469042500c", SPEC_NONE,  SCC8},
-  {"e690b9aa565cb9995d3b59156f109cdad865c3cc", SPEC_NONE,  SCC8},
+  {"e690b9aa565cb9995d3b59156f109cdad865c3cc", SPEC_NONE,  ASC16SRAM2},
   {"e692fe39337dbd10dbf35e90f7afc8b21da20aa2", SPEC_NONE,  ASC16},
   {"e6948984d029a837a8f38629bf695a22e2aec82a", SPEC_NONE,  SCC8},
   {"e69ebe64ae0458c71516c246f626b4f780c4ff39", SPEC_NONE,  PAGE23},

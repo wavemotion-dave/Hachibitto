@@ -54,9 +54,9 @@ const u32 crc32_table[256] = {
 // ------------------------------------------------------------------------
 // Is this filename a disk or data pack (based on extension of the file)?
 // ------------------------------------------------------------------------
-u8 isDiskOrDataPack(const char *filename)
+u8 isDisk(const char *filename)
 {
-    if ((strcasecmp(strrchr(filename, '.'), ".ddp") == 0) || (strcasecmp(strrchr(filename, '.'), ".dsk") == 0)) return 1;
+    if ((strcasecmp(strrchr(filename, '.'), ".dsk") == 0)) return 1;
     else return 0;    
 }
 
@@ -141,10 +141,13 @@ u32 getFileCrc(const char* filename)
             }
         }
         fclose(file2);
-   } while (crc1 != crc2);
+    } while (crc1 != crc2);
 
+    // ------------------------------------------------------------------------------------------
     // After we compute the size above... we check if this is a .dsk file and return CRC by name
-    if (isDiskOrDataPack(filename))
+    // since disks are, by nature, mutable and can change (causing the CRC32 to change as well).
+    // ------------------------------------------------------------------------------------------
+    if (isDisk(filename))
     {
         return crcBasedOnFilename(filename);
     }

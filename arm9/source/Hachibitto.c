@@ -298,7 +298,7 @@ void SmoothStartSCC(mm_word len, mm_addr dest)
     last_sample = *p;
 }
 
-ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats format)
+ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
     {
@@ -329,15 +329,18 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
             s16 *p = mixbuf1;
             s32 smoothed = ay_smoothed;
 
-            while (count--) {
-                s32 diff = (s32)*p - smoothed;
-                if (diff > MAX_STEP) diff = MAX_STEP;
-                else if (diff < -MAX_STEP) diff = -MAX_STEP;
+            if (isDSiMode()) // Only DSi supports audio filters
+            {
+                while (count--) {
+                    s32 diff = (s32)*p - smoothed;
+                    if (diff > MAX_STEP) diff = MAX_STEP;
+                    else if (diff < -MAX_STEP) diff = -MAX_STEP;
 
-                smoothed += diff;
-                *p++ = (s16)smoothed;
+                    smoothed += diff;
+                    *p++ = (s16)smoothed;
+                }
+                ay_smoothed = smoothed;
             }
-            ay_smoothed = smoothed;
 
             SCCMixer(len*2, mixbuf2, &mySCC);
             p = (s16*)dest;
@@ -368,66 +371,31 @@ ITCM_CODE mm_word OurSoundMixer_DSi(mm_word len, mm_addr dest, mm_stream_formats
         {
             ay38910Mixer(len * 2, dest, &myAY);
 
-            s16 *p = (s16*)dest;
-            int count = len * 2;
-            s32 smoothed = ay_smoothed;
-
-            while (count--) {
-                s32 diff = (s32)*p - smoothed;
-                if (diff > MAX_STEP) {
-                    diff = MAX_STEP;
-                } else if (diff < -MAX_STEP) {
-                    diff = -MAX_STEP;
-                }
-                smoothed += diff;
-                *p++ = (s16)smoothed;
-            }
-            ay_smoothed = smoothed;
-            last_sample = ((s16*)dest)[len*2 - 1];
-        }
-    }
-
-    return  len;
-}
-
-ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
-{
-    if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
-    {
-        s16 *p = (s16*)dest;
-        for (int i=0; i<len*2; i++)
-        {
-           *p++ = last_sample;      // To prevent pops and clicks... just keep outputting the last sample
-        }
-    }
-    else
-    {
-        if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
-        {
-            ay38910Mixer(len*2, mixbuf1, &myAY);
-            SCCMixer(len*2, mixbuf2, &mySCC);
-
-            s16 *p = (s16*)dest;
-            for (int i=0; i<len*2; i++)
+            if (isDSiMode()) // DSi gets filter
             {
-                // ------------------------------------------------------------------------
-                // We normalize the samples and mix them carefully to minimize clipping...
-                // ------------------------------------------------------------------------
-                s32 combined = (mixbuf1[i]) + (mixbuf2[i]) + 32768;
-                if (combined >  32767) combined = 32767;
-                *p++ = (s16)combined;
+                s16 *p = (s16*)dest;
+                int count = len * 2;
+                s32 smoothed = ay_smoothed;
+
+                while (count--) {
+                    s32 diff = (s32)*p - smoothed;
+                    if (diff > MAX_STEP) {
+                        diff = MAX_STEP;
+                    } else if (diff < -MAX_STEP) {
+                        diff = -MAX_STEP;
+                    }
+                    smoothed += diff;
+                    *p++ = (s16)smoothed;
+                }
+                ay_smoothed = smoothed;
             }
-            p--; last_sample = *p;
-        }
-        else  // Pretty simple... just AY so mix directly to destination buffer
-        {
-            ay38910Mixer(len*2, dest, &myAY);
             last_sample = ((s16*)dest)[len*2 - 1];
         }
     }
 
     return  len;
 }
+
 
 // -------------------------------------------------------------------------------------------
 // Setup the maxmod audio stream - this will be a 16-bit Stereo PCM output at 55KHz which
@@ -450,7 +418,7 @@ void setupStream(void)
     //----------------------------------------------------------------
     myStream.sampling_rate  = sample_rate;            // sample_rate for the CV to match the SN/AY drivers
     myStream.buffer_length  = buffer_size;            // buffer length = (512+16)
-    myStream.callback       = (isDSiMode() ? OurSoundMixer_DSi : OurSoundMixer); // set callback function
+    myStream.callback       = OurSoundMixer;          // set callback function
     myStream.format         = MM_STREAM_16BIT_STEREO; // format = stereo 16-bit
     myStream.timer          = MM_TIMER0;              // use hardware timer 0
     myStream.manual         = false;                  // use automatic filling
@@ -1941,26 +1909,14 @@ void getfile_crc(const char *filename)
 {
     DSPrint(11,13,6, "LOADING...");
 
-    file_crc = getFileCrc(filename);        // The CRC is used as a unique ID to save out High Scores and Configuration...
+    // -------------------------------------------------------------------
+    // This reads the file into ROM_Memory[] and computes the CRC32 which
+    // is used for favorites, high score saves and configuration data. 
+    // For large files (> 1MB), this can take several seconds.
+    // -------------------------------------------------------------------
+    file_crc = getFileCrc(filename);
 
     DSPrint(11,13,6, "          ");
-
-    // ------------------------------------------------------------------------------
-    // And a handful of games require SRAM which is a special case-by-case basis...
-    // ------------------------------------------------------------------------------
-    msx_sram_enabled = 0;
-    if (file_crc == 0x92943e5b) msx_sram_enabled = 0x10;       // MSX Hydlide 2 - Shine Of Darkness (EN)
-    if (file_crc == 0xb29edaec) msx_sram_enabled = 0x10;       // MSX Hydlide 2 - Shine Of Darkness (EN)
-    if (file_crc == 0xa0fd57cf) msx_sram_enabled = 0x10;       // MSX Hydlide 2 - Shine Of Darkness (EN)
-    if (file_crc == 0xd640deaf) msx_sram_enabled = 0x20;       // MSX Dragon Slayer 2 - Xanadu (EN)
-    if (file_crc == 0x119b7ba8) msx_sram_enabled = 0x20;       // MSX Dragon Slayer 2 - Xanadu (JP)
-    if (file_crc == 0x27fd8f9a) msx_sram_enabled = 0x10;       // MSX Deep Dungeon I (JP)
-    if (file_crc == 0x213da247) msx_sram_enabled = 0x10;       // MSX Deep Dungeon II (EN)
-    if (file_crc == 0x101db19c) msx_sram_enabled = 0x10;       // MSX Deep Dungeon II (JP)
-    if (file_crc == 0x96b7faca) msx_sram_enabled = 0x10;       // MSX Harry Fox Special (JP)
-    if (file_crc == 0xb8fc19a4) msx_sram_enabled = 0x20;       // MSX Cosmic Soldier 2 - Psychic War
-    if (file_crc == 0x4ead5098) msx_sram_enabled = 0x20;       // MSX Ghengis Khan
-    if (file_crc == 0x3aa33a30) msx_sram_enabled = 0x20;       // MSX Nobunaga no Yabou - Zenkokuhan
 }
 
 

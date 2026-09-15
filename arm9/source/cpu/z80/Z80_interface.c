@@ -29,41 +29,30 @@
 // ----------------------------------------------------------------
 ITCM_CODE u8 cpu_readmem16(u16 address)
 {
-    // Everything in this block is accessing high-memory...
-    if (unlikely(special_ram_access))
+    // ----------------------------------------------------
+    // Are we reading from the SCC chip memory mapped area?
+    // ----------------------------------------------------
+    if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
-        // ----------------------------------------------------
-        // Are we reading from the SCC chip memory mapped area?
-        // ----------------------------------------------------
-        if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
-        {
-             if (bCartInPage[2])
-             {
-                // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
-                if (address >= 0x9800 && address <= 0x987F)
-                {
-                    //TBD: this breaks Metal Gear 2 - Solid Snake. Leave it disabled for now...
-                    // return SCCRead(address, &mySCC);
-                }
-            }
-        }
-        else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
-        {
-            if (bCartInPage[2]) return SCCRead(address, &mySCC);
-        }
-        else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
-        {
-            if (myConfig.machineType != MACHINE_MSX1)
+         if (bCartInPage[2])
+         {
+            // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
+            if (address >= 0x9800 && address <= 0x987F)
             {
-                return ~msx_subslot; // Compliment is returned
+                //TBD: this breaks Metal Gear 2 - Solid Snake. Leave it disabled for now...
+                // return SCCRead(address, &mySCC);
             }
         }
-        else if (special_ram_access & SPEC_RAM_SRAM_ACTIVE) // Don't need to check msx_mode as this can only be true in that mode
+    }
+    else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
+    {
+        if (bCartInPage[2]) return SCCRead(address, &mySCC);
+    }
+    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 0 where the BIOS / Extended BIOS sits
+    {
+        if (myConfig.machineType != MACHINE_MSX1)
         {
-            if ((address >= 0x8000) && (address <= 0xBFFF)) // Between 0x8000 and 0xBFFF
-            {
-              return SRAM_Memory[address&0x3FFF];
-            }
+            return ~msx_subslot; // Compliment is returned
         }
     }
 
@@ -224,7 +213,7 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 // 4000h~7FFFh  via writes to 6000h to 67FFh
 // 8000h~BFFFh  via writes to 7000h to 77FFh
 // -------------------------------------------------------------------------
-void HandleAscii16K(u32* src, u8 block, u16 address)
+ITCM_CODE void HandleAscii16K(u32* src, u8 block, u16 address)
 {
     if (bCartInPage[1] && (address & 0xF800) == 0x6000)
     {
@@ -235,24 +224,12 @@ void HandleAscii16K(u32* src, u8 block, u16 address)
     }
     else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
     {
-        // ---------------------------------------------------------------------------------------------------------
-        // Check if we have an SRAM capable game - those games (e.g. Hydlide II) use the block at 0x8000 for SRAM.
-        // In theory this 2K or 8K of SRAM is mirrored but we don't worry about it - just allow writes.
-        // ---------------------------------------------------------------------------------------------------------
-        if (msx_sram_enabled && (block == msx_sram_enabled))
+        MSXCartPtr[4] = (u8*)src;
+        MSXCartPtr[5] = (u8*)src+0x2000;
+        if (bCartInPage[2])
         {
-            special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
-        }
-        else
-        {
-            special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
-            MSXCartPtr[4] = (u8*)src;
-            MSXCartPtr[5] = (u8*)src+0x2000;
-            if (bCartInPage[2])
-            {
-                MemoryMap[4] = MSXCartPtr[4];
-                MemoryMap[5] = MSXCartPtr[5];
-            }
+            MemoryMap[4] = MSXCartPtr[4];
+            MemoryMap[5] = MSXCartPtr[5];
         }
     }
 }
@@ -410,32 +387,22 @@ void HandleSCCPlus(u16 address, u8 value)
 
 // ------------------------------------------------------------------
 // Write memory handles both normal writes and bankswitched since
-// write is much less common than reads...   We handle the MSX
+// write is much less common than reads... We handle the popular MSX
 // Konami 8K, SCC and ASCII 8K mappers directly here for max speed.
 // ------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u8 value,u16 address)
 {
-    if (bRAMInPage[address >> 14]) // RAM Exists... write it.
+    if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
     {
-        if (unlikely(special_ram_access & SPEC_RAM_SRAM_ACTIVE)) //TODO: make this a unique mapper... that doesn't set bRAMInPage[] true.
-        {
-            if ((address & 0xC000) == 0x8000)
-            {
-                SRAM_Memory[address&0x3FFF] = value;   // Write SRAM area
-                write_NV_counter = 4;                  // This will back the EE in 4 seconds of non-activity on the SRAM
-                return;
-            }
-        }
-
-        *(MemoryMap[address>>13] + (address&0x1FFF))=value;  // Allow write - this is a RAM mapped slot
+        *(MemoryMap[address>>13] + (address&0x1FFF))=value;
     }
-    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only for Slot 3 where Extended BIOS and Disk Controller sits
+    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when the Page 3 slot is expanded
     {
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
         return;
     }
-    else if (mapperMask)
+    else if (mapperMask) // Check if the cart has some special mapper properties (ASC8, ASC16, KON8, etc)
     {
         // -------------------------------------------------------------
         // Compute the block and offset of the new memory and we
@@ -511,44 +478,28 @@ ITCM_CODE void cpu_writemem16(u8 value,u16 address)
             }
             else if (bCartInPage[1] && ((address & 0xF800) == 0x7000))
             {
-                if (msx_sram_enabled && (block == msx_sram_enabled))
+                MSXCartPtr[4] = (u8*)src;  // Main ROM
+                MSXCartPtr[0] = (u8*)src;  // Mirror
+                if (bCartInPage[2])
                 {
-                    special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
+                    MemoryMap[4] = MSXCartPtr[4];
                 }
-                else
+                if (bCartInPage[0])
                 {
-                    special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
-                    MSXCartPtr[4] = (u8*)src;  // Main ROM
-                    MSXCartPtr[0] = (u8*)src;  // Mirror
-                    if (bCartInPage[2])
-                    {
-                        MemoryMap[4] = MSXCartPtr[4];
-                    }
-                    if (bCartInPage[0])
-                    {
-                        MemoryMap[0] = MSXCartPtr[0];
-                    }
+                    MemoryMap[0] = MSXCartPtr[0];
                 }
             }
             else if (bCartInPage[1] && ((address & 0xF800) == 0x7800))
             {
-                if (msx_sram_enabled && (block == msx_sram_enabled))
+                MSXCartPtr[5] = (u8*)src;  // Main ROM
+                MSXCartPtr[1] = (u8*)src;  // Mirror
+                if (bCartInPage[2])
                 {
-                    special_ram_access |= SPEC_RAM_SRAM_ACTIVE;
+                    MemoryMap[5] = MSXCartPtr[5];
                 }
-                else
+                if (bCartInPage[0])
                 {
-                    special_ram_access &= ~SPEC_RAM_SRAM_ACTIVE;
-                    MSXCartPtr[5] = (u8*)src;  // Main ROM
-                    MSXCartPtr[1] = (u8*)src;  // Mirror
-                    if (bCartInPage[2])
-                    {
-                        MemoryMap[5] = MSXCartPtr[5];
-                    }
-                    if (bCartInPage[0])
-                    {
-                        MemoryMap[1] = MSXCartPtr[1];
-                    }
+                    MemoryMap[1] = MSXCartPtr[1];
                 }
             }
         }

@@ -38,10 +38,9 @@ u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0
 u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
 u8 msx_beeper_process       __attribute__((section(".dtcm"))) = 0;
 u8 beeperWasOn              __attribute__((section(".dtcm"))) = 0;
-u8 msx_sram_enabled         __attribute__((section(".dtcm"))) = 0;
 u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
-u8 special_ram_access       __attribute__((section(".dtcm"))) = 0;
+u8 special_ram_access       __attribute__((section(".dtcm"))) = 0x00;
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
@@ -1006,6 +1005,8 @@ void MSX_InitialMemoryLayout(u32 romSize)
     Port_PPI_A = 0x00;
     Port_PPI_B = 0x00;
     Port_PPI_C = 0x00;
+    
+    special_ram_access = 0x00;
 
     msx_subslot = myConfig.machineType ? 0x00 : 0xFF;
 
@@ -1350,6 +1351,18 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }
+        else if (mapperType == ASC8SRAM2)
+        {
+            //tbd:zzz
+        }
+        else if (mapperType == ASC8SRAM8)
+        {
+            //tbd:zzz
+        }
+        else if (mapperType == ASC16SRAM8)
+        {
+            //tbd:zzz
+        }
         else if (mapperType == XEVIOUS)
         {
             MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1419,8 +1432,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
         {
             mapperMask = 0xFF;
         }
-
-        if (msx_sram_enabled) mapperMask = 0x3F;        // Override for SRAM which uses upper bits (4 or 5) to select
     }
     else
     {
