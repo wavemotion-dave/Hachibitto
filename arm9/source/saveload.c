@@ -253,6 +253,8 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(OccBuf,                 sizeof(OccBuf),                 1, handle);
         if (retVal) retVal = fwrite(nibbleLUT16,            sizeof(nibbleLUT16),            1, handle);
         if (retVal) retVal = fwrite(screen7LUT,             sizeof(screen7LUT),             1, handle);
+        if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
+        if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
 
         // -----------------------------------------------------------------------
         // Compress the 128K RAM data using 'high' compression ratio...
@@ -466,6 +468,8 @@ void msxLoadState(void)
             if (retVal) retVal = fread(OccBuf,                 sizeof(OccBuf),                 1, handle);
             if (retVal) retVal = fread(nibbleLUT16,            sizeof(nibbleLUT16),            1, handle);
             if (retVal) retVal = fread(screen7LUT,             sizeof(screen7LUT),             1, handle);
+            if (retVal) retVal = fread(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
+            if (retVal) retVal = fread(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
 
             // -----------------------------------------------------------------------
             // Restore Main RAM memory which was saved in a compressed format

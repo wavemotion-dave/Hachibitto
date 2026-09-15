@@ -25,6 +25,26 @@
 ;@      register behavior are implemented, same as the original
 ;@      driver - sccTestReg is storage only, matching the prior
 ;@      sccTestReg's level of support.
+;@    - sccChControl (0xAF, channel enable/"key on" mask) is now actually
+;@      enforced, but at mix time rather than write time: SCCMixer checks
+;@      each channel's enable bit every sample and treats a disabled
+;@      channel as volume 0 for that sample only, without touching the
+;@      stored sccChXVolume/Freq fields at all. sccKeyOnW and the VolW
+;@      handlers no longer modify Volume based on enable state - the raw
+;@      mask byte still auto-lands in sccChControl via SCCWrite's generic
+;@      register shadow-store, and that's all they need to do.
+;@        An earlier version of this fix did the muting at write time
+;@      instead (zeroing sccChXVolume in sccKeyOnW whenever a channel was
+;@      disabled). That fixed the original boot-time buzzing/static, but
+;@      broke any game that toggles the enable mask as a cheap per-note
+;@      gate without rewriting volume on every note (i.e. relying on the
+;@      chip to remember the last commanded volume/frequency across a
+;@      disable/re-enable, which is exactly what real SCC hardware does -
+;@      the enable register only gates output, it never clears the
+;@      registers themselves). That version showed up as intermittent
+;@      dropouts in music that previously played fine. Gating in the
+;@      mixer instead of at write time fixes the original bug without
+;@      that regression, since the stored registers are never destroyed.
 ;@    - Per-channel volume is no longer applied by self-modifying the
 ;@      mixer's own instructions (the old vol0-vol4 code-patch trick).
 ;@      SCCWrite now stores the precomputed volume into the existing
@@ -89,7 +109,10 @@ sccMixLoop:
 	mov r8,r3,lsl#18
 	subcs r3,r3,r8,asr#4
 	ldrb r9,[r2,#sccCh0Volume-sccStateStart]	;@ Volume (plain data - safe under concurrent SCCWrite)
-	cmp r9,#0
+	ldrb r8,[r2,#sccChControl-sccStateStart]	;@ Enable mask - gated here at mix time, not at
+	tst r8,#0x01					;@ write time, so a disabled channel's stored
+	moveq r9,#0					;@ volume/frequency survive untouched for whenever
+	cmp r9,#0					;@ it gets re-enabled without a fresh volume write.
 	ldrsbne lr,[r2,lr]			;@ Channel 0
 	mulne r9,lr,r9
 
@@ -98,7 +121,10 @@ sccMixLoop:
 	movs lr,r4,lsr#27
 	mov r8,r4,lsl#18
 	subcs r4,r4,r8,asr#4
-	ldrb r8,[r2,#sccCh1Volume-sccStateStart]	;@ Volume (plain data)
+	ldrb r8,[r2,#sccChControl-sccStateStart]	;@ Enable mask (r8 reused for volume just below -
+	tst r8,#0x02					;@ ldrb doesn't touch flags, so this tst's result
+	ldrb r8,[r2,#sccCh1Volume-sccStateStart]	;@ survives to the moveq after it)
+	moveq r8,#0
 	cmp r8,#0
 	ldrsbne lr,[r10,lr]			;@ Channel 1
 	mlane r9,r8,lr,r9
@@ -108,7 +134,10 @@ sccMixLoop:
 	movs lr,r5,lsr#27
 	mov r8,r5,lsl#18
 	subcs r5,r5,r8,asr#4
+	ldrb r8,[r2,#sccChControl-sccStateStart]	;@ Enable mask
+	tst r8,#0x04
 	ldrb r8,[r2,#sccCh2Volume-sccStateStart]	;@ Volume (plain data)
+	moveq r8,#0
 	cmp r8,#0
 	ldrsbne lr,[r11,lr]			;@ Channel 2
 	mlane r9,r8,lr,r9
@@ -118,7 +147,10 @@ sccMixLoop:
 	movs lr,r6,lsr#27
 	mov r8,r6,lsl#18
 	subcs r6,r6,r8,asr#4
+	ldrb r8,[r2,#sccChControl-sccStateStart]	;@ Enable mask
+	tst r8,#0x08
 	ldrb r8,[r2,#sccCh3Volume-sccStateStart]	;@ Volume (plain data)
+	moveq r8,#0
 	cmp r8,#0
 	ldrsbne lr,[r12,lr]			;@ Channel 3
 	mlane r9,r8,lr,r9
@@ -129,7 +161,10 @@ sccMixLoop:
 	mov r8,r7,lsl#18
 	subcs r7,r7,r8,asr#4
 	add r12,r12,#0x20			;@ Ch3 Wave base -> Ch4 Wave base (SCC+, independent)
+	ldrb r8,[r2,#sccChControl-sccStateStart]	;@ Enable mask
+	tst r8,#0x10
 	ldrb r8,[r2,#sccCh4Volume-sccStateStart]	;@ Volume (plain data)
+	moveq r8,#0
 	cmp r8,#0
 	ldrsbne lr,[r12,lr]			;@ Channel 4, own waveform (SCC+)
 	mlane r9,r8,lr,r9
@@ -361,10 +396,14 @@ sccCh4VolW:
 	adrne r1,SCCVolume
 	ldrbne r0,[r1,r0]
 	strb r0,[r2,#sccCh4Volume]	;@ plain data write - mixer reads it live
-;@----------------------------------------------------------------------------
-sccKeyOnW:
-;@----------------------------------------------------------------------------
 	bx lr
+;@----------------------------------------------------------------------------
+sccKeyOnW:				;@ 0xAF - channel enable/"key on" mask, bit0-4 = ch0-ch4
+;@----------------------------------------------------------------------------
+	bx lr				;@ the raw mask byte already lands in sccChControl
+					;@ via SCCWrite's generic register shadow-store above;
+					;@ nothing else to do here - SCCMixer is what actually
+					;@ enforces the mask now (see there for why).
 ;@----------------------------------------------------------------------------
 	.end
 #endif // #ifdef __arm__

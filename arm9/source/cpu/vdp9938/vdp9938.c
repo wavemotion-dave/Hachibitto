@@ -1256,13 +1256,13 @@ ITCM_CODE void RefreshLine7(register u8 uY)
 ITCM_CODE void RefreshLine8(register u8 uY)
 {
     DEBUG_REFRESH(8);
-    // -----------------------------------------------------------------
+    // -------------------------------------------------------------------
     // We purposely don't call RefreshLine() as we need the speed of a
     // direct rendering into XBuf[]. This could cause problems if we 
     // have sprites that clip at the left edge... but what can you do?!
     // It's unlikely there will be any kind of sprite tricks happening 
-    // for the Screen 8 mode so we're probably okay.
-    // -----------------------------------------------------------------
+    // for the Screen 8 mode so we're probably okay. Emulation isn't easy.
+    // -------------------------------------------------------------------
     if (!ScreenON)
     {
       memset(XBuf + (uY<<8), XPal[BGColor], 256);

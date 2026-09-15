@@ -39,7 +39,6 @@ typedef struct {
 #define NettouYakyuu        0xFF
 #define NEO8                0xFF
 #define NEO16               0xFF
-#define ASC16SRAM2          0xFF
 #define MIRRORED4000        0xFF
 #define HamarajaNight       0xFF
 #define YAMANOOTO           0xFF

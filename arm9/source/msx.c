@@ -1329,7 +1329,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 Mirror
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 Mirror
         }
-        else if (mapperType == ASC8)
+        else if ((mapperType == ASC8) || (mapperType == ASC8SRAM2) || (mapperType == ASC8SRAM8))
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
@@ -1340,7 +1340,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
         }
-        else if (mapperType == ASC16 || mapperType == ZEN16)
+        else if (mapperType == ASC16 || mapperType == ZEN16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8)
         {
             MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1350,18 +1350,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
             MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment Unmapped
-        }
-        else if (mapperType == ASC8SRAM2)
-        {
-            //tbd:zzz
-        }
-        else if (mapperType == ASC8SRAM8)
-        {
-            //tbd:zzz
-        }
-        else if (mapperType == ASC16SRAM8)
-        {
-            //tbd:zzz
         }
         else if (mapperType == XEVIOUS)
         {
@@ -1385,12 +1373,13 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
         }
-        else if (mapperType == SUPERLR)        // Just for Super Lode Runner (TODO: not working yet... strange cart, doesn't have to be visible to react!)
+        else if (mapperType == SUPERLR)        // Just for Super Lode Runner
         {
+            special_ram_access = SPEC_RAM_SUPERLR_ACTIVE;
             MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment Unmapped
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 0 default
             MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1402,28 +1391,28 @@ void MSX_InitialMemoryLayout(u32 romSize)
         // ---------------------------------------------------------------------
         if (romSize <= (128 * 1024))
         {
-            if (mapperType == ASC16 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS)
+            if (mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS)
                 mapperMask = (romSize <= (64 * 1024)) ? 0x03:0x07;
             else
                 mapperMask = (romSize <= (64 * 1024)) ? 0x07:0x0F;
         }
         else if (romSize <= (512 * 1024))
         {
-            if (mapperType == ASC16 || mapperType == ZEN16 || mapperType == XEVIOUS)
+            if (mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16 || mapperType == XEVIOUS || mapperType == SUPERLR)
                 mapperMask = (romSize <= (256 * 1024)) ? 0x0F:0x1F;
             else
                 mapperMask = (romSize <= (256 * 1024)) ? 0x1F:0x3F;
         }
         else if (romSize <= (1024 * 1024))
         {
-            if (mapperType == ASC16 || mapperType == ZEN16)
+            if (mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16)
                 mapperMask = 0x3F;
             else
                 mapperMask = 0x7F;
         }
         else if (romSize <= (2048 * 1024))
         {
-            if (mapperType == ASC16 || mapperType == ZEN16)
+            if (mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16)
                 mapperMask = 0x7F;
             else
                 mapperMask = 0xFF;
@@ -1438,8 +1427,19 @@ void MSX_InitialMemoryLayout(u32 romSize)
         // Size not right for MSX support... we've already pre-filled 0xFF so nothing more to do here... System will not run.
     }
 
+    // --------------------------------------------------------------------------
     // Some mappers have 8K blocks, some have 16K blocks... sort that out here.
-    msx_block_size = ((mapperType == ASC16 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS) ? 0x4000:0x2000);
+    // --------------------------------------------------------------------------
+    msx_block_size = ((mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16 || 
+                       mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS) ? 0x4000:0x2000);
+                       
+    // ---------------------------------------------------------------------------------------------------------
+    // If we are dealing with one of the rare SRAM games, read the SRAM file from the SD card back into memory.
+    // ---------------------------------------------------------------------------------------------------------
+    if ((mapperType == ASC8SRAM2) || (mapperType == ASC8SRAM8) || (mapperType == ASC16SRAM2) || (mapperType == ASC16SRAM8))
+    {
+        msxLoadEEPROM();
+    }
 }
 
 // ------------------------------------------------------------------------------------
@@ -1488,7 +1488,20 @@ void SCC_LegacyWrite(u8 value, u16 address)
     {
         SCCWrite(value, off + 0x20, &mySCC);
     }
-    // 0x90-0xFF: mirrors/deform area in classic mode - not worth modeling further
+    else if (off == 0x9F)
+    {
+        // Channel Control/Muted Bits
+        debug[0]++;
+    }
+    else if (off >= 0xE0)
+    {
+        // Deformation / Test Register
+        debug[1]++;
+    }
+    else
+    {
+        debug[2]++; // One of the Mirrors!!
+    }
 }
 
 
@@ -1561,8 +1574,8 @@ void msxSaveEEPROM(void)
     FILE *handle = fopen(szName, "wb+");
     if (handle != NULL)
     {
-      fwrite(SRAM_Memory, sizeof(SRAM_Memory), 1, handle);
-      fclose(handle);
+        fwrite(SRAM_Memory, 0x2000, 1, handle);   // SRAM is either 2K or 8K
+        fclose(handle);
     }
 }
 
@@ -1583,9 +1596,9 @@ void msxLoadEEPROM(void)
     szName[len-1] = 'm';
     szName[len-0] = 0;
 
-    if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0) == 0)
+    if (ReadFileCarefully(szName, SRAM_Memory, 0x2000, 0) == 0)
     {
-      memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
+        memset(SRAM_Memory, 0xFF, 0x2000);
     }
 }
 

@@ -10,6 +10,9 @@
 
 extern Z80 CPU;
 
+extern u8 sram_write_enabled_a;
+extern u8 sram_write_enabled_b;
+
 extern void ClearCPUInterrupt(void);
 
 extern void cpu_writeport16(register unsigned short Port,register unsigned char Value);

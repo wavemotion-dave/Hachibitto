@@ -107,6 +107,7 @@ extern u8 special_ram_access;
 #define SPEC_RAM_SUBSLOT_ACTIVE     0x01
 #define SPEC_RAM_SCC_ENABLED        0x02
 #define SPEC_RAM_SCC_PLUS_ENABLED   0x04
+#define SPEC_RAM_SUPERLR_ACTIVE     0x08
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -141,11 +142,12 @@ extern u8 msx_kana_lock;
 #define XEVIOUS         10
 #define ASC8SRAM8       11
 #define ASC8SRAM2       12
-#define ASC16SRAM8      13
-#define AT0K            14
-#define AT4K            15
-#define AT8K            16
-#define LIN64           17
+#define ASC16SRAM2      13
+#define ASC16SRAM8      14
+#define AT0K            15
+#define AT4K            16
+#define AT8K            17
+#define LIN64           18
 #define SCCPLUS_RAM     88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data

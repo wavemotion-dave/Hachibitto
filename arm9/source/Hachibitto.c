@@ -72,7 +72,8 @@ u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for
 u8 BIOS_Memory[0x8000]                ALIGN(32) = {0};        // To hold our BIOS and related OS memory - always in the lower 32K memory region
 u8 SRAM_Memory[0x10000]               ALIGN(32) = {0};        // SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
 
-u8 io_show_status = 0;  // Used to indicate a RD/WR status for various disk/tape activities
+u8 io_show_status = 0;      // Used to indicate a disk activity icons
+u8 sram_show_status = 0;    // Used to show SRAM icon
 
 static char cmd_line_file[256];
 char initial_file[MAX_ROM_NAME] = "";
@@ -80,7 +81,6 @@ char initial_path[MAX_ROM_NAME] = "";
 
 u8 msx_caps_lock        = 0;
 u8 msx_kana_lock        = 0;
-u8 write_NV_counter     = 0;
 
 u8   disk_unsaved_data[2]      = {0,0};
 
@@ -501,8 +501,6 @@ void ResetMSX(void)
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
     
-    write_NV_counter=0;                   // Nothing to write for EEPROM yet
-    
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it
     
@@ -521,6 +519,8 @@ void ResetMSX(void)
     TIMER2_CR=TIMER_ENABLE  | TIMER_DIV_1024;
     timingFrames  = 0;
     skip_render = 0;
+    io_show_status = 0;
+    sram_show_status = 0;    
 }
 
 //*********************************************************************************
@@ -636,23 +636,30 @@ void DisplayStatusLine(bool bForce)
             DSPrint(20,1,6, "   "); // Clear Disk icon
         }
     }
+    else
+    {
+        if (sram_show_status)
+        {
+            DSPrint(20,0,2, "'()");  // Show SRAM icon
+            DSPrint(20,1,2, "GHI");  // Show SRAM icon
+            if (--sram_show_status == 0)
+            {
+                // Save EE now!
+                msxSaveEEPROM();                
+            }
+        }
+        else
+        {
+            DSPrint(20,0,6, "   "); // Clear SRAM icon
+            DSPrint(20,1,6, "   "); // Clear SRAM icon
+        }
+    }
 
-    if (io_show_status == 0)
+    if ((io_show_status == 0) && (sram_show_status == 0))
     {
         // SCC has a little cool graphic to go with it!
         DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
         DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
-    }
-
-    if (write_NV_counter > 0)
-    {
-        --write_NV_counter;
-        if (write_NV_counter == 0)
-        {
-            // Save EE now!
-            msxSaveEEPROM();
-        }
-        DSPrint(21,0,6, (write_NV_counter ? "EE":"  "));
     }
 
     if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
@@ -1849,8 +1856,6 @@ u8 msxInit(char *szGame)
      uVide=0;
      dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
     }
-
-    write_NV_counter=0;
 
     // loadrom() will figure out how big and where to load it...
     RetFct = loadrom(szGame);
