@@ -1130,38 +1130,38 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         if (mapperType == AT4K)  // Load the 16K rom at 0x4000 without Mirrors
         {
-                MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
                 MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
-                MSXCartPtr[4] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[5] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[4] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
         else if (mapperType == AT8K) // Load the 16K rom at 0x8000 without Mirrors
         {
-                MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[2] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[3] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
                 MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
-                MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
         else // This game loads with MIRRORS active
         {
             if (msx_basic)  // Basic Game loads at 0x8000 without Mirrors
             {
-                MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[2] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[3] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
                 MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
-                MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-                MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
+                MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
             }
             else    // Mirrors every 16K
             {
@@ -1191,34 +1191,34 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
             MSXCartPtr[2] = (u8*)ROM_Memory+0x4000;        // Segment 2
             MSXCartPtr[3] = (u8*)ROM_Memory+0x6000;        // Segment 3
-            MSXCartPtr[4] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[5] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
+            MSXCartPtr[4] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
         else  if (mapperType == AT4K)  // Then the full 32K ROM is mapped here
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
             MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
             MSXCartPtr[4] = (u8*)ROM_Memory+0x4000;        // Segment 2
             MSXCartPtr[5] = (u8*)ROM_Memory+0x6000;        // Segment 3
-            MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[7] = (u8*)ROM_Memory+0xC000;        // Segment NA
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
         else if (mapperType == AT8K)  // Then the full 32K ROM is mapped here
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[1] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[2] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[3] = (u8*)ROM_Memory+0xC000;        // Segment NA
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
             MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
             MSXCartPtr[6] = (u8*)ROM_Memory+0x4000;        // Segment 2
             MSXCartPtr[7] = (u8*)ROM_Memory+0x6000;        // Segment 3
         }
-        else
+        else // MIRRORED (in some way)
         {
             if (msx_init >= 0x4000 || msx_basic) // This comes from the .ROM header - if the init address is 0x4000 or higher, we load in bank 1+2
             {
@@ -1301,8 +1301,8 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[3] = (u8*)ROM_Memory+0x6000;        // Segment 3
             MSXCartPtr[4] = (u8*)ROM_Memory+0x8000;        // Segment 4
             MSXCartPtr[5] = (u8*)ROM_Memory+0xA000;        // Segment 5
-            MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment NA
-            MSXCartPtr[7] = (u8*)ROM_Memory+0xE000;        // Segment NA
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
     }
     else if ((romSize == (64 * 1024)) && (mapperType == LIN64))   // 64K Linear ROM
@@ -1473,6 +1473,7 @@ void MSX_HandleBeeper(void)
 // ---------------------------------------------------------------------------
 void SCC_LegacyWrite(u8 value, u16 address)
 {
+    debug_printf("SCC %04X = %02X\n", address, value);
     u8 off = address & 0xFF;
 
     if (off < 0x60)                        // Ch0-Ch2 wave RAM - untouched by the layout shift
@@ -1493,10 +1494,11 @@ void SCC_LegacyWrite(u8 value, u16 address)
         // Channel Control/Muted Bits
         debug[0]++;
     }
-    else if (off >= 0xE0)
+    else if (off == 0xE0)
     {
         // Deformation / Test Register
         debug[1]++;
+        debug[10] = 100+value;
     }
     else
     {

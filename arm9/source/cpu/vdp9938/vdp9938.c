@@ -1346,17 +1346,34 @@ void CheckNewMode(void)
   OH = SprHeights[VDP[1]&0x03];
   IH = SprHeights[VDP[1]&0x02];
 
-  u32 I=(ScrMode>6) ? 11:10;
-  ChrTab=VDP_Memory+(((int)(VDP[2]&SCR[ScrMode].R2)<<I));
-  ChrGen=VDP_Memory+(((int)(VDP[4]&SCR[ScrMode].R4)<<11));
-  ColTab=VDP_Memory+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
-  SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
-  SprGen=VDP_Memory+((int)(VDP[6]<<11));
+  if (myConfig.machineType == MACHINE_MSX1)
+  {
+      u32 VRAMMask = 0x3FFF;
+      ChrTab=VDP_Memory+(((int)(VDP[2]&SCR[ScrMode].R2)<<10)&VRAMMask);
+      ColTab=VDP_Memory+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)&VRAMMask);
+      ChrGen=VDP_Memory+(((int)(VDP[4]&SCR[ScrMode].R4)<<11)&VRAMMask);
+      SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)&VRAMMask);
+      SprGen=VDP_Memory+(((int)(VDP[6])<<11)&VRAMMask);
+        
+      ChrTabM = ((int)(VDP[2]|(u8)~SCR[ScrMode].M2)<<10)|0x03FF;
+      ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x003F;
+      ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
+      SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x007F;
+  }
+  else
+  {
+      u32 I=(ScrMode>6) ? 11:10;
+      ChrTab=VDP_Memory+(((int)(VDP[2]&SCR[ScrMode].R2)<<I));
+      ChrGen=VDP_Memory+(((int)(VDP[4]&SCR[ScrMode].R4)<<11));
+      ColTab=VDP_Memory+(((int)(VDP[3]&SCR[ScrMode].R3)<<6)) + ((int)VDP[10]<<14);
+      SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)) + ((int)VDP[11]<<15);
+      SprGen=VDP_Memory+((int)(VDP[6]<<11));
 
-  ChrTabM = ((int)(VDP[2]|(u8)~SCR[ScrMode].M2)<<I)|((1<<I)-1);
-  ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
-  ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
-  SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
+      ChrTabM = ((int)(VDP[2]|(u8)~SCR[ScrMode].M2)<<I)|((1<<I)-1);
+      ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
+      ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
+      SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
+  }
   
   handle_transparency();
   if (ScrMode < 4) RebuildLutTablehh();
@@ -1705,7 +1722,7 @@ void Reset9938(void)
             u8 b2 = (VDP9938A_palette[idx*3+2] >> 6) & 0x03;
 
             u8 byte = (g3 << 5) | (r3 << 2) | b2;
-            XPal[idx] = byte ? byte : 1;   // avoid the DS's hardware-transparent index 0
+            XPal[idx] = byte;
         }
     }
     
@@ -1718,33 +1735,47 @@ void Reset9938(void)
     BuildNibbleLUT();
     BuildScreen7LUT();
     
-    memset(OccBuf,0,sizeof(OccBuf));
+    memset(OccBuf, 0x00, sizeof(OccBuf));
 
-    VDP[0] = 0x00;                      // Graphic mode enabled
-    VDP[1] = 0x10;                      // 16K VRAM, IRQ enable, high-res mode
-    VDP[2] = 0xFF;                      // Name table for text modes
-    VDP[3] = 0xFF;                      // Color table
-    VDP[4] = 0xFF;                      // Pattern generator
-    VDP[5] = 0xFF;                      // Sprite attribute table
-    VDP[6] = 0x00;                      // Sprite generator table
-    VDP[7] = 0x00;                      // FG/BG colors
+    if (myConfig.machineType == MACHINE_MSX1)
+    {
+        VDP[0] = 0x00;                      // Control Bits I:  Graphics Mode 1 (M3... M1,M2 in VDP[1])
+        VDP[1] = 0x80;                      // Control Bits II: Force 16K Video Memory (M2,M3 zero)
+        VDP[2] = 0x06;                      // Default for pattern table base address
+        VDP[3] = 0x80;                      // Default for color table base address
+        VDP[4] = 0x00;                      // Default for pattern generator base address
+        VDP[5] = 0x36;                      // Default for sprite attribute table base address
+        VDP[6] = 0x07;                      // Default for sprite generator table base address
+        VDP[7] = 0x00;                      // FG color and BG color both 0x00 to start
+    }
+    else // MSX2 defaults...
+    {
+        VDP[0] = 0x00;                      // Graphic mode enabled
+        VDP[1] = 0x10;                      // 128K VRAM, IRQ enable, high-res mode
+        VDP[2] = 0xFF;                      // Name table for text modes
+        VDP[3] = 0xFF;                      // Color table
+        VDP[4] = 0xFF;                      // Pattern generator
+        VDP[5] = 0xFF;                      // Sprite attribute table
+        VDP[6] = 0x00;                      // Sprite generator table
+        VDP[7] = 0x00;                      // FG/BG colors
+    }
 
-    VDPCtrlLatch=0;
-    VAddr = 0x0000;
-    FGColor=BGColor=0;
-    ScrMode=0;                          // Default to Screen 0 for VDP9938
-    CurLine=0;
-    ChrTab=ColTab=ChrGen=VDP_Memory;
-    SprTab=SprGen=VDP_Memory;
-    VDPDlatch = 0;
-    VPAGE=VDP_Memory;                           /* VRAM page        */
-    frame_number = 0;
-    msx_irq_pending = 0;
+    VDPCtrlLatch=0;                         // Control Latch zero
+    VDPDlatch = 0;                          // Data Latch zero
+    VAddr = 0x0000;                         // Video Address zero
+    FGColor=BGColor=0;                      // Colors zero
+    ScrMode=0;                              // Default to Screen 0 for VDP9938
+    CurLine=0;                              // Start at line 0
+    ChrTab=ColTab=ChrGen=VDP_Memory;        // Character Table/Generator pointing to start of Video Memory
+    SprTab=SprGen=VDP_Memory;               // Sprite Table/Generator pointing to start of Video Memory
+    VPAGE=VDP_Memory;                       // VPAGE starts off pointing to start of Video Memory
+    frame_number = 0;                       // Zero frame counter
+    msx_irq_pending = 0;                    // No IRQs pending
 
-    ChrTabM = 0x3FFF;
-    ColTabM = 0x3FFF;
-    ChrGenM = 0x3FFF;
-    SprTabM = 0x3FFF;
+    ChrTabM = 0x3FFF;                       // Default Mask
+    ColTabM = 0x3FFF;                       // Default Mask
+    ChrGenM = 0x3FFF;                       // Default Mask
+    SprTabM = 0x3FFF;                       // Default Mask
 
     RefreshLine = RefreshLine0;
 
