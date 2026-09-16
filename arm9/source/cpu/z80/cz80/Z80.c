@@ -66,7 +66,6 @@ inline byte RdZ80(word A)   {return (special_ram_access ? cpu_readmem16(A) : *(M
 #define S(Fl)        CPU.AF.B.l|=Fl
 #define R(Fl)        CPU.AF.B.l&=~(Fl)
 #define FLAGS(Rg,Fl) CPU.AF.B.l=Fl|ZSTable[Rg]
-#define INCR(N)      //We don't bother to increment R. Nothing worthwhile uses it and we simply simulate the value when a caller asks for it.
 
 #define M_RLC(Rg)      \
   CPU.AF.B.l=Rg>>7;Rg=(Rg<<1)|CPU.AF.B.l;CPU.AF.B.l|=PZSTable[Rg]
@@ -334,10 +333,6 @@ static void CodesCB(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesCB[I];
-  CPU.TotalCycles+=CyclesCB[I];
-
-  /* R register incremented on each M1 cycle */
-  INCR(1);
 
   switch(I)
   {
@@ -357,7 +352,6 @@ static void CodesDDCB(void)
   J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXXCB[I];
-  CPU.TotalCycles+=CyclesXXCB[I];
 
   switch(I)
   {
@@ -378,7 +372,6 @@ static void CodesFDCB(void)
   J.W=CPU.XX.W+(offset)OpZ80(CPU.PC.W++);
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXXCB[I];
-  CPU.TotalCycles+=CyclesXXCB[I];
 
   switch(I)
   {
@@ -397,10 +390,6 @@ static void CodesED(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesED[I];
-  CPU.TotalCycles+=CyclesED[I];
-
-  /* R register incremented on each M1 cycle */
-  INCR(1);
 
   switch(I)
   {
@@ -421,10 +410,6 @@ static void CodesDD(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXX[I];
-  CPU.TotalCycles+=CyclesXX[I];
-
-  /* R register incremented on each M1 cycle */
-  INCR(1);
 
   switch(I)
   {
@@ -449,10 +434,6 @@ static void CodesFD(void)
   /* Read opcode and count cycles */
   I=OpZ80(CPU.PC.W++);
   CPU.ICount-=CyclesXX[I];
-  CPU.TotalCycles+=CyclesXX[I];
-
-  /* R register incremented on each M1 cycle */
-  INCR(1);
 
   switch(I)
   {
@@ -475,29 +456,29 @@ static void CodesFD(void)
 /*************************************************************/
 void ResetZ80(Z80 *R)
 {
-  CPU.PC.W     = 0x0000;
-  CPU.SP.W     = 0xF000;
-  CPU.AF.W     = 0x0000;
-  CPU.BC.W     = 0x0000;
-  CPU.DE.W     = 0x0000;
-  CPU.HL.W     = 0x0000;
-  CPU.AF1.W    = 0x0000;
-  CPU.BC1.W    = 0x0000;
-  CPU.DE1.W    = 0x0000;
-  CPU.HL1.W    = 0x0000;
-  CPU.IX.W     = 0x0000;
-  CPU.IY.W     = 0x0000;
-  CPU.I        = 0x00;
-  CPU.R        = 0x00;
-  CPU.R_HighBit= 0x00;
-  CPU.IFF      = 0x00;
-  CPU.IBackup  = 0;
-  CPU.ICount   = CPU.IPeriod = 0;
-  CPU.IRequest = INT_NONE;
-  CPU.NumInts     = 0;
-  CPU.Trace    = 0;
-  CPU.TrapBadOps = 1;
-  CPU.TotalCycles = 0;
+  CPU.PC.W              = 0x0000;
+  CPU.SP.W              = 0xF000;
+  CPU.AF.W              = 0x0000;
+  CPU.BC.W              = 0x0000;
+  CPU.DE.W              = 0x0000;
+  CPU.HL.W              = 0x0000;
+  CPU.AF1.W             = 0x0000;
+  CPU.BC1.W             = 0x0000;
+  CPU.DE1.W             = 0x0000;
+  CPU.HL1.W             = 0x0000;
+  CPU.IX.W              = 0x0000;
+  CPU.IY.W              = 0x0000;
+  CPU.I                 = 0x00;
+  CPU.R                 = 0x00;
+  CPU.R_HighBit         = 0x00;
+  CPU.IFF               = 0x00;
+  CPU.IBackup           = 0;
+  CPU.ICount            = CPU.IPeriod = 0;
+  CPU.IRequest          = INT_NONE;
+  CPU.NumInts           = 0;
+  CPU.Trace             = 0;
+  CPU.TrapBadOps        = 1;
+  CPU.TotalInstructions = 0;
 
   JumpZ80(CPU.PC.W);
 }
@@ -520,10 +501,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=OpZ80(CPU.PC.W++);
       CPU.ICount-=Cycles[I];
-      CPU.TotalCycles+=Cycles[I];
-
-      /* R register incremented on each M1 cycle */
-      INCR(1);
+      CPU.TotalInstructions++;  // Only counting base instructions... good enough
 
       /* Interpret opcode */
       switch(I)

@@ -47,10 +47,13 @@ extern u8 disk_unsaved_data[];
 #define ST_NOT_READY     0x80   // 1 = Not Ready, 0 = Ready
 
 // ---------------------------------------------------------------------------
-// Cycle-accurate FDC timing. CPU.TotalCycles is a free-running Z80 T-state
+// Cycle-accurate FDC timing. CPU.TotalInstructions is a free-running Z80 T-state
 // counter that never resets, so we can timestamp "when is the next byte/step
 // allowed" and compare against it on every access -- pacing no longer depends
 // on how often (or how unevenly) a given disk driver polls the FDC ports.
+// Note we are only tracking CPU.TotalInstructions which is just the number of
+// base M1 instructions processed. We multiply by 8 to get a VERY rough cycle
+// count. It's not accurate but it's good enough for rough FDC timing.
 // ---------------------------------------------------------------------------
 #define FDC_CPU_CLOCK        3579545                                  // Z80 clock, NTSC
 #define FDC_DATA_RATE_BPS    250000                                   // MSX double-density (MFM)
@@ -60,16 +63,12 @@ extern u8 disk_unsaved_data[];
 void fdc_debug(u8 bWrite, u8 addr, u8 data)
 {
 #if 0 // Set to 1 to enable debug
-    char tmpBuf[33];
-    static u8 line=0;
     static u8 idx=0;
 
     if (bWrite)
-        sprintf(tmpBuf, "W%04d %d=%02X  %02X %02X %02X %d %02X %d", idx++, addr, data, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
+        debug_printf(tmpBuf, "W%04d %d=%02X  %02X %02X %02X %d %02X %d\n", idx++, addr, data, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
     else
-        sprintf(tmpBuf, "R%04d %d     %02X %02X %02X %d %02X %d", idx++, addr, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
-    DSPrint(0,5+line++, 7, tmpBuf);
-    line = line % 19;
+        debug_printf(tmpBuf, "R%04d %d     %02X %02X %02X %d %02X %d\n", idx++, addr, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
 #endif
 }
 
@@ -158,7 +157,7 @@ void fdc_state_machine(void)
     // Cycle-based busy gate: bail out, touching nothing, until the deadline
     // for the current step/byte has actually elapsed.
     if (!(FDC.status & ST_BUSY)) return;
-    if ((s32)(CPU.TotalCycles - FDC.cycle_deadline) < 0) return;
+    if ((s32)((CPU.TotalInstructions*8) - FDC.cycle_deadline) < 0) return;
 
     switch(FDC.command & 0xF0)
     {
@@ -179,7 +178,8 @@ void fdc_state_machine(void)
             }
             else // Inwards
             {
-                FDC.track++;
+                if (FDC.track < (Geom.tracks-1)) FDC.track++;
+                fdc_buffer_track();
             }
             FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
             break;
@@ -187,7 +187,8 @@ void fdc_state_machine(void)
         case 0x40: // Step in
         case 0x50: // Step in
             FDC.stepDirection = 0; // Step inwards
-            FDC.track++;
+            if (FDC.track < (Geom.tracks-1)) FDC.track++;
+            fdc_buffer_track();
             FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
             break;
 
@@ -213,10 +214,15 @@ void fdc_state_machine(void)
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);              // Data Ready and no errors... still busy
                     FDC.data = FDC.track_buffer[FDC.track_buffer_idx++]; // Read data from our track buffer
                     FDC.wait_for_read = 1;                               // Wait for the CPU to fetch the data
-                    FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;  // Pace the next byte
+                    FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_CYCLES_PER_BYTE;  // Pace the next byte
                     if (++FDC.sector_byte_counter >= Geom.sectorSize)    // Did we cross a sector boundary?
                     {
                         if (FDC.command & 0x10) FDC.sector++;       // Bump the sector number only if multiple sector command
+                        if (FDC.sector >= Geom.sectors)             // If we reached the last sector... bump the track
+                        {
+                            if (FDC.track < (Geom.tracks-1)) FDC.track++;
+                            fdc_buffer_track();
+                        }
                         FDC.sector_byte_counter = 0;                // And reset our counter
                     }
                 }
@@ -229,7 +235,7 @@ void fdc_state_machine(void)
             {
                 FDC.status |= (ST_BUSY | ST_INDEX_DRQ);   // We're good to accept data now
                 FDC.wait_for_write = 1;                   // And start looking for data
-                FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;  // Pace first byte
+                FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_CYCLES_PER_BYTE;  // Pace first byte
             }
             else if (FDC.wait_for_write == 0)
             {
@@ -247,10 +253,15 @@ void fdc_state_machine(void)
                 {
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);  // Data Ready and no errors... still busy
                     FDC.wait_for_write = 1;                  // Wait for the CPU to give us more data
-                    FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;  // Pace next byte
+                    FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_CYCLES_PER_BYTE;  // Pace next byte
                     if (++FDC.sector_byte_counter >= Geom.sectorSize)   // Did we cross a sector boundary?
                     {
                         if (FDC.command & 0x10) FDC.sector++;   // Bump the sector number only if multiple sector command
+                        if (FDC.sector >= Geom.sectors)             // If we reached the last sector... bump the track
+                        {
+                            if (FDC.track < (Geom.tracks-1)) FDC.track++;
+                            fdc_buffer_track();
+                        }
                         FDC.sector_byte_counter = 0;            // And reset our counter
                     }
                 }
@@ -281,7 +292,7 @@ void fdc_state_machine(void)
 //         3                 ------- Data ---------
 u8 fdc_read(u8 addr)
 {
-    if (FDC.drive >= Geom.drives) return ST_NOT_READY; // Make sure this is a valid drive
+    if (FDC.drive >= Geom.drives) {if (addr == 4) return 0x7F; else return ST_NOT_READY;} // Make sure this is a valid drive
 
     fdc_state_machine();    // Clock the floppy drive controller state machine
 
@@ -340,8 +351,11 @@ void fdc_write(u8 addr, u8 data)
             break;
         case 4: //  D4h is Write-only. xxMSDDDD where Bit0 activates Drive A, Bit1 activates Drive B, etc.
             FDC.drive = (data & 0x01 ? 0:1);
-            FDC.side  = (data & 0x10 ? 1:0);
-            FDC.motor = (data & 0x20 ? 1:0);
+            if (FDC.drive < Geom.drives) // Don't record the side/motor bits if this drive isn't valid for us
+            {
+                FDC.side  = (data & 0x10 ? 1:0);
+                FDC.motor = (data & 0x20 ? 1:0);
+            }
             break;
         default: break;
     }
@@ -370,7 +384,7 @@ void fdc_write(u8 addr, u8 data)
         {
             FDC.commandType = 1;                            // Type-I command
             FDC.status = (data & 0x08) ? (ST_BUSY | ST_HEAD_ENGAGED) : ST_BUSY; // Busy, check if we engage the head
-            FDC.cycle_deadline = CPU.TotalCycles + FDC_STEP_CYCLES;  // Paces Restore/Seek/Step/StepIn/StepOut alike
+            FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_STEP_CYCLES;  // Paces Restore/Seek/Step/StepIn/StepOut alike
 
             if ((data&0xF0) == 0x00)                        // Restore (Seek Track 0)
             {
@@ -408,7 +422,7 @@ void fdc_write(u8 addr, u8 data)
                 FDC.track_buffer_end = (data & 0x10) ? (Geom.sectorSize*Geom.sectors) : (FDC.track_buffer_idx+Geom.sectorSize);
                 FDC.wait_for_read = 0;                                                      // Start fetching data
                 FDC.sector_byte_counter = 0;                                                // Reset our fetch counter
-                FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;                 // Pace first byte
+                FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_CYCLES_PER_BYTE;                 // Pace first byte
                 if (io_show_status == 0) io_show_status = 4;                                // And let the world know we are reading...
             }
             else if (((data&0xF0) == 0xA0) || ((data&0xF0) == 0xB0)) // Write Sector... either single or multiple
@@ -418,7 +432,7 @@ void fdc_write(u8 addr, u8 data)
                 FDC.track_buffer_end = (data & 0x10) ? (Geom.sectorSize*Geom.sectors) : (FDC.track_buffer_idx+Geom.sectorSize);
                 FDC.sector_byte_counter = 0;                                                // Reset our sector byte counter
                 FDC.wait_for_write = 3;                                                     // Start the Write Process... we will allow data shortly
-                FDC.cycle_deadline = CPU.TotalCycles + FDC_CYCLES_PER_BYTE;                 // Pace first byte
+                FDC.cycle_deadline = (CPU.TotalInstructions*8) + FDC_CYCLES_PER_BYTE;                 // Pace first byte
                 io_show_status = 5;                                                         // And let the world know we are writing...
             }
             else if ((data&0xF0) == 0xE0) // Read Track

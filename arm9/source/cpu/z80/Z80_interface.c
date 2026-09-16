@@ -466,10 +466,10 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     }
     else if (bCartInPage[2] && ((address & 0xF800) == 0x9000))
     {
-        // -----------------------------------------------------------------------
-        // Bit 5 is the only bit that is required to map SCC registers into view.
+        // --------------------------------------------------------------------------------------------------
+        // For standard SCC carts we require the full 0x3F to be programmed to enable the SCC register view.
         // And yes, the banking logic below is still always called...
-        // -----------------------------------------------------------------------
+        // --------------------------------------------------------------------------------------------------
         if ((value & 0x3F) == 0x3F)
         {
             special_ram_access |= SPEC_RAM_SCC_ENABLED;  // SCC Registers are now "in view"
@@ -616,7 +616,7 @@ void HandleSCCPlusModeRegister(u8 value)
     sccplus_mode = value;
 
     // Bit5 alone decides which window shows the audio registers
-    if ((value & 0x3F) == 0x3F)
+    if ((value & 0x20))
     {
         special_ram_access &= ~SPEC_RAM_SCC_ENABLED;
         special_ram_access |= SPEC_RAM_SCC_PLUS_ENABLED;

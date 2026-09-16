@@ -1488,21 +1488,7 @@ void SCC_LegacyWrite(u8 value, u16 address)
     {
         SCCWrite(value, off + 0x20, &mySCC);
     }
-    else if (off == 0x9F)
-    {
-        // Channel Control/Muted Bits
-        debug[0]++;
-    }
-    else if (off == 0xE0)
-    {
-        // Deformation / Test Register
-        debug[1]++;
-        debug[10] = 100+value;
-    }
-    else
-    {
-        debug[2]++; // One of the Mirrors!!
-    }
+    // Otherwise it's one of the mirrors or deformation registers which we aren't emulating yet...
 }
 
 

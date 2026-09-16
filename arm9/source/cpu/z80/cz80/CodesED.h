@@ -106,7 +106,7 @@ case LD_A_I:
   break;
 
 case LD_A_R:
-  CPU.R = (CPU.R & 0x80) + (CPU.TotalCycles / 8) % 127; CPU.AF.B.h=(CPU.R&0x7F) | CPU.R_HighBit;  // The R is a 7-bit refresh counter with a 'secret' flag at the high bit that a few odd games take advantage of
+  CPU.R = (CPU.R & 0x80) + (CPU.TotalInstructions & 0x7F); CPU.AF.B.h=(CPU.R&0x7F) | CPU.R_HighBit;  // The R is a 7-bit refresh counter with a 'secret' flag at the high bit that a few odd games take advantage of
   CPU.AF.B.l=(CPU.AF.B.l&C_FLAG)|(CPU.IFF&IFF_2? P_FLAG:0)|ZSTable[CPU.AF.B.h];
   break;
 
@@ -189,7 +189,6 @@ case OTIR:
   {
     CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
     CPU.ICount+=5;
-    CPU.TotalCycles-=5;
   }
   break;
 
@@ -213,7 +212,6 @@ case OTDR:
   {
     CPU.AF.B.l=(CPU.AF.B.l & S_FLAG) | Z_FLAG | (I&0x80 ? N_FLAG:0) | (CPU.HL.B.l+I>255? (C_FLAG|H_FLAG):0);
     CPU.ICount+=5;
-    CPU.TotalCycles-=5;
   }
   break;
 
@@ -234,7 +232,6 @@ case LDIR:
   {
     CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
     CPU.ICount+=5;
-    CPU.TotalCycles-=5;
   }
   break;
 
@@ -256,7 +253,6 @@ case LDDR:
   {
     CPU.AF.B.l&=~(N_FLAG|H_FLAG|P_FLAG);
     CPU.ICount+=5;
-    CPU.TotalCycles-=5;
   }
   break;
 
