@@ -23,8 +23,8 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-u8 sram_write_enabled_a = 0; //TODO: save this in saveload.c? probably
-u8 sram_write_enabled_b = 0;
+u8 sram_write_enabled_a = 0; // Is SRAM writable in segment A (many SRAM games allow writes in 2 segments)
+u8 sram_write_enabled_b = 0; // Is SRAM writable in segment B (many SRAM games allow writes in 2 segments)
 
 // ----------------------------------------------------------------
 // All memory fetches run through this except OP codes which are
@@ -37,14 +37,9 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     // ----------------------------------------------------
     if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
-         if (bCartInPage[2])
+         if (bCartInPage[2]) // Is the cart mapped in?
          {
-            // 1. Only addresses 0x9800 to 0x987F actually read from the SCC Wave RAM
-            if (address >= 0x9800 && address <= 0x987F)
-            {
-                //TBD: this breaks Metal Gear 2 - Solid Snake. Leave it disabled for now...
-                // return SCCRead(address, &mySCC);
-            }
+            return SCCRead(address, &mySCC);
         }
     }
     else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
@@ -475,7 +470,7 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
         // Bit 5 is the only bit that is required to map SCC registers into view.
         // And yes, the banking logic below is still always called...
         // -----------------------------------------------------------------------
-        if (value&0x20)
+        if ((value & 0x3F) == 0x3F)
         {
             special_ram_access |= SPEC_RAM_SCC_ENABLED;  // SCC Registers are now "in view"
             msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
@@ -621,7 +616,7 @@ void HandleSCCPlusModeRegister(u8 value)
     sccplus_mode = value;
 
     // Bit5 alone decides which window shows the audio registers
-    if (sccplus_mode & 0x20)
+    if ((value & 0x3F) == 0x3F)
     {
         special_ram_access &= ~SPEC_RAM_SCC_ENABLED;
         special_ram_access |= SPEC_RAM_SCC_PLUS_ENABLED;
@@ -661,7 +656,7 @@ void HandleSCCPlus(u16 address, u8 value)
     // Classic SCC registers shadow 8000-9FFF whenever Sound Mode = compat
     if (bCartInPage[2] && (special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
-        SCC_LegacyWrite(value, address);
+        SCC_LegacyWrite(value, address&0xFF);
         return;
     }
 
@@ -813,7 +808,7 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
             // -----------------------------------------------------------------------------------
             if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
             {
-                 SCC_LegacyWrite(value, address);
+                 SCC_LegacyWrite(value, address&0xFF);
             }
             else // We only handle bank switching if the SCC registers were not accessed above...
             {

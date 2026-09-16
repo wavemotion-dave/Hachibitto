@@ -55,7 +55,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     }
     else
     {
-        XPal[index] = color_grb ? color_grb : 1;    // Never land on transparency
+        XPal[index] = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
     }
     
     handle_transparency();
@@ -1711,7 +1711,8 @@ void Reset9938(void)
 
         BG_PALETTE[idx] = RGB15(red<<2,green<<2,blue<<3);
     }
-    BG_PALETTE[1] = RGB15(0,0,0);   // We need a real black... 
+    
+    BG_PALETTE[4] = RGB15(1,1,1);   // We need a real black... and index 4 was already very close!
     
     // Set the XPal[] palette index array for Legacy colors
     for (int idx=0; idx<16; idx++)
@@ -1721,7 +1722,7 @@ void Reset9938(void)
         u8 b2 = (VDP9918A_palette[idx*3+2] >> 6) & 0x03;
 
         u8 byte = (g3 << 5) | (r3 << 2) | b2;
-        XPal[idx] = byte ? byte:1; // Never land back on transparent
+        XPal[idx] = byte ? byte : 4; // Never land back on transparent. Index 4 is our black.
     }
     
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start

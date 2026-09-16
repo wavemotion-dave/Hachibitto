@@ -1473,7 +1473,6 @@ void MSX_HandleBeeper(void)
 // ---------------------------------------------------------------------------
 void SCC_LegacyWrite(u8 value, u16 address)
 {
-    debug_printf("SCC %04X = %02X\n", address, value);
     u8 off = address & 0xFF;
 
     if (off < 0x60)                        // Ch0-Ch2 wave RAM - untouched by the layout shift
