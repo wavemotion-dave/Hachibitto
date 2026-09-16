@@ -55,7 +55,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     }
     else
     {
-        XPal[index] = color_grb;
+        XPal[index] = color_grb ? color_grb : 1;    // Never land on transparency
     }
     
     handle_transparency();
@@ -169,7 +169,7 @@ void (*RefreshLine)(u8 uY) __attribute__((section(".dtcm"))) = RefreshLine0;
 /** Palette9918[] ********************************************/
 /** 16 standard colors used by VDP9938/TMS9928 VDP chips.   **/
 /*************************************************************/
-u8 VDP9938A_palette[16*3] = {
+u8 VDP9918A_palette[16*3] = {
   0x00,0x00,0x00,   0x00,0x00,0x00,   0x20,0xC0,0x20,   0x60,0xE0,0x60,
   0x20,0x20,0xE0,   0x40,0x60,0xE0,   0xA0,0x20,0x20,   0x40,0xC0,0xE0,
   0xE0,0x20,0x20,   0xE0,0x60,0x60,   0xC0,0xC0,0x20,   0xC0,0xC0,0x80,
@@ -1711,19 +1711,17 @@ void Reset9938(void)
 
         BG_PALETTE[idx] = RGB15(red<<2,green<<2,blue<<3);
     }
+    BG_PALETTE[1] = RGB15(0,0,0);   // We need a real black... 
     
     // Set the XPal[] palette index array for Legacy colors
     for (int idx=0; idx<16; idx++)
     {
-        for (int idx=0; idx<16; idx++)
-        {
-            u8 g3 = (VDP9938A_palette[idx*3+1] >> 5) & 0x07;
-            u8 r3 = (VDP9938A_palette[idx*3+0] >> 5) & 0x07;
-            u8 b2 = (VDP9938A_palette[idx*3+2] >> 6) & 0x03;
+        u8 g3 = (VDP9918A_palette[idx*3+1] >> 5) & 0x07;
+        u8 r3 = (VDP9918A_palette[idx*3+0] >> 5) & 0x07;
+        u8 b2 = (VDP9918A_palette[idx*3+2] >> 6) & 0x03;
 
-            u8 byte = (g3 << 5) | (r3 << 2) | b2;
-            XPal[idx] = byte;
-        }
+        u8 byte = (g3 << 5) | (r3 << 2) | b2;
+        XPal[idx] = byte ? byte:1; // Never land back on transparent
     }
     
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start
