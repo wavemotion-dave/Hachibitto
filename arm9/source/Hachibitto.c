@@ -1294,10 +1294,10 @@ void Hachibitto_main(void)
             } //  SCR_TOUCH
             else
             {
-              touch_debounce = 0;
-              SaveNow=LoadNow = 0;
-              lastUN = 0;  dampenClick = 0;
-              last_kbd_key = 0;
+                touch_debounce = 0;
+                SaveNow=LoadNow = 0;
+                lastUN = 0;  dampenClick = 0;
+                last_kbd_key = 0;
             }
       }
 
@@ -1319,6 +1319,7 @@ void Hachibitto_main(void)
       }
       else if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_Y))
       {
+            // Snapshot - show the little camera icon for a second or so...
             DSPrint(20,0,2, "9:;");
             DSPrint(20,1,2, "YZ[");
             screenshot();
@@ -2045,7 +2046,7 @@ ITCM_CODE u32 LoopZ80()
   Loop9938();
 
   // Generate an interrupt if called for...
-  if(CPU.IRequest!=INT_NONE)
+  if(CPU.IRequest != INT_NONE)
   {
       IntZ80(&CPU, CPU.IRequest);
       CPU.NumInts++;   // Track Interrupt Requests

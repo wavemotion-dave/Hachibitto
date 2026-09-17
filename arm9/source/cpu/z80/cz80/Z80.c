@@ -525,7 +525,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Restore the ICount */
       CPU.ICount+=CPU.IBackup-1;
       /* Interrupt CPU if needed */
-      if((CPU.IRequest!=INT_NONE)&&(CPU.IRequest!=INT_QUIT)) IntZ80(&CPU,CPU.IRequest);
+      if (CPU.IRequest!=INT_NONE) IntZ80(&CPU,CPU.IRequest);
     }
   }
 }

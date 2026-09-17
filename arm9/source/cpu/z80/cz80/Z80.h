@@ -27,8 +27,6 @@
 extern "C" {
 #endif
 
-//#define ZEXALL_TEST          /* Uncomment this to run the ZEXALL Z80 instruction test */
-
                                /* Compilation options:       */
 #define LSB_FIRST              /* Compile for low-endian CPU */
 #define EXECZ80                /* Call Z80 each scanline     */
@@ -45,7 +43,6 @@ extern "C" {
 #define INT_IRQ     INT_RST38  /* Default IRQ opcode is FFh  */
 #define INT_NMI     0xFFFD     /* Non-maskable interrupt     */
 #define INT_NONE    0xFFFF     /* No interrupt required      */
-#define INT_QUIT    0xFFFE     /* Exit the emulation         */
 
                                /* Bits in Z80 F register:    */
 #define S_FLAG      0x80       /* 1: Result negative         */

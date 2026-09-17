@@ -1062,7 +1062,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
     for (u8 i=0; i<8; i++)
     {
         MSXCartPtr[i] = Unmapped_Memory;             // Cart has nothing in it by default
-        MSXRamPtr[i] = RAM_Memory + (0x2000 * i);       // RAM defaults to first 64K by default
+        MSXRamPtr[i] = RAM_Memory + (0x2000 * i);    // RAM defaults to first 64K by default
     }
 
     // ---------------------------------------------
@@ -1085,7 +1085,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
             // flash cart boots before any bank-select writes happen).
             // ---------------------------------------------------------------
             memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
-            //memcpy(SRAM_Memory, ROM_Memory, (romSize > sizeof(SRAM_Memory)) ? sizeof(SRAM_Memory) : romSize);
 
             sccplus_mode = 0x00;
             HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly
@@ -1094,14 +1093,14 @@ void MSX_InitialMemoryLayout(u32 romSize)
             mapperMask = 0;
             msx_block_size = 0x2000;
 
-            MSXCartPtr[0] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[1] = (u8*)Unmapped_Memory;       // Segment Unmapped
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;        // Segment Unmapped
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;        // Segment Unmapped
             MSXCartPtr[2] = SRAM_Memory + (0 * 0x2000);  // 4000-5FFF -> page 0
             MSXCartPtr[3] = SRAM_Memory + (1 * 0x2000);  // 6000-7FFF -> page 1
             MSXCartPtr[4] = SRAM_Memory + (2 * 0x2000);  // 8000-9FFF -> page 2
             MSXCartPtr[5] = SRAM_Memory + (3 * 0x2000);  // A000-BFFF -> page 3
-            MSXCartPtr[6] = (u8*)Unmapped_Memory;       // Segment Unmapped
-            MSXCartPtr[7] = (u8*)Unmapped_Memory;       // Segment Unmapped
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;        // Segment Unmapped
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;        // Segment Unmapped
         }
         else
         {

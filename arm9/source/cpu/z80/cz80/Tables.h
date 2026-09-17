@@ -306,7 +306,7 @@ static const byte PZSHTable_BIT[129] __attribute__((section(".dtcm"))) =
   H_FLAG,                 H_FLAG,         H_FLAG,         H_FLAG,         H_FLAG,         H_FLAG,         H_FLAG,         H_FLAG, // 78
   S_FLAG|H_FLAG           };
 
-static const word DAATable[2048] __attribute__((section(".dtcm"))) =
+static const word DAATable[2048] =
 {
   0x0044,0x0100,0x0200,0x0304,0x0400,0x0504,0x0604,0x0700,
   0x0808,0x090C,0x1010,0x1114,0x1214,0x1310,0x1414,0x1510,
