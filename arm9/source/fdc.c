@@ -152,7 +152,7 @@ void LoopFDC(void)
 
     if (FDC.read_timeout)
     {
-        if (!(FDC.read_timeout))
+        if (!(--FDC.read_timeout))
         {
             FDC.int_req = 0x80;
             FDC.status |=  ST_TRACK0_LOST;
@@ -170,8 +170,12 @@ void fdc_state_machine(void)
     switch(FDC.command & 0xF0)
     {
         case 0x00: // Restore - same as Seek Track except track=0
-            FDC.data = 0x00;                            // Data also zeroed here
-            // No break
+            FDC.track = 0;                              // Settle on requested track
+            FDC.wait_for_read = 2;                      // No data to transfer
+            FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
+            FDC.int_req = 0x80;
+            break;
+
         case 0x10: // Seek Track
             FDC.track = FDC.data;                       // Settle on requested track
             FDC.wait_for_read = 2;                      // No data to transfer
@@ -218,6 +222,7 @@ void fdc_state_machine(void)
                 if (FDC.track_buffer_idx >= FDC.track_buffer_end) // Is there any more data to put out?
                 {
                     FDC.status &= ~ST_BUSY;               // Done. No longer busy.
+                    FDC.status &= ~ST_INDEX_DRQ;          // Ensure we don't ask for more data.
                     FDC.wait_for_read = 2;                // Don't fetch more FDC data
                     FDC.sector_byte_counter = 0;          // And reset our counter
                     FDC.int_req = 0x80;                   // Signal interrupt
@@ -225,7 +230,7 @@ void fdc_state_machine(void)
                 }
                 else
                 {
-                    FDC.read_timeout = 255;                              // Read time-out in a bit less than 1 frame
+                    FDC.read_timeout = 255;                              // Read time-out in a bit less than 1 frame (255 scanlines)
                     FDC.int_req = 0x40;                                  // Data request but not interrupt request
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);              // Data Ready and no errors... still busy
                     FDC.data = FDC.track_buffer[FDC.track_buffer_idx++]; // Read data from our track buffer

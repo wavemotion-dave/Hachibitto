@@ -396,7 +396,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 void msx_slot_map_msx1(unsigned char Value)
 {
     // ---------------------------------------------------------------------
-    // Slot 0 holds the 32K of MSX BIOS (0xFF above 32K)
+    // Slot 0 holds the 32K of MSX BIOS
     // Slot 1 is where the Game Cartridge Lives (up to 64K)
     // Slot 2 is empty (0xFF always)
     // Slot 3 is our main RAM. We emulate 64K of RAM
