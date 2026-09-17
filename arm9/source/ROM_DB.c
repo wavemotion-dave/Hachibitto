@@ -53,7 +53,6 @@ typedef struct {
 #define playball            0xFF
 #define keyboardmaster      0xFF
 #define Synthesizer         0xFF
-#define Majutsushi          0xFF
 #define MSXWrite            0xFF
 #define Namco               0xFF
 #define HarryFox            0xFF
@@ -1471,7 +1470,7 @@ const ROM_DB_t ROM_DB[] =
   {"24e8911555185be0ad7dbf46593b721878657ba2", SPEC_NONE,  ASC16},
   {"24f88556ec603e258e6047dd166d9350f53608b2", SPEC_NONE,  SCC8},
   {"24f9aaf5e2fc58ce12833003afe501abc5dfea75", SPEC_NONE,  SCC8},
-  {"25022c4f5cfc805e93026fd5fda781e9a1807474", SPEC_NONE,  Majutsushi},
+  {"25022c4f5cfc805e93026fd5fda781e9a1807474", SPEC_NONE,  MAJUT},
   {"2508316d46f7700ef13c09998eb23dac6844803b", SPEC_NONE,  MIRRORED},
   {"250d0d6e646eae4817802c49e367ad8c1c35a462", SPEC_NONE,  MIRRORED},
   {"250d4c7c6565b0c4935f6301e8de2c182e659fd0", SPEC_NONE,  MIRRORED},
@@ -2455,7 +2454,7 @@ const ROM_DB_t ROM_DB[] =
   {"3fe78ca418eea1c330a2c97f05bf2a459fd5e5a1", SPEC_NONE,  MIRRORED},
   {"3fe9e8b240f0c191f59bb48dae1ade69746f73f1", SPEC_NONE,  SCC8},
   {"3ff276af654c7dc712abed79d9123317ce79b4e4", SPEC_NONE,  SCC8},
-  {"3ff54468a5acf1ad44e85bdc993044aaa3165a63", SPEC_NONE,  Majutsushi},
+  {"3ff54468a5acf1ad44e85bdc993044aaa3165a63", SPEC_NONE,  MAJUT},
   {"3ff5c1c272350a3285159afb920768381aa7fa9e", SPEC_NONE,  PAGE23},
   {"3ff76dc2922389bdae031f26e071cdc7cc92ba45", SPEC_NONE,  PAGE23},
   {"3ffbddc453a612492f969db674d2eacb6022b232", SPEC_NONE,  MIRRORED},
@@ -7844,7 +7843,7 @@ const ROM_DB_t ROM_DB[] =
   {"d07af8022481bed2523e0e9eec67bf8ce64f9142", SPEC_NONE,  MIRRORED},
   {"d086280dea7fb10fabaae26ed9d404bbe69c70c4", SPEC_NONE,  MIRRORED},
   {"d089996f8b24141071c54fb46d9bb8a1c0488332", SPEC_NONE,  MIRRORED},
-  {"d08d4e2a8d92c01551ff012a71a1f3e57fe2d09c", SPEC_NONE,  Majutsushi},
+  {"d08d4e2a8d92c01551ff012a71a1f3e57fe2d09c", SPEC_NONE,  MAJUT},
   {"d08d6858872eb43c282f35ea6cb39c60b1222e82", SPEC_NONE,  PAGE23},
   {"d08ec54791f98b908f9f4b5e53dea13f52c6539f", SPEC_NONE,  PAGE23},
   {"d0969270d6e78e055a81e9c892761e30221b4a72", SPEC_NONE,  MIRRORED},

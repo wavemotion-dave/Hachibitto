@@ -34,6 +34,7 @@ u32 frame_number        __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpochSaved    __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
+u8 frame_skip_mask      __attribute__((section(".dtcm"))) = 0;
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -43,8 +44,15 @@ u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
 u8 screen7LUT[256]       __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
-{    
-    XPal[0] = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
+{   
+    u8 new_bg_color = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
+
+    // Only update the table if the XPal[] palette table is changing...
+    if (XPal[0] != new_bg_color)
+    {
+        XPal[0] = new_bg_color;
+        if (ScrMode < 4) RebuildLutTablehh();
+    }
 }
 
 void vdp_9938_write_palette(u8 index, u8 color_grb)
@@ -52,14 +60,19 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     if (index == 0)
     {
         XPalReal0 = color_grb;
+        handle_transparency();
     }
     else
     {
-        XPal[index] = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
+        u8 new_color = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
+        
+        // Only update the table if the XPal[] palette table is changing...
+        if (XPal[index] != new_color)
+        {
+            XPal[index] = new_color;
+            if (ScrMode < 4) RebuildLutTablehh();
+        }
     }
-    
-    handle_transparency();
-    if (ScrMode < 4) RebuildLutTablehh();
 }
 
 // When CPU writes to Port 0x9A
@@ -170,7 +183,7 @@ void (*RefreshLine)(u8 uY) __attribute__((section(".dtcm"))) = RefreshLine0;
 /** 16 standard colors used by VDP9938/TMS9928 VDP chips.   **/
 /*************************************************************/
 u8 VDP9918A_palette[16*3] = {
-  0x00,0x00,0x00,   0x00,0x00,0x00,   0x20,0xC0,0x20,   0x60,0xE0,0x60,
+  0x00,0x00,0x00,   0x01,0x01,0x01,   0x20,0xC0,0x20,   0x60,0xE0,0x60,
   0x20,0x20,0xE0,   0x40,0x60,0xE0,   0xA0,0x20,0x20,   0x40,0xC0,0xE0,
   0xE0,0x20,0x20,   0xE0,0x60,0x60,   0xC0,0xC0,0x20,   0xC0,0xC0,0x80,
   0x20,0x80,0x20,   0xC0,0x40,0xA0,   0xA0,0xA0,0xA0,   0xE0,0xE0,0xE0,
@@ -958,7 +971,7 @@ void RefreshLine3(u8 uY) // Purposely no ITCM_CODE as this is the least used Scr
 }
 
 #define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
-u8 LineScratch[400] __attribute__((section(".dtcm")));
+u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
 
 uint8_t *RefreshBorder(uint8_t Y)
 {
@@ -987,13 +1000,18 @@ ITCM_CODE void CommitLine(u8 Y)
     // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
     u32 * restrict dst = (u32*)(XBuf + ((u16)Y << 8));
     const u8 * restrict src = (const u8*)(LineScratch + LS_BASE);
-    for (int i=0; i<16;i++)
+    for (int i=0; i<8;i++)
     {
         *dst++ = (XPal[src[0]]  << 0) | (XPal[src[1]]  << 8) | (XPal[src[2]]  << 16) | (XPal[src[3]]  << 24);
         *dst++ = (XPal[src[4]]  << 0) | (XPal[src[5]]  << 8) | (XPal[src[6]]  << 16) | (XPal[src[7]]  << 24);
         *dst++ = (XPal[src[8]]  << 0) | (XPal[src[9]]  << 8) | (XPal[src[10]] << 16) | (XPal[src[11]] << 24);
         *dst++ = (XPal[src[12]] << 0) | (XPal[src[13]] << 8) | (XPal[src[14]] << 16) | (XPal[src[15]] << 24);
-        src += 16;
+
+        *dst++ = (XPal[src[16]] << 0) | (XPal[src[17]] << 8) | (XPal[src[18]] << 16) | (XPal[src[19]] << 24);
+        *dst++ = (XPal[src[20]] << 0) | (XPal[src[21]] << 8) | (XPal[src[22]] << 16) | (XPal[src[23]] << 24);
+        *dst++ = (XPal[src[24]] << 0) | (XPal[src[25]] << 8) | (XPal[src[26]] << 16) | (XPal[src[27]] << 24);
+        *dst++ = (XPal[src[28]] << 0) | (XPal[src[29]] << 8) | (XPal[src[30]] << 16) | (XPal[src[31]] << 24);
+        src += 32;
     }
 }
 
@@ -1014,77 +1032,38 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
       T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
       I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
    
-      // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
-      // doesn't change mid-line), so check it once rather than per-pixel.
-      int misaligned = ((uintptr_t)P & 3) != 0;
-   
       uint32_t *P32 = (uint32_t*)P;
-      uint16_t *P16 = (uint16_t*)P;
-   
+      
       uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
       uint32_t p0 = 0, p1 = 0;
    
       int X = 32;
    
-      if (!misaligned)
+      do
       {
-          do
-          {
-            uint32_t t_val = *(uint8_t*)T;
-            T = (uint32_t*)((uint8_t*)T + 1);
-   
-            if (t_val != lastT)
-            {
-                lastT = t_val;
-                J = (int)t_val << 3;
-                uint32_t idx = (I + J);
-   
-                uint32_t K_col = ColTab[idx & ColTabM];
-                uint32_t FC    = K_col >> 4;
-                uint32_t BC    = K_col & 0x0F;
-   
-                K = ChrGen[idx & ChrGenM];
-   
-                p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-                p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-            }
-   
-            P32[0] = p0;
-            P32[1] = p1;
-            P32 += 2;
-   
-          } while (--X);
-      }
-      else
-      {
-          do
-          {
-              uint32_t t_val = *(uint8_t*)T;
-              T = (uint32_t*)((uint8_t*)T + 1);
-              
-              if (t_val != lastT)
-              {
-                  lastT = t_val;
-                  J = (int)t_val << 3;
-                  uint32_t idx = (I + J);
-              
-                  uint32_t K_col = ColTab[idx & ColTabM];
-                  uint32_t FC    = K_col >> 4;
-                  uint32_t BC    = K_col & 0x0F;
-              
-                  K = ChrGen[idx & ChrGenM];
-              
-                  p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-                  p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-              }
-              
-              P16[0] = (uint16_t)p0;
-              P16[1] = (uint16_t)(p0 >> 16);
-              P16[2] = (uint16_t)p1;
-              P16[3] = (uint16_t)(p1 >> 16);
-              P16 += 4;
-          } while (--X);
-      }
+        uint32_t t_val = *(uint8_t*)T;
+        T = (uint32_t*)((uint8_t*)T + 1);
+
+        if (t_val != lastT)
+        {
+            lastT = t_val;
+            J = (int)t_val << 3;
+            uint32_t idx = (I + J);
+
+            uint32_t K_col = ColTab[idx & ColTabM];
+            uint32_t FC    = K_col >> 4;
+            uint32_t BC    = K_col & 0x0F;
+
+            K = ChrGen[idx & ChrGenM];
+
+            p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+            p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+        }
+
+        P32[0] = p0;
+        P32[1] = p1;
+        P32 += 2;
+      } while (--X);
    
       ColorSprites(Y, P-32);
       CommitLine(Y);
@@ -1106,56 +1085,44 @@ ITCM_CODE void RefreshLine5(register u8 uY)
         const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
         if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
 
-        // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
-        // doesn't change mid-line), so check it once rather than per-pixel.
-        int misaligned = ((uintptr_t)P & 3) != 0;
+        u32 * restrict dst32 = (u32*)P;
+        const u32 * restrict src32 = (u32*)src;
 
-        if (!misaligned)
+        for (int i = 0; i < 4; i++)
         {
-            u32 * restrict dst32 = (u32*)P;
-            const u32 * restrict src32 = (u32*)src;
+            u32 s0 = src32[0];
+            u32 s1 = src32[1];
+            
+            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
 
-            for (int i = 0; i < 8; i++)
-            {
-                u32 s0 = src32[0];
-                u32 s1 = src32[1];
-                
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+            s0 = src32[2];
+            s1 = src32[3];
+            
+            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+            
+            s0 = src32[4];
+            s1 = src32[5];
+            
+            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
 
-                s0 = src32[2];
-                s1 = src32[3];
-                
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-                
-                src32 += 4;
-            }
-        }
-        else
-        {
-            u16 *dst16 = (u16*)P;
+            s0 = src32[6];
+            s1 = src32[7];
+            
+            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
 
-            for (int i = 0; i < 128; i += 8)
-            {
-                u32 s0 = *(u32*)(src + i);
-                u32 s1 = *(u32*)(src + i + 4);
-
-                u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-
-                dst16[0]=(u16)r0; dst16[1]=(u16)(r0>>16);
-                dst16[2]=(u16)r1; dst16[3]=(u16)(r1>>16);
-                dst16[4]=(u16)r2; dst16[5]=(u16)(r2>>16);
-                dst16[6]=(u16)r3; dst16[7]=(u16)(r3>>16);
-                dst16 += 8;
-            }
+            src32 += 8;
         }
 
         ColorSprites(uY, P-32);
@@ -1285,9 +1252,9 @@ ITCM_CODE void RefreshLine8(register u8 uY)
 /*********************************************************************************
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'
  ********************************************************************************/
-u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x1f,0xff,0xff,0xff,0xff,0xff,0x3f,0xff,
-                                                             0xff,0xff,0x07,0x03,0xff,0xff,0x07,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x7e,0x7f,0x7f,0xff,0x3f,0xff,0x3f,0xff,
+                                                             0xfb,0xbf,0x07,0x03,0xff,0xff,0x07,0x0f,
+                                                             0x0f,0xbf,0xff,0xff,0x3f,0x3f,0x3f,0xff,
                                                              0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // These are VDP9958 only
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
                                                              0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
@@ -1340,6 +1307,12 @@ void CheckNewMode(void)
     default:   newMode=ScrMode;break;
   }
   
+  // If we just switched into a legacy mode, rebuild the table
+  if ((ScrMode != newMode) && (newMode < 4))
+  {
+      RebuildLutTablehh();
+  }
+  
   ScrMode=newMode;
 
   RefreshLine = SCR[ScrMode].Refresh;
@@ -1376,7 +1349,6 @@ void CheckNewMode(void)
   }
   
   handle_transparency();
-  if (ScrMode < 4) RebuildLutTablehh();
 }
 
 
@@ -1623,7 +1595,7 @@ void Loop9938(void)
       // ---------------------------------------------------------------
       // On the DS-Lite/Phat, we have to frameskip every other frame...
       // ---------------------------------------------------------------
-      if (timingFrames & (isDSiMode() ? 0:1))
+      if (timingFrames & frame_skip_mask)
       {
           skip_render  = 1; // This whole frame is skipped
           scan_sprites = 1; // But we still need to scan sprites
@@ -1730,12 +1702,33 @@ void Reset9938(void)
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
+    memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
 
     BuildNibbleLUT();
     BuildScreen7LUT();
     
-    memset(OccBuf, 0x00, sizeof(OccBuf));
-
+    // ---------------------------------------------------------------------------------------------
+    // For the DS-Lite/Phat we need some level of frameskip... the MSX2 has just too much happening!
+    // ---------------------------------------------------------------------------------------------
+    if (isDSiMode())
+    {
+        frame_skip_mask = 0;    // Never need to skip any frames for DSi mode - the CPU is fast enough!
+    }
+    else
+    {
+        frame_skip_mask = 1;
+        
+        // Snatcher and Manbow need help...
+        if (strstr(initial_file_upper, "MANBOW"))
+        {
+            frame_skip_mask = 3;
+        }
+        if (strstr(initial_file_upper, "SNATCHER"))
+        {
+            frame_skip_mask = 3;
+        }
+    }
+    
     if (myConfig.machineType == MACHINE_MSX1)
     {
         VDP[0] = 0x00;                      // Control Bits I:  Graphics Mode 1 (M3... M1,M2 in VDP[1])

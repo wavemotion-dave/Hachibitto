@@ -86,10 +86,21 @@ typedef union
   word W;
 } pair;
 
+// ----------------------------------------------------------------------
+// We use this to fake the PC into a 32-bit native integer for the
+// DS so that we can get maximum speed throughput. It's not technically
+// safe as a real Z80 PC would roll over from FFFF to 0000 but we 
+// need the extra speed and this buys us almost 3 frames of performance.
+// ----------------------------------------------------------------------
+typedef union
+{
+  struct { byte l,h, zz, xx; } B;
+  u32 W;
+} dpair;
 
 typedef struct
 {
-  pair PC;                          /* Program Counter                      */
+  dpair PC;                         /* Program Counter - native 32-bit speed*/
   pair AF,BC,DE,HL,IX,IY,SP;        /* Main registers                       */
   pair AF1,BC1,DE1,HL1;             /* Shadow registers                     */
   byte IFF,I;                       /* Interrupt registers                  */
@@ -104,7 +115,7 @@ typedef struct
   byte R_HighBit;                   /* Used to preserve the high bit for R  */
   u32  R;                           /* Refresh register - masked on read    */
   u32  TotalInstructions;           /* Total CPU main instructions          */
-  word NumInts;                     /* Number of Interrupts Processed       */
+  u32  NumInts;                     /* Number of Interrupts Processed       */
 } Z80;
 
 

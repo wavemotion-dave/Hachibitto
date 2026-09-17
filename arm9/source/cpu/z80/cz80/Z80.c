@@ -46,7 +46,7 @@ extern u32 DX, DY;
 /*************************************************************/
 
 extern u8 *MemoryMap[8];
-extern u8 RAM_Memory[];
+
 // ------------------------------------------------------
 // These defines and inline functions are to map maximum
 // speed/efficiency onto the memory system we have.
@@ -55,7 +55,8 @@ extern void cpu_writemem16 (u8 value,u16 address);
 extern byte cpu_readmem16 (u16 address);
 
 extern u8 special_ram_access;
-inline byte OpZ80(word A)   {return *(MemoryMap[A>>13] + (A&0x1FFF));}
+
+inline byte OpZ80(u32 A)   {return *(MemoryMap[A>>13] + (A&0x1FFF));}
 inline byte RdZ80(word A)   {return (special_ram_access ? cpu_readmem16(A) : *(MemoryMap[A>>13] + (A&0x1FFF)));}
 #define     WrZ80(A,V)       cpu_writemem16(V,A)
 
@@ -501,7 +502,8 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=OpZ80(CPU.PC.W++);
       CPU.ICount-=Cycles[I];
-      CPU.TotalInstructions++;  // Only counting base instructions... good enough
+      
+      CPU.TotalInstructions++;  // Only counting base instructions... good enough for FDC timing
 
       /* Interpret opcode */
       switch(I)

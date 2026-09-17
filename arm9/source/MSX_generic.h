@@ -12,6 +12,7 @@
 #define _MSX_GENERIC_H_
 
 #include "Hachibitto.h"
+#include "FMPAC.h"
 #include "cpu/z80/Z80_interface.h"
 #include "cpu/vdp9938/vdp9938.h"
 #include "cpu/ay38910/AY38910.h"
@@ -24,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0009
+#define CONFIG_VER                  0x000A
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -82,7 +83,7 @@ struct __attribute__((__packed__)) Config_t
     u8  yOffset;
     u8  cpuBoost;
     u8  splitRefresh;
-    u8  reserved2;
+    u8  msxMusic;
     u8  reserved3;
     u8  reserved4;
     u8  reserved5;
@@ -148,6 +149,9 @@ extern u8 msx_kana_lock;
 #define AT4K            16
 #define AT8K            17
 #define LIN64           18
+
+#define MAJUT           70
+
 #define SCCPLUS_RAM     88
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
@@ -162,6 +166,7 @@ extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_MSX2[0x8000];
 extern const unsigned char MSXBios_MSX2EXT[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];
+extern const unsigned char MSXBios_FMPAC[0x4000];
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
@@ -172,6 +177,7 @@ extern u8  sccplus_page[4];
 extern u8  sccplus_mode;
 extern AY38910 myAY;
 extern SCC     mySCC;
+extern FMPAC   myYM;
 extern u8 msx_scc_enable;
 extern u8 JoyMode;
 extern u32 JoyState;
@@ -193,6 +199,7 @@ extern u8 key_graph;
 extern u8 key_dia;
 extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;
+extern u8 msx_music_capable_game;
 extern u8 msx_subslot;
 extern u8 XPalReal0;
 extern u8 ALatch;

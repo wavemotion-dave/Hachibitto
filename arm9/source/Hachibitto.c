@@ -18,6 +18,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <fat.h>
+#include <ctype.h>
 #include <maxmod9.h>
 
 #include "Hachibitto.h"
@@ -32,6 +33,7 @@
 #include "topscreen.h"
 #include "fdc.h"
 #include "V9938.h"
+#include "FMPAC.h"
 #include "CRC32.h"
 
 #include "soundbank.h"
@@ -39,7 +41,6 @@
 #include "screenshot.h"
 #include "cpu/z80/Z80_interface.h"
 #include "cpu/scc/SCC.h"
-
 #include "printf.h"
 
 u32 debug[0x10]={0};
@@ -77,12 +78,11 @@ u8 sram_show_status = 0;    // Used to show SRAM icon
 
 static char cmd_line_file[256];
 char initial_file[MAX_ROM_NAME] = "";
+char initial_file_upper[MAX_ROM_NAME] = "";
 char initial_path[MAX_ROM_NAME] = "";
 
 u8 msx_caps_lock        = 0;
 u8 msx_kana_lock        = 0;
-
-u8   disk_unsaved_data[2]      = {0,0};
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -128,15 +128,15 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     JST_DOWN,
     JST_LEFT,
     JST_RIGHT,
-    JST_FIRE2,
     JST_FIRE1,
+    JST_FIRE2,
 
     JST_UP      << 16,      // P2 versions of the above...
     JST_DOWN    << 16,
     JST_LEFT    << 16,
     JST_RIGHT   << 16,
-    JST_FIRE2   << 16,
     JST_FIRE1   << 16,
+    JST_FIRE2   << 16,
 
     META_KBD_A,
     META_KBD_B,
@@ -310,7 +310,12 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     }
     else
     {
-        if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
+        if (msx_music_capable_game)
+        {
+            ay38910Mixer(len*2, dest, &myAY);
+            FMPACMixer(len*2, dest, &myYM);
+        }
+        else if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
         {
             if (bFirstSCCEnable)
             {
@@ -444,6 +449,7 @@ void sound_chip_reset()
     memset(mixbuf2, 0x00, sizeof(mixbuf2));
     
     msx_scc_capable_game = 0;
+    msx_music_capable_game = 0;
     bFirstSCCEnable = 1;
     SoundPause();
     
@@ -458,10 +464,14 @@ void sound_chip_reset()
     // -----------------------------------------------------------------
     // The SCC sound chip is just for a few select Konami MSX1 games
     // -----------------------------------------------------------------
-    memset(&mySCC, 0x00, sizeof(mySCC));
     SCCReset(&mySCC);
-    
     SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
+
+    // -----------------------------------------------------------------
+    // The YM2413 chip is the MSX MUSIC standard for late-era games...
+    // -----------------------------------------------------------------
+    FMPACReset(&myYM);
+    FMPACMixer(16, mixbuf2, &myYM);   // Do an initial mix conversion to clear the output
 }
 
 // -----------------------------------------------------------------------
@@ -496,8 +506,6 @@ void ResetMSX(void)
     
     msx_reset();                          // Reset the MSX specific vars
     
-    disk_unsaved_data[0] = 0;             // No unsaved tape/disk data to start
-    disk_unsaved_data[1] = 0;             // No unsaved tape/disk data to start
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
     
@@ -657,9 +665,23 @@ void DisplayStatusLine(bool bForce)
 
     if ((io_show_status == 0) && (sram_show_status == 0))
     {
-        // SCC has a little cool graphic to go with it!
-        DSPrint(20,0, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "012":"   "));
-        DSPrint(20,1, (msx_scc_capable_game ? 2:0), (msx_scc_capable_game ? "PQR":"   "));
+        if (msx_scc_capable_game)
+        {
+            // SCC has a little cool graphic to go with it!
+            DSPrint(20, 0, 2, "012");
+            DSPrint(20, 1, 2, "PQR");
+        }
+        else if (msx_music_capable_game)
+        {
+            // MSX MUSIC has a little cool graphic to go with it!
+            DSPrint(20, 0, 2, "$%&");
+            DSPrint(20, 1, 2, "DEF");
+        }
+        else // Clear the display area...
+        {
+            DSPrint(20, 0, 0, "   ");
+            DSPrint(20, 1, 0, "   ");
+        }
     }
 
     if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
@@ -998,6 +1020,10 @@ void Hachibitto_main(void)
 
   // Returns when  user has asked for a game to run...
   BottomScreenOptions();
+  
+  // Clear top screen
+  BG_PALETTE[0] = RGB15(0,0,0);
+  memset((u8*)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
 
   // Get the MSX Machine Emulator ready
   msxInit(gpFic[ucGameAct].szName);
@@ -1048,8 +1074,11 @@ void Hachibitto_main(void)
             u16 emuFps = emuActFrames;
             if (myGlobalConfig.showFPS)
             {
-                if (emuFps == 61) emuFps=60;
-                else if (emuFps == 59) emuFps=60;
+                if (myGlobalConfig.showFPS != 2) // If not Full Speed... round towards 60
+                {
+                    if (emuFps == 61) emuFps=60;
+                    else if (emuFps == 59) emuFps=60;
+                }
                 if (emuFps/100) szChai[0] = '0' + emuFps/100;
                 else szChai[0] = ' ';
                 szChai[1] = '0' + (emuFps%100) / 10;
@@ -1155,6 +1184,7 @@ void Hachibitto_main(void)
                           // Ask for verification
                           if (showMessage("DO YOU REALLY WANT TO", "RESET THE CURRENT GAME ?") == ID_SHM_YES)
                           {
+                              memset((u8*)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
                               DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
                               ResetMSX();
                           }
@@ -1938,6 +1968,11 @@ u8 loadrom(const char *filename)
     {
         // Save the initial filename and file - we need it for save/restore of state
         strcpy(initial_file, filename);
+        strcpy(initial_file_upper, filename);
+        for (int i=0; i<strlen(initial_file_upper); i++) 
+        {
+            initial_file_upper[i] = toupper(initial_file_upper[i]);     // Uppercase string
+        }
         getcwd(initial_path, MAX_ROM_NAME);
 
         // Get file size the 'fast' way - use fstat() instead of fseek() or ftell()

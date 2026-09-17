@@ -38,8 +38,8 @@ extern u32 DX, DY;
 #define JST_RIGHT           0x0200
 #define JST_DOWN            0x0400
 #define JST_LEFT            0x0800
-#define JST_FIRE1           0x0040
-#define JST_FIRE2           0x4000
+#define JST_FIRE1           0x1000
+#define JST_FIRE2           0x2000
 
 // -----------------------------------------------------------------------------------
 // And these are meta keys for mapping NDS keys to keyboard keys (many of the computer
@@ -159,35 +159,30 @@ extern u32 DX, DY;
 #define KBD_KEY_DEAD        26
 #define KBD_KEY_YEN         27
 
+#define VDP_IRQ_VBLANK  0x01
+#define VDP_IRQ_LINE    0x02
+
+#define WAITVBL swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank();
+
 extern u16 emuFps;
 extern u16 emuActFrames;
 extern u16 timingFrames;
 
 extern char initial_file[];
+extern char initial_file_upper[];
 extern char initial_path[];
 
 extern u16 nds_key;
 extern u8  kbd_key;
-
 extern u8 msx_mode;
-
 extern u8 kbd_keys_pressed;
 extern u8 kbd_keys[12];
-
-extern u8 disk_unsaved_data[2];
-
-#define WAITVBL swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank();
-
-extern volatile u16 vusCptVBL;                   // Video Management
-
+extern volatile u16 vusCptVBL;
 extern u32 keyCoresp[MAX_KEY_OPTIONS];
 extern u16 NDS_keyMap[];
-
 extern u8 soundEmuPause;
 extern u8 skip_render;
-
 extern int bg0, bg1, bg0b, bg1b;
-
 extern u8 io_show_status;
 extern u8 sram_show_status;
 
@@ -198,12 +193,7 @@ extern void UnPauseSound(void);
 extern void ReadFileCRCAndConfig(void);
 extern void DisplayStatusLine(bool bForce);
 extern void ResetMSX(void);
-
-#define VDP_IRQ_VBLANK  0x01
-#define VDP_IRQ_LINE    0x02
-
 extern void SetVDPIRQ(u8 bit, u8 set);
-
 extern void debug_init();
 extern void debug_save();
 extern void debug_printf(const char * str, ...);

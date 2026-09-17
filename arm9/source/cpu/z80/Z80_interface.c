@@ -37,8 +37,8 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     // ----------------------------------------------------
     if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
-         if (bCartInPage[2]) // Is the cart mapped in?
-         {
+        if (bCartInPage[2]) // Is the cart mapped in?
+        {
             return SCCRead(address, &mySCC);
         }
     }
@@ -552,6 +552,46 @@ void HandleXevious(u32* src, u8 block, u16 address)
     }
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Same as Konami8 but with DAC at 0x4000 range. We don't handle that yet, but game is playable.
+// ---------------------------------------------------------------------------------------------
+void HandleMajut(u32* src, u8 block, u16 address)
+{
+    if (bCartInPage[1] && ((address & 0xE000) == 0x6000))
+    {
+        MSXCartPtr[3] = (u8*)src;  // Main ROM
+        MSXCartPtr[7] = (u8*)src;  // Mirror
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+    }
+    else if (bCartInPage[2] && ((address & 0xE000) == 0x8000))
+    {
+        MSXCartPtr[4] = (u8*)src;  // Main ROM
+        MSXCartPtr[0] = (u8*)src;  // Mirror
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+    }
+    else if (bCartInPage[2] && ((address & 0xE000) == 0xA000))
+    {
+        MSXCartPtr[5] = (u8*)src;  // Main ROM
+        MSXCartPtr[1] = (u8*)src;  // Mirror
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+    }
+}
+
+void HandleXBlam(u32* src, u8 block, u16 address)
+{
+    if (address == 0x4045)
+    {
+        MSXCartPtr[4] = (u8*)src;          // Main ROM at 8000
+        MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000
+        if (bCartInPage[2])
+        {
+            MemoryMap[4] = MSXCartPtr[4];
+            MemoryMap[5] = MSXCartPtr[5];
+        }
+    }
+}
+
 // ---------------------------------------------------------------------
 // Lode Runner maps with writes to 0x0000 but it's even more unusual
 // in that it doesn't care if the cart is mapped into view as it will
@@ -720,25 +760,19 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
         // ---------------------------------------------------------------------------------
         if (mapperType == KON8)
         {
-            if (bCartInPage[1] && ((address & 0xF000) == 0x4000))
-            {
-                MSXCartPtr[2] = (u8*)src;  // Main ROM
-                MSXCartPtr[6] = (u8*)src;  // Mirror
-                MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            }
-            else if (bCartInPage[1] && ((address & 0xF000) == 0x6000))
+            if (bCartInPage[1] && ((address & 0xE000) == 0x6000))
             {
                 MSXCartPtr[3] = (u8*)src;  // Main ROM
                 MSXCartPtr[7] = (u8*)src;  // Mirror
                 MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
             }
-            else if (bCartInPage[2] && ((address & 0xF000) == 0x8000))
+            else if (bCartInPage[2] && ((address & 0xE000) == 0x8000))
             {
                 MSXCartPtr[4] = (u8*)src;  // Main ROM
                 MSXCartPtr[0] = (u8*)src;  // Mirror
                 MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             }
-            else if (bCartInPage[2] && ((address & 0xF000) == 0xA000))
+            else if (bCartInPage[2] && ((address & 0xE000) == 0xA000))
             {
                 MSXCartPtr[5] = (u8*)src;  // Main ROM
                 MSXCartPtr[1] = (u8*)src;  // Mirror
@@ -847,18 +881,13 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
         {
             HandleXevious(src, block, address);
         }
+        else if (mapperType == MAJUT)
+        {
+            HandleMajut(src, block, address);
+        }
         else if (mapperType == XBLAM)
         {
-            if (address == 0x4045)
-            {
-                MSXCartPtr[4] = (u8*)src;          // Main ROM at 8000
-                MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000
-                if (bCartInPage[2])
-                {
-                    MemoryMap[4] = MSXCartPtr[4];
-                    MemoryMap[5] = MSXCartPtr[5];
-                }
-            }
+            HandleXBlam(src, block, address);
         }
         else if ((special_ram_access & SPEC_RAM_SUPERLR_ACTIVE) && (address == 0x0000))
         {

@@ -32,7 +32,8 @@ struct FDC_t
     u8  commandType;
     u8  write_track_allowed;
     u8  stepDirection;
-    u8  spare;
+    u8  int_req;
+    u8  read_timeout;
     u8  track_dirty[2];         // True if at least 1 track is dirty on this disk
     u8  track_buffer[10240];    // Enough for 16+ sectors of 512 bytes or 10 sectors of 1024 bytes
     u16 track_buffer_idx;
@@ -54,17 +55,6 @@ struct FDC_GEOMETRY_t
     u8 *disk0;
     u8 *disk1;
 };
-
-// WD2793 Status Register Bit Definitions
-#define ST_BUSY             0x01  // The most important flag! Programs check this often...
-#define ST_INDEX_DRQ        0x02  // Index Pulse (Type I) / Data Request (Type II/III)
-#define ST_TRACK0_LOST      0x04  // Track 0 (Type I) / Lost Data (Type II/III)
-#define ST_CRC_ERROR        0x08  // Not used yet
-#define ST_SEEK_RNF         0x10  // Seek Error (Type I) / Record Not Found (Type II/III)
-#define ST_HEAD_LOADED_TYPE 0x20  // Head Loaded (Type I) / Record Type (Type II/III)
-#define ST_WRITE_PROT       0x40  // Not used yet
-#define ST_NOT_READY        0x80  // WD2793: 1 = Not Ready, 0 = Ready (INVERTED from WD1770!)
-
 
 extern struct FDC_t             FDC;
 extern struct FDC_GEOMETRY_t    Geom;

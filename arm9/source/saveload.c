@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0002  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0004  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -46,7 +46,8 @@ struct RomOffset Offsets[8];
 #define TYPE_FDC   3
 #define TYPE_BIOS  4
 #define TYPE_EBIOS 5
-#define TYPE_SRAM  6
+#define TYPE_FMPAC 6
+#define TYPE_SRAM  7
 #define TYPE_OTHER 9
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
@@ -140,6 +141,11 @@ void msxSaveState(void)
             {
                 Offsets[i].type = TYPE_EBIOS;
                 Offsets[i].offset = MemoryMap[i] - MSXBios_MSX2EXT;
+            }
+            else if ((MemoryMap[i] >= MSXBios_FMPAC) && (MemoryMap[i] < MSXBios_FMPAC+(sizeof(MSXBios_FMPAC))))
+            {
+                Offsets[i].type = TYPE_FMPAC;
+                Offsets[i].offset = MemoryMap[i] - MSXBios_FMPAC;
             }
             else
             {
@@ -255,6 +261,8 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(screen7LUT,             sizeof(screen7LUT),             1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
+        if (retVal) retVal = fwrite(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
+        
 
         // -----------------------------------------------------------------------
         // Compress the 128K RAM data using 'high' compression ratio...
@@ -365,6 +373,10 @@ void msxLoadState(void)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset);
                 }
+                else if (Offsets[i].type == TYPE_FMPAC)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_FMPAC + Offsets[i].offset);
+                }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {
                     MemoryMap[i] = (u8 *) (Offsets[i].offset);
@@ -470,6 +482,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(screen7LUT,             sizeof(screen7LUT),             1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
+            if (retVal) retVal = fread(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
 
             // -----------------------------------------------------------------------
             // Restore Main RAM memory which was saved in a compressed format
