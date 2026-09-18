@@ -395,9 +395,9 @@ void msx_slot_map_msx1(unsigned char Value)
 {
     // ---------------------------------------------------------------------
     // Slot 0 holds the 32K of MSX BIOS
-    // Slot 1 is where the Game Cartridge Lives (up to 64K)
-    // Slot 2 is empty (0xFF always)
-    // Slot 3 is our main RAM. We emulate 64K of RAM
+    // Slot 1 is where the Game Cartridge Lives (may contain a mapper)
+    // Slot 2 is empty (0xFF read always)
+    // Slot 3 is our main RAM. We emulate 64K of RAM in MSX1 mode
     // ---------------------------------------------------------------------
     if (((Value>>0) & 0x03) != ((Port_PPI_A>>0) & 0x03))
     switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
@@ -536,7 +536,7 @@ void msx_slot_map_msx1(unsigned char Value)
 // Memory          Slot 0       Slot 1      Slot 2      Slot 3-0   Slot 3-1    Slot 3-2    Slot 3-3
 // C000h~FFFFh      ---       Cartridge     16K RAM      ---        ---         ---         ---
 // 8000h~BFFFh      ---       Cartridge     16K RAM      ---        ---         ---         ---
-// 4000h~7FFFh    Main-ROM    Cartridge     16K RAM      ---        Disk-ROM    ---         ---
+// 4000h~7FFFh    Main-ROM    Cartridge     16K RAM      ---        Disk-ROM    MSX-Music   ---
 // 0000h~3FFFh    Main-ROM    Cartridge     16K RAM      Ext-ROM    ---         ---         ---
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeA(unsigned char Value)
