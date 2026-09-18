@@ -136,12 +136,13 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD F1", 
   "KEYBOARD F2",
   "KEYBOARD F3",
-  "KEYBOARD F5", //80
+  "KEYBOARD F4", //80
+  "KEYBOARD F5", //81
 
-  "PAN UP",      //81
-  "PAN DOWN",    //82
-  "SHOW TOP",    //83
-  "SHOW BOTTOM", //84
+  "PAN UP",      //82
+  "PAN DOWN",    //83
+  "SHOW TOP",    //84
+  "SHOW BOTTOM", //85
 };
 
 
@@ -857,8 +858,8 @@ void MapPlayer1(void)
     myConfig.keymap[3]   = 3;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 4;    // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 5;    // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -873,8 +874,8 @@ void MapPlayer2(void)
     myConfig.keymap[3]   = 9;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 10;   // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 11;   // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -889,8 +890,8 @@ void MapCursors(void)
     myConfig.keymap[3]   = 59;   // Right Arrow
     myConfig.keymap[4]   = 52;   // Space
     myConfig.keymap[5]   = 56;   // Up Arrow
-    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -1033,7 +1034,7 @@ const struct options_t Option_Table[1][20] =
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},        
-        {"SCC+ CART",      {"NONE", "INSTALLED"},                                                                                                                               &myConfig.expansion,      2},
+        {"SCC+ CART",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.expansion,      2},
 //TODO: {"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},        
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},        

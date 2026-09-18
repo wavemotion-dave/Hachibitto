@@ -219,8 +219,15 @@ void fdc_state_machine(void)
         case 0x90: // Read Sector (multiple)
             if (FDC.wait_for_read == 0)
             {
+                static u8 zzz=0;
                 if (FDC.track_buffer_idx >= FDC.track_buffer_end) // Is there any more data to put out?
                 {
+                    if (zzz) 
+                    {
+                        FDC.cycle_deadline = (CPU.TotalInstructions*8) + (10*FDC_CYCLES_PER_BYTE);  // Pace the next byte
+                        zzz=0;
+                    }
+                    
                     FDC.status &= ~ST_BUSY;               // Done. No longer busy.
                     FDC.status &= ~ST_INDEX_DRQ;          // Ensure we don't ask for more data.
                     FDC.wait_for_read = 2;                // Don't fetch more FDC data
@@ -230,6 +237,7 @@ void fdc_state_machine(void)
                 }
                 else
                 {
+                    zzz=1;
                     FDC.read_timeout = 255;                              // Read time-out in a bit less than 1 frame (255 scanlines)
                     FDC.int_req = 0x40;                                  // Data request but not interrupt request
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);              // Data Ready and no errors... still busy

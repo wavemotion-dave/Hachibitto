@@ -1517,7 +1517,14 @@ ITCM_CODE byte RdCtrl9938(void)
   else if (VDP[15] == 2) // Status register 2
   {
       // Check if we are in the visible screen area
-      if (CurLine < VDP9938_START_LINE || CurLine > VDP9938_END_LINE) data |= 0x40;
+      if (CurLine < VDP9938_START_LINE || CurLine >= VDP9938_END_LINE)
+      {
+          data |= 0x40; // We are in VBLANK 
+      }
+      else
+      {
+          data &= ~0x40; // We are in active drawing area
+      }
 
       // A standard scanline has 228 Z80 cycles. H-Blank typically kicks in
       // roughly around cycle 170-174 depending on display widths. This isn't
@@ -1526,10 +1533,20 @@ ITCM_CODE byte RdCtrl9938(void)
       {
           data |= 0x20; // Set HR Flag (Bit 5) -> We are inside H-Blank
       }
+      else
+      {
+          data &= ~0x20; // We are in active scanline
+      }
+      
+      if (frame_number & 1) data |= 0x02; else data &= ~0x02; // Even vs Odd frame
   }
   else if (VDP[15] == 7)
   {
       data=VDPStatus[7]=VDP[44]=VDPRead();
+  }
+  else
+  {
+      debug[VDP[15]]++;
   }
 
   return(data);

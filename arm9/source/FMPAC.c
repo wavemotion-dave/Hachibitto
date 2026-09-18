@@ -16,12 +16,15 @@
 #define FMPAC_SIN_SHIFT			24		// phase>>24 -> 8-bit (256 entry) table index
 #define FMPAC_GAIN_RAMP_STEP		16		// gain moves this much per sample toward its target -
 							// ~16 samples (~0.6ms) for a full ramp, cheap click avoidance
-#define FMPAC_OUT_SHIFT			10		// output headroom - FMPACMixer accumulates into a buffer
-							// PSG/SCC have likely already written into, so this leaves
-							// more room before the final clamp has to hard-clip (which
-							// sounds like static/distortion). Was 8 - try 10 first; raise
-							// further (quieter) if static persists, or drop toward 8 if
-							// FM-PAC ends up inaudibly quiet against the other two chips.
+#define FMPAC_OUT_SHIFT			10		// melodic channel output headroom
+#define FMPAC_NOISE_OUT_SHIFT		12		// noise drums get MORE attenuation than melodic channels -
+							// broadband noise reads as much harsher/louder than a tone
+							// at the same numeric amplitude, and real FM-PAC percussion
+							// is shaped/filtered rather than raw noise, which this driver
+							// doesn't attempt. Confirmed via replaying real game data
+							// (Aleste) that noise-active moments carry ~20x the high-
+							// frequency energy of noise-inactive ones - this constant is
+							// the knob to turn if it's still too harsh, or too quiet.
 
 //@----------------------------------------------------------------------------
 //@ 256-entry linear sine table, amplitude -127..127. One lookup per active
@@ -145,7 +148,7 @@ static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume)
 
 	osc->phase += osc->phaseIncrement;
 	s32 s = FMPAC_SinTable[(osc->phase >> FMPAC_SIN_SHIFT) & 0xFF];
-	return (s * (15 - volume) * osc->gain) >> 8;
+	return (s * (15 - volume) * osc->gain) >> FMPAC_OUT_SHIFT;
 }
 
 //@----------------------------------------------------------------------------
@@ -175,7 +178,7 @@ static s32 FMPAC_RenderNoiseDrum(FMPAC *chip, FMPAC_Oscillator *osc, u8 keyOn, u
 	chip->noiseLFSR = lfsr;
 
 	s32 noise = (s32)(lfsr & 0xFF) - 128;	// -128..127
-	return (noise * (15 - (volume & 0x0F)) * osc->gain) >> 8;
+	return (noise * (15 - (volume & 0x0F)) * osc->gain) >> FMPAC_NOISE_OUT_SHIFT;
 }
 
 //@----------------------------------------------------------------------------
@@ -326,6 +329,7 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 				sample += FMPAC_RenderNoiseDrum(chip, &chip->rhythmTCY, tcyOn, chip->rhythmVolTCY);
 		}
 
+        sample = sample << 3;
 		s32 mixed = (s32)dest[i] + sample;
 		if (mixed > 32767) mixed = 32767;
 		if (mixed < -32768) mixed = -32768;

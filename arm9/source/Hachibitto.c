@@ -349,7 +349,8 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     {
         if (msx_music_capable_game) // If MSX-MUSIC is enabled, we mix AY with the FM channels
         {
-            ay38910Mixer(len*2, dest, &myAY);
+            ay38910Mixer(len*2, dest, &myAY); //todo: RESTORE AY
+            //for (int i=0; i<len*2; i++) ((u16*)dest)[i]=0x00; // clear mixer
             FMPACMixer(len*2, dest, &myYM);
         }
         else if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
