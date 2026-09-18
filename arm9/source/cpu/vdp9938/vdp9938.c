@@ -1083,7 +1083,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
         uint8_t *P = RefreshBorder(uY);
 
         const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
-        if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
+        if (FlipEvenOdd && OddPage && (VDP_Memory <= src - 0x8000)) src -= 0x8000;
 
         u32 * restrict dst32 = (u32*)P;
         const u32 * restrict src32 = (u32*)src;
@@ -1608,7 +1608,7 @@ void Loop9938(void)
           // ---------------------------------------------------------------
           int first_visible_line = VDP9938_START_LINE+myConfig.yOffset+temp_offset;
           
-          if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+192)))
+          if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+(myConfig.scaleScreen ? 212:192))))
           {
               RefreshLine(CurLine - VDP9938_START_LINE);
           }

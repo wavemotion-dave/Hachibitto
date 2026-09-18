@@ -4,27 +4,36 @@
 //
 //  Interface shape deliberately mirrors SCC.s/SCC.i: FMPACReset,
 //  FMPACWrite, FMPACRead, FMPACMixer, FMPACGetStateSize, FMPACSaveState,
-//  FMPACLoadState. First pass is plain C; the mixer is the candidate for
-//  a hand-written ARM asm port later, same as SCC's history.
+//  FMPACLoadState.
 //
-//  ACCURACY LEVEL - read this before assuming behavior matches real HW:
-//    This is the "simplified/approximate" synthesis option, not a
-//    cycle/bit-accurate OPLL core. Specifically:
-//      - Real OPLL does FM synthesis in the log domain (phase -> logsin
-//        table -> add attenuation -> exp table -> linear sample). This
-//        driver instead uses a single plain linear sine table and scales
-//        the result by envelope/volume directly. Sounds "FM-shaped" but
-//        will not timbre-match real hardware exactly.
-//      - The envelope generator is a simplified linear-ish ADSR (four
-//        stages, level 0-255, fixed step tables indexed by rate), not
-//        the chip's real logarithmic-rate envelope with key-scaling.
-//      - The 15 preset instruments below are hand-approximated (roughly
-//        categorized by brightness/feedback/envelope shape to be
-//        recognizable as "that kind of sound"), NOT the real YM2413
-//        factory ROM values. Swap FMPAC_InstrumentROM[] for the real
-//        table later if exact-timbre compatibility ever matters.
-//      - Vibrato/AM (registers' VIB/AM bits) are decoded and stored but
-//        not yet applied to the signal - flagged TODO at the field.
+//  ACCURACY LEVEL - this is a DRASTIC simplification, not FM synthesis:
+//    Measured mixer cost with real 2-operator FM + full ADSR was ~5x over
+//    budget on this hardware (22fps vs. a 90fps target) even at -O2, and
+//    DTCM placement of the lookup tables barely moved it (~2%) -
+//    confirming the cost is raw per-sample computation, not memory
+//    latency or missing compiler optimization. Per explicit direction,
+//    this version trades authenticity for speed:
+//      - NO FM modulation. Each channel is a single sine-wave oscillator,
+//        tuned from its own frequency registers. The modulator operator,
+//        self-feedback, and phase modulation are gone entirely.
+//      - NO ADSR envelope. A channel's gain just ramps linearly toward
+//        full volume on key-on and toward zero on key-off, at a fixed
+//        rate - no attack/decay/sustain/release shaping, no per-instrument
+//        rate tables. Once a held note reaches its target gain, the
+//        per-sample "envelope" cost is a single comparison that does
+//        nothing.
+//      - Instrument selection ($30-$38 high nibble) and the custom/ROM
+//        instrument registers ($00-$07) are still fully decoded and
+//        stored (so nothing is lost if this needs to be dialed back up
+//        later), but the mixer only reads mulCar from them (for a
+//        free per-instrument pitch multiplier) - TL, feedback, KSL, AM,
+//        VIB, and all ADSR rates are stored but unused.
+//      - Rhythm mode's non-tonal drums (HH/SD/TOP-CY) still use noise,
+//        but with the same simple gain ramp as melodic channels rather
+//        than their own ADSR rates.
+//    Every channel now sounds like a plain tone or a burst of noise -
+//    no FM timbre, no per-instrument envelope character. This is
+//    deliberate: getting the frame rate back is the only goal right now.
 //
 //  Register map (verified against the Yamaha OPLL Application Manual,
 //  not reconstructed from memory - see chat for the source):
@@ -39,13 +48,11 @@
 //    $20-$28   D5=SUS D4=KEY D3-1=BLOCK D0=F-Number bit8
 //    $30-$38   D7-4=INST(0-15) D3-0=VOL
 //  Rhythm mode (D5 of $0E set) repurposes channels 6/7/8 (zero-indexed):
-//    ch6 = Bass Drum (both operators, melodic-style, own key-on = D4/$0E)
-//    ch7 = Hi-Hat (modulator, key-on = D0/$0E) + Snare Drum (carrier, D3/$0E)
-//    ch8 = Tom-Tom (modulator, key-on = D2/$0E) + Top Cymbal (carrier, D1/$0E)
-//  In rhythm mode $26/$27/$28 key-on bits (D4) must stay 0 - the chip
-//  uses $0E's dedicated bits instead - and Yamaha's recommended fixed
-//  setup values are $16=0x20 $17=0x50 $18=0xC0 $26=0x05 $27=0x05 $28=0x01.
-//  Rhythm volumes: $36=BD(D3-0) $37=HH(D7-4)+SD(D3-0) $38=TOM(D7-4)+TOP-CY(D3-0).
+//    ch6 = Bass Drum (tonal oscillator, key-on = D4/$0E)
+//    ch7 = Hi-Hat (noise, key-on = D0/$0E) + Snare Drum (noise, D3/$0E)
+//    ch8 = Tom-Tom (tonal oscillator, key-on = D2/$0E) + Top Cymbal (noise, D1/$0E)
+//  Setup values ($16-$18/$26-$28) and rhythm volumes ($36-$38) are still
+//  decoded the same as before - only the synthesis method changed.
 //
 
 #ifndef FMPAC_H
@@ -54,97 +61,81 @@
 #include <nds.h>
 
 #define FMPAC_NUM_CHANNELS   9
-#define FMPAC_NUM_OPERATORS  2		// 0 = modulator, 1 = carrier
 
 //@----------------------------------------------------------------------------
-//@ One operator's register-level parameters (this exact 8-byte layout is
-//@ shared between the mutable "custom" instrument (regs $00-$07) and each
-//@ of the 15 preset ROM-equivalent entries below, so both can be decoded
-//@ by the same code path).
+//@ Register-level instrument parameters. Fully decoded and stored (both the
+//@ mutable custom instrument and the 15 ROM presets) even though the mixer
+//@ currently only reads mulCar - kept complete so richer synthesis can be
+//@ dialed back in later without redoing the register decode.
 //@----------------------------------------------------------------------------
 typedef struct
 {
-	u8 mulMod, mulCar;		// $00/$01 D3-0  - frequency multiplier, 0-15 (see MUL table)
-	u8 amMod,  amCar;		// $00/$01 D7    - amplitude modulation enable (TODO: not yet applied)
-	u8 vibMod, vibCar;		// $00/$01 D6    - vibrato enable (TODO: not yet applied)
-	u8 egTypeMod, egTypeCar;	// $00/$01 D5    - 0=percussive (decay past sustain), 1=sustained (hold)
-	u8 ksrMod, ksrCar;		// $00/$01 D4    - key scale rate (TODO: not yet applied to envelope speed)
-	u8 kslMod, kslCar;		// $02/$03 D7-6  - key scale level (TODO: not yet applied as attenuation)
-	u8 tl;				// $02     D5-0  - modulator total level, 0-63 (carrier's level = channel VOL)
-	u8 dm, dc;			// $03     D3,D4 - half-wave rectify modulator/carrier (TODO: not yet applied)
-	u8 fb;				// $03     D2-0  - modulator self-feedback amount, 0-7
-	u8 arMod, drMod, slMod, rrMod;	// $04/$06 - modulator attack/decay/sustain-level/release rates
-	u8 arCar, drCar, slCar, rrCar;	// $05/$07 - carrier attack/decay/sustain-level/release rates
+	u8 mulMod, mulCar;		// $00/$01 D3-0  - frequency multiplier, 0-15 (see MUL table). Only
+					// mulCar is currently read by the mixer (free per-instrument pitch variety).
+	u8 amMod,  amCar;		// $00/$01 D7    - unused by the mixer currently
+	u8 vibMod, vibCar;		// $00/$01 D6    - unused by the mixer currently
+	u8 egTypeMod, egTypeCar;	// $00/$01 D5    - unused (no ADSR right now)
+	u8 ksrMod, ksrCar;		// $00/$01 D4    - unused by the mixer currently
+	u8 kslMod, kslCar;		// $02/$03 D7-6  - unused by the mixer currently
+	u8 tl;				// $02     D5-0  - unused by the mixer currently (no FM = no modulator level)
+	u8 dm, dc;			// $03     D3,D4 - unused by the mixer currently
+	u8 fb;				// $03     D2-0  - unused (no feedback without a modulator)
+	u8 arMod, drMod, slMod, rrMod;	// $04/$06 - unused (no ADSR right now)
+	u8 arCar, drCar, slCar, rrCar;	// $05/$07 - unused (no ADSR right now)
 } FMPAC_Instrument;
 
 //@----------------------------------------------------------------------------
-//@ Runtime (audio-rate) state for one operator - not saved register content,
-//@ this is where the operator "currently is" in its phase/envelope cycle.
+//@ Runtime (audio-rate) state for one channel's oscillator.
 //@----------------------------------------------------------------------------
-typedef enum
-{
-	FMPAC_ENV_IDLE = 0,
-	FMPAC_ENV_ATTACK,
-	FMPAC_ENV_DECAY,
-	FMPAC_ENV_SUSTAIN,
-	FMPAC_ENV_RELEASE
-} FMPAC_EnvelopeStage;
-
 typedef struct
 {
-	u32 phase;			// fixed-point phase accumulator (see FMPAC.c for the fixed-point format)
-	u32 phaseIncrement;		// cached per-sample phase step - recomputed only when freq/block/mul/instrument change, not every sample
-	u32 envAccum;			// 16.16 fixed-point fractional accumulator - envLevel only moves in whole
-					// units, but real envelope times need sub-1-unit-per-sample steps at
-					// audio rate, hence this rather than stepping envLevel directly
-	u8  envLevel;			// 0 (silent) - 255 (full) current envelope amplitude
-	u8  envStage;			// FMPAC_EnvelopeStage
-	s16 feedbackHist[2];		// modulator's last two output samples, for self-feedback (FB); unused on carrier
-} FMPAC_Operator;
+	u32 phase;			// fixed-point phase accumulator
+	u32 phaseIncrement;		// cached per-sample phase step - recomputed only when freq/block/mul/instrument change
+	u8  gain;			// 0 (silent) - 255 (full) - ramps toward keyOn?255:0 each sample, fixed rate
+} FMPAC_Oscillator;
 
 //@----------------------------------------------------------------------------
-//@ Register-level (saved) state for one channel, plus its two operators'
+//@ Register-level (saved) state for one channel, plus its oscillator's
 //@ runtime state. In rhythm mode, channels 6-8's fields below are
 //@ reinterpreted per the register map notes above rather than unused.
 //@----------------------------------------------------------------------------
 typedef struct
 {
 	u8  instrument;			// $3x D7-4 - 0 = custom (FMPAC.customInstrument), 1-15 = ROM preset
-	u8  volume;			// $3x D3-0 - carrier attenuation, 0 (loudest) - 15 (quietest)
+	u8  volume;			// $3x D3-0 - attenuation, 0 (loudest) - 15 (quietest)
 	u16 fNumber;			// $1x + $2x D0 - 9-bit F-Number
 	u8  block;			// $2x D3-1 - octave, 0-7
 	u8  keyOn;			// $2x D4 (melodic) or the matching $0E bit (rhythm ch6-8)
-	u8  sustain;			// $2x D5 - extends release rate when key is off
+	u8  sustain;			// $2x D5 - stored, currently unused by the mixer
 
 	const FMPAC_Instrument *instPtr;	// cached &customInstrument or &InstrumentROM[instrument] -
 						// re-pointed only on a $3x write, not re-derived every sample
 
-	FMPAC_Operator mod;
-	FMPAC_Operator car;
+	FMPAC_Oscillator osc;
 } FMPAC_Channel;
 
 //@----------------------------------------------------------------------------
 //@ Whole-chip state. This is the struct pointer passed around exactly like
-//@ SCC's SCCptr, and the whole thing (or a clearly-marked sub-range of it,
-//@ if we later split "live" vs "saved" the way SCC.i does) is what
-//@ FMPACSaveState/FMPACLoadState round-trip.
+//@ SCC's SCCptr, and the whole thing is what FMPACSaveState/FMPACLoadState
+//@ round-trip.
 //@----------------------------------------------------------------------------
 typedef struct
 {
 	FMPAC_Channel channels[FMPAC_NUM_CHANNELS];
 	FMPAC_Instrument customInstrument;	// regs $00-$07, used by any channel with instrument==0
-	u8 rhythmReg;				// $0E raw byte, decoded on demand (see FMPAC_RHYTHM_* masks)
+	u8 rhythmReg;				// $0E raw byte
 	u8 rhythmVolBD;				// $36 D3-0
 	u8 rhythmVolHH, rhythmVolSD;		// $37 D7-4, D3-0
 	u8 rhythmVolTOM, rhythmVolTCY;		// $38 D7-4, D3-0
-	u8 testReg;				// $0F, storage only - real HW says this should stay 0
-	u8 addressLatch;			// last value written to the address-select port (see FMPAC.c)
+	u8 testReg;				// $0F, storage only
+	u8 addressLatch;			// last value written to the address-select port (caller's convenience)
 	u32 noiseLFSR;				// shared noise generator feeding HH/SD/TOP-CY - must never be seeded 0
+	FMPAC_Oscillator rhythmSD;		// rhythm mode only: channel 7's SECOND voice (HH uses channels[7].osc)
+	FMPAC_Oscillator rhythmTCY;		// rhythm mode only: channel 8's SECOND voice (TOM uses channels[8].osc)
 } FMPAC;
 
 //@----------------------------------------------------------------------------
-//@ Register bit masks/shifts (for the few registers whose fields don't
-//@ split cleanly along nibble/byte lines).
+//@ Register bit masks/shifts.
 //@----------------------------------------------------------------------------
 #define FMPAC_REG_AM_BIT		0x80
 #define FMPAC_REG_VIB_BIT		0x40
@@ -184,12 +175,9 @@ typedef struct
 #define FMPAC_CHANNEL_TOMTCY		8	// real-world "channel 9"
 
 //@----------------------------------------------------------------------------
-//@ Approximate instrument table. Index 0 is never read from here - a
-//@ channel with instrument==0 always uses FMPAC.customInstrument instead.
-//@ Indices 1-15 are hand-picked stand-ins for Violin/Guitar/Piano/Flute/
-//@ Clarinet/Oboe/Trumpet/Organ/Horn/Synthesizer/Harpsichord/Vibraphone/
-//@ SynthBass/AcousticBass/ElectricGuitar - NOT the real ROM data (see the
-//@ file-level comment). Defined in FMPAC.c.
+//@ Instrument table - real Yamaha ROM data (decoded from a verified
+//@ reference core), though the mixer currently only reads mulCar/mulMod
+//@ from each entry. Defined in FMPAC.c.
 //@----------------------------------------------------------------------------
 extern const FMPAC_Instrument FMPAC_InstrumentROM[16];
 
@@ -199,7 +187,7 @@ extern const FMPAC_Instrument FMPAC_InstrumentROM[16];
 void FMPACReset(FMPAC *chip);
 void FMPACWrite(u8 value, u8 address, FMPAC *chip);	// address = resolved register 0x00-0x38, not a Z80 address
 u8   FMPACRead(u8 address, FMPAC *chip);
-void FMPACMixer(int len, s16 *dest, FMPAC *chip);	// dest = mono sample buffer, chip mixed in additively? see FMPAC.c
+void FMPACMixer(int len, s16 *dest, FMPAC *chip);	// accumulates into dest - see FMPAC.c
 
 u32  FMPACGetStateSize(void);
 void FMPACSaveState(u8 *dest, FMPAC *chip);

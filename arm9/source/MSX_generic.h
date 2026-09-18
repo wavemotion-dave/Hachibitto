@@ -84,7 +84,7 @@ struct __attribute__((__packed__)) Config_t
     u8  cpuBoost;
     u8  splitRefresh;
     u8  msxMusic;
-    u8  reserved3;
+    u8  scaleScreen;
     u8  reserved4;
     u8  reserved5;
     u8  reserved6;

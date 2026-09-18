@@ -916,7 +916,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
 
 u8 handle_alpha_keyboard_press(u16 iTx, u16 iTy)  // Generic and Simplified Alpha-Numeric Keyboard
 {
-    if ((iTy >= 14) && (iTy < 48))   // Row 1 (number row)
+    if ((iTy >= 14) && (iTy < 50))   // Row 1 (number row)
     {
         if      ((iTx >= 0)   && (iTx < 28))   kbd_key = '1';
         else if ((iTx >= 28)  && (iTx < 54))   kbd_key = '2';
@@ -929,7 +929,7 @@ u8 handle_alpha_keyboard_press(u16 iTx, u16 iTy)  // Generic and Simplified Alph
         else if ((iTx >= 200) && (iTx < 226))  kbd_key = '9';
         else if ((iTx >= 226) && (iTx < 255))  kbd_key = '0';
     }
-    else if ((iTy >= 48) && (iTy < 85))  // Row 2 (QWERTY row)
+    else if ((iTy >= 50) && (iTy < 88))  // Row 2 (QWERTY row)
     {
         if      ((iTx >= 0)   && (iTx < 28))   kbd_key = 'Q';
         else if ((iTx >= 28)  && (iTx < 54))   kbd_key = 'W';
@@ -942,7 +942,7 @@ u8 handle_alpha_keyboard_press(u16 iTx, u16 iTy)  // Generic and Simplified Alph
         else if ((iTx >= 200) && (iTx < 226))  kbd_key = 'O';
         else if ((iTx >= 226) && (iTx < 255))  kbd_key = 'P';
     }
-    else if ((iTy >= 85) && (iTy < 122)) // Row 3 (ASDF row)
+    else if ((iTy >= 88) && (iTy < 125)) // Row 3 (ASDF row)
     {
         if      ((iTx >= 0)   && (iTx < 28))   kbd_key = 'A';
         else if ((iTx >= 28)  && (iTx < 54))   kbd_key = 'S';
@@ -955,7 +955,7 @@ u8 handle_alpha_keyboard_press(u16 iTx, u16 iTy)  // Generic and Simplified Alph
         else if ((iTx >= 200) && (iTx < 226))  kbd_key = 'L';
         else if ((iTx >= 226) && (iTx < 255))  kbd_key = KBD_KEY_BS;
     }
-    else if ((iTy >= 122) && (iTy < 159)) // Row 4 (ZXCV row)
+    else if ((iTy >= 125) && (iTy < 160)) // Row 4 (ZXCV row)
     {
         if      ((iTx >= 0)   && (iTx < 28))   kbd_key = 'Z';
         else if ((iTx >= 28)  && (iTx < 54))   kbd_key = 'X';
@@ -964,17 +964,14 @@ u8 handle_alpha_keyboard_press(u16 iTx, u16 iTy)  // Generic and Simplified Alph
         else if ((iTx >= 106) && (iTx < 132))  kbd_key = 'B';
         else if ((iTx >= 132) && (iTx < 148))  kbd_key = 'N';
         else if ((iTx >= 148) && (iTx < 174))  kbd_key = 'M';
-        else if ((iTx >= 174) && (iTx < 200))  kbd_key = (key_shift ?  KBD_KEY_QUOTE : ',');
-        else if ((iTx >= 200) && (iTx < 226))  kbd_key = (key_shift ?  KBD_KEY_F1 : '.');
-        else if ((iTx >= 226) && (iTx < 255))  kbd_key = KBD_KEY_RET;
+        else if ((iTx >= 174) && (iTx < 200))  kbd_key = (key_shift ?  ',' : '.');
+        else if ((iTx >= 200) && (iTx < 255))  kbd_key = KBD_KEY_RET;
     }
-    else if ((iTy >= 159) && (iTy < 192)) // Row 5 (SPACE BAR and icons row)
+    else if ((iTy >= 160) && (iTy < 192)) // Row 5 (SPACE BAR and icons row)
     {
-        if      ((iTx >= 1)   && (iTx < 52))   return MENU_CHOICE_MENU;
-        else if ((iTx >= 54)  && (iTx < 202))  kbd_key = ' ';
+             if ((iTx >= 1)   && (iTx < 202))  kbd_key = ' ';
         else if ((iTx >= 202) && (iTx < 255))  return MENU_CHOICE_MENU;
     }
-
 
     return MENU_CHOICE_NONE;
 }
@@ -1159,7 +1156,11 @@ void Hachibitto_main(void)
                   // ------------------------------------------------------------
                   else
                   {
-                      meta_key = handle_msx_keyboard_press(iTx, iTy);
+                      if (myConfig.keyboard == OVL_ALPHAKBD)
+                        meta_key = handle_alpha_keyboard_press(iTx, iTy);
+                      else 
+                        meta_key = handle_msx_keyboard_press(iTx, iTy);
+                      
                   }
 
                   if (kbd_key != 0)
@@ -1553,13 +1554,6 @@ void BottomScreenKeypad(void)
       dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
       dmaCopy((void*) debug_ovlPal,(void*) BG_PALETTE_SUB,256*2);
     }
-    else if (myConfig.keyboard == OVL_FULLKBD) // Full Keyboard (based on machine)
-    {
-      decompress(msx_kbdTiles, bgGetGfxPtr(bg0b),  LZ77Vram);
-      decompress(msx_kbdMap, (void*) bgGetMapPtr(bg0b),  LZ77Vram);
-      dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
-      dmaCopy((void*) msx_kbdPal,(void*) BG_PALETTE_SUB,256*2);
-    }
     else if (myConfig.keyboard == OVL_ALPHAKBD) // Alpha Simplified Keyboard
     {
       //  Init bottom screen
@@ -1568,9 +1562,12 @@ void BottomScreenKeypad(void)
       dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
       dmaCopy((void*) alpha_kbdPal,(void*) BG_PALETTE_SUB,256*2);
     }
-    else // Generic Overlay (overlay == 0)
+    else // Must be OVL_FULLKBD
     {
-        //todo
+      decompress(msx_kbdTiles, bgGetGfxPtr(bg0b),  LZ77Vram);
+      decompress(msx_kbdMap, (void*) bgGetMapPtr(bg0b),  LZ77Vram);
+      dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
+      dmaCopy((void*) msx_kbdPal,(void*) BG_PALETTE_SUB,256*2);
     }
 
     unsigned  short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
@@ -1606,6 +1603,9 @@ void HachibittoInitCPU(void)
 // -------------------------------------------------------------
 void irqVBlank(void)
 {
+    int ydyBG = 0x0100; // Default to no screen scale
+    int shifty = 0;
+    
     // Manage time and true vSync on display output to reduce tearing...
     vusCptVBL++;
     dsVSyncCount++;
@@ -1619,9 +1619,29 @@ void irqVBlank(void)
     {
         cyBG = 0;
     }
+    else
+    {
+        // --------------------------------------------------------------------
+        // Compress screen (yuck!). We do a little bit of DS magic here to 
+        // shift one of the two DS video pointers so that we end up with a 
+        // tiny bit of vertical blurring that helps games that have static
+        // screens so that some lines repeat a pixel rather than just losing
+        // it completely. This produces squatter/fatter text but generally 
+        // looks better than a line of missing pixels. It's not perfect.
+        // --------------------------------------------------------------------
+        if (myConfig.scaleScreen)
+        {
+            ydyBG = ((212 / 192) << 8) | (212 % 192);
+            if (myConfig.yOffset+temp_offset == 0)  cyBG = (1<<8);
+            shifty=20;
+        }
+    }
 
-    REG_BG2Y = cyBG;
+    REG_BG2Y = cyBG + shifty;
     REG_BG3Y = cyBG;
+
+    REG_BG2PD = ydyBG;
+    REG_BG3PD = ydyBG;
 
     if (temp_offset)
     {
@@ -1870,10 +1890,19 @@ u8 msxInit(char *szGame)
     // Here we can claim back 128K of VRAM which is otherwise unused
     // but we can use it for fast memory swaps and look-up-tables.
     // -----------------------------------------------------------------
-    videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
+    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
     vramSetBankA(VRAM_A_MAIN_BG_0x06000000);      // This is our top emulation screen (where the game is played)
     vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000 which can be used in-game
     REG_BG3CNT = BG_BMP8_256x256;
+    REG_BG2CNT = BG_BMP8_256x256;
+
+    REG_BG2PA = (1<<8);
+    REG_BG2PB = 0;
+    REG_BG2PC = 0;
+    REG_BG2PD = (1<<8);
+    REG_BG2X = 0;
+    REG_BG2Y = 0;
+    
     REG_BG3PA = (1<<8);
     REG_BG3PB = 0;
     REG_BG3PC = 0;
