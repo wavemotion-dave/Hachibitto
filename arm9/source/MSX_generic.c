@@ -127,22 +127,21 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD LBRACKET",
   "KEYBOARD RBRACKET",
   "KEYBOARD ATSIGN", //70
+  "KEYBOARD YEN",
   "KEYBOARD BS",
   "KEYBOARD TAB",
   "KEYBOARD INS",
-  "KEYBOARD DEL",
-  "KEYBOARD CLEAR", // 75
+  "KEYBOARD DEL", // 75
   "KEYBOARD STOP",
   "KEYBOARD F1", 
   "KEYBOARD F2",
   "KEYBOARD F3",
-  "KEYBOARD F4", //80
-  "KEYBOARD F5",
+  "KEYBOARD F5", //80
 
-  "PAN UP",      //82
-  "PAN DOWN",
-  "SHOW TOP",    //84
-  "SHOW BOTTOM", //85
+  "PAN UP",      //81
+  "PAN DOWN",    //82
+  "SHOW TOP",    //83
+  "SHOW BOTTOM", //84
 };
 
 
@@ -858,8 +857,8 @@ void MapPlayer1(void)
     myConfig.keymap[3]   = 3;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 4;    // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 5;    // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -874,8 +873,8 @@ void MapPlayer2(void)
     myConfig.keymap[3]   = 9;    // NDS D-Pad mapped to MSX Joystick RIGHT
     myConfig.keymap[4]   = 10;   // NDS A Button mapped to MSX Button 1
     myConfig.keymap[5]   = 11;   // NDS B Button mapped to MSX Button 2
-    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -890,8 +889,8 @@ void MapCursors(void)
     myConfig.keymap[3]   = 59;   // Right Arrow
     myConfig.keymap[4]   = 52;   // Space
     myConfig.keymap[5]   = 56;   // Up Arrow
-    myConfig.keymap[6]   = 82;   // NDS X Button mapped to PAN UP
-    myConfig.keymap[7]   = 83;   // NDS Y Button mapped to PAN DN
+    myConfig.keymap[6]   = 81;   // NDS X Button mapped to PAN UP
+    myConfig.keymap[7]   = 82;   // NDS Y Button mapped to PAN DN
     myConfig.keymap[8]   = 49;   // NDS R      mapped to CTRL
     myConfig.keymap[9]   = 48;   // NDS L      mapped to SHIFT
     myConfig.keymap[10]  = 53;   // NDS Start  mapped to RETURN
@@ -1008,14 +1007,14 @@ void FindConfig(void)
 // ------------------------------------------------------------------------------
 // Options are handled here... we have a number of things the user can tweak
 // and these options are applied immediately. The user can also save off
-// their option choices for the currently running game into the NINTV-DS.DAT
-// configuration database. When games are loaded back up, NINTV-DS.DAT is read
+// their option choices for the currently running game into the Hachibitto.DAT
+// configuration database. When games are loaded back up, Hachibitto.DAT is read
 // to see if we have a match and the user settings can be restored for the game.
 // ------------------------------------------------------------------------------
 struct options_t
 {
     const char  *label;
-    const char  *option[37];
+    const char  *option[32];
     u8          *option_val;
     u8           option_max;
 };

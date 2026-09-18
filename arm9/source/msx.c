@@ -37,8 +37,6 @@ u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
-u8 msx_beeper_process       __attribute__((section(".dtcm"))) = 0;
-u8 beeperWasOn              __attribute__((section(".dtcm"))) = 0;
 u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;
@@ -258,9 +256,9 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
                   if (kbd_key == '9')           key1 |= 0x02;
                   if (kbd_key == '-')           key1 |= 0x04;
                   if (kbd_key == '=')           key1 |= 0x08;
-                  if (kbd_key == '\\')          key1 |= 0x10;
-                  if (kbd_key == '[')           key1 |= 0x20;
-                  if (kbd_key == ']')           key1 |= 0x40;
+                  if (kbd_key == '|')           key1 |= 0x10; // YEN
+                  if (kbd_key == '@')           key1 |= 0x20;
+                  if (kbd_key == '[')           key1 |= 0x40;
                   if (kbd_key == ';')           key1 |= 0x80;
                   if (kbd_key == ':')           key1 |= 0x80;
               }
@@ -270,7 +268,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
               if (kbd_key)
               {
                   if (kbd_key == KBD_KEY_QUOTE) key1 |= 0x01;
-                  if (kbd_key == '`')           key1 |= 0x02;
+                  if (kbd_key == ']')           key1 |= 0x02;
                   if (kbd_key == ',')           key1 |= 0x04;
                   if (kbd_key == '.')           key1 |= 0x08;
                   if (kbd_key == '/')           key1 |= 0x10;
@@ -1475,27 +1473,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         msxLoadEEPROM();
     }
-}
-
-// ------------------------------------------------------------------------------------
-// If the MSX Beeper is being used (rare but a few of the ZX Spectrum ports use it),
-// then we need to service it here. We basically track the frequency at which the
-// game has hit the beeper and approximate that by using AY Channel A to produce the
-// tone.  This is crude and doesn't sound quite right... but good enough.
-// ------------------------------------------------------------------------------------
-void BeeperOFF(void)
-{
-    //TODO: beeper not supported yet
-}
-
-void BeeperON(u16 beeper_freq)
-{
-    //TODO: beeper not supported yet
-}
-
-void MSX_HandleBeeper(void)
-{
-    //TODO: beeper not supported yet
 }
 
 // ---------------------------------------------------------------------------

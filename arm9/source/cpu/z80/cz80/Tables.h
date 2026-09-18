@@ -28,9 +28,8 @@
 // and we will compensate the cycles if the jump is not taken. 
 //
 // Also, the M1 wait state is included in these tables as this 
-// will occur on the Colecovision, ADAM and MSX which are some
-// primary targets for this emulation. We'll compensate the cycle
-// counter when we have a machine that does not use the M1 wait.
+// will occur on the MSX and MSX2 which are the intended targets
+// for this emulation.
 //
 // The 0+2 are intentional below as we compensate an extra M1
 // wait for the prefixed instructions CB, DD, ED and FD

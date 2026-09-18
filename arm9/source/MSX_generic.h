@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x000A
+#define CONFIG_VER                  0x000B
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -210,7 +210,7 @@ extern u8 palette_latch;
 extern uint8_t OccBuf[320];
 extern u16 nibbleLUT16[256];
 extern u8 screen7LUT[256];
-
+extern u16 beeperFreq;
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need
@@ -228,9 +228,6 @@ extern void BufferKeys(char *str);
 extern void MSX_InitialMemoryLayout(u32 romSize);
 extern void msxSaveEEPROM(void);
 extern void msxLoadEEPROM(void);
-extern void MSX_HandleBeeper(void);
-extern void BeeperON(u16 beeper_freq);
-extern void BeeperOFF(void);
 extern void Z80_Interface_Reset(void);
 extern void LoadFavorites(void);
 extern void preserveCompressedMem(void);

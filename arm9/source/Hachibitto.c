@@ -197,11 +197,11 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_LBRACKET,
     META_KBD_RBRACKET,
     META_KBD_ATSIGN,
+    META_KBD_YEN,
     META_KBD_BS,
     META_KBD_TAB,
     META_KBD_INS,
     META_KBD_DEL,
-    META_KBD_CLR,
     META_KBD_STOP_BRK,
     META_KBD_F1,
     META_KBD_F2,
@@ -256,6 +256,39 @@ const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
 // -------------------------------------------------------------------------------------------
 s16 last_sample __attribute__((section(".dtcm"))) = 0;
 
+// -----------------------------------------------------------------------------------------------
+// A simplified beeper handler. Very few MSX games use the 1-bit beeper. It's mainly "lazy"
+// ZX Spectrum conversions. Almost no software designed originally for the MSX uses the beeper.
+// So this does a simple job - we know how many times the beeper bit on Port C was "hit" by 
+// the program. We basically use that to know how often to toggle a square wave sound and mix
+// it into the existing sound output buffer. It's crude but gets the job done and is good enough.
+// -----------------------------------------------------------------------------------------------
+void ProcessBeeper(mm_word len, mm_addr dest)
+{
+    s16 beeperTone = 0;
+    
+    if (beeperFreq > 16) beeperFreq = 16;
+    int toggle = len / beeperFreq;
+    for (int i=0; i<len; i++)
+    {
+        if (toggle)
+        {
+            if (--toggle == 0)
+            {
+                beeperTone ^= 0x1000;
+                toggle = len / beeperFreq;
+            }
+        }
+        ((s16*)dest)[(i*2)+0] += beeperTone;
+        ((s16*)dest)[(i*2)+1] += beeperTone;
+    }
+    beeperFreq = 0;    
+}
+
+// ------------------------------------------------------------
+// When we first enable the SCC, there is a sharp click heard.
+// This smooths that over a bit so it's much less harsh.
+// ------------------------------------------------------------
 void SmoothStartSCC(mm_word len, mm_addr dest)
 {
     s32 combined_smoothed = last_sample;
@@ -298,6 +331,10 @@ void SmoothStartSCC(mm_word len, mm_addr dest)
     last_sample = *p;
 }
 
+// -----------------------------------------------------------------------------------------------
+// This is our main sound mixer. It's called periodically by the maxmod handler when it needs
+// more samples in the buffer. We generally produce AY output but sometimes mix in SCC or beeper.
+// -----------------------------------------------------------------------------------------------
 ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats format)
 {
     if (soundEmuPause)  // If paused, just "mix" in mute sound chip... all channels are OFF
@@ -310,7 +347,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     }
     else
     {
-        if (msx_music_capable_game)
+        if (msx_music_capable_game) // If MSX-MUSIC is enabled, we mix AY with the FM channels
         {
             ay38910Mixer(len*2, dest, &myAY);
             FMPACMixer(len*2, dest, &myYM);
@@ -372,11 +409,17 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             p--;
             last_sample = *p;
         }
-        else  // Pretty simple... just AY
+        else  // Pretty simple... just AY (and maybe beeper)
         {
             ay38910Mixer(len * 2, dest, &myAY);
+            
+            // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
+            if (beeperFreq)
+            {
+                ProcessBeeper(len, dest);
+            }
 
-            if (isDSiMode()) // DSi gets filter
+            if (isDSiMode()) // DSi gets slight audio filter to remove clicks
             {
                 s16 *p = (s16*)dest;
                 int count = len * 2;
@@ -832,7 +875,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
     }
     else if ((iTy >= 42) && (iTy < 72))   // Row 2 (number row)
     {
-        if      ((iTx >= 0)   && (iTx < 15))   kbd_key = '[';
+        if      ((iTx >= 0)   && (iTx < 15))   kbd_key = '@';
         else if ((iTx >= 15)  && (iTx < 31))   kbd_key = '1';
         else if ((iTx >= 31)  && (iTx < 45))   kbd_key = '2';
         else if ((iTx >= 45)  && (iTx < 61))   kbd_key = '3';
@@ -845,7 +888,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         else if ((iTx >= 151) && (iTx < 165))  kbd_key = '0';
         else if ((iTx >= 165) && (iTx < 181))  kbd_key = '-';
         else if ((iTx >= 181) && (iTx < 195))  kbd_key = '=';
-        else if ((iTx >= 195) && (iTx < 210))  kbd_key = '\\';
+        else if ((iTx >= 195) && (iTx < 210))  kbd_key = '|'; // YEN
         else if ((iTx >= 210) && (iTx < 255))  kbd_key = KBD_KEY_SEL;
     }
     else if ((iTy >= 72) && (iTy < 102))  // Row 3 (QWERTY row)
@@ -861,8 +904,8 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         else if ((iTx >= 129) && (iTx < 143))  kbd_key = 'I';
         else if ((iTx >= 143) && (iTx < 158))  kbd_key = 'O';
         else if ((iTx >= 158) && (iTx < 174))  kbd_key = 'P';
-        else if ((iTx >= 174) && (iTx < 189))  kbd_key = ']';
-        else if ((iTx >= 189) && (iTx < 203))  kbd_key = '`';
+        else if ((iTx >= 174) && (iTx < 189))  kbd_key = '[';
+        else if ((iTx >= 189) && (iTx < 203))  kbd_key = ']';
         else if ((iTx >= 203) && (iTx < 214))  kbd_key = KBD_KEY_DEAD;
         else if ((iTx >= 214) && (iTx < 255))  kbd_key = KBD_KEY_STOP;
     }
@@ -1418,10 +1461,10 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_RBRACKET)  kbd_key = ']';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_BS)        kbd_key = KBD_KEY_BS;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_ATSIGN)    kbd_key = '@';
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_YEN)       kbd_key = '|';
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_TAB)       kbd_key = KBD_KEY_TAB;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_INS)       kbd_key = KBD_KEY_INS;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_DEL)       kbd_key = KBD_KEY_DEL;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CLR)       kbd_key = KBD_KEY_CLEAR;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_STOP_BRK)  kbd_key = KBD_KEY_STOP;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F1)        kbd_key = KBD_KEY_F1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_F2)        kbd_key = KBD_KEY_F2;
