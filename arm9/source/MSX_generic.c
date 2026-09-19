@@ -62,7 +62,7 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "P2 JOY RIGHT",
   "P2 BUTTON 1", //10
   "P2 BUTTON 2",
-  
+
   "KEYBOARD A", //12
   "KEYBOARD B",
   "KEYBOARD C",
@@ -133,7 +133,7 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD INS",
   "KEYBOARD DEL", // 75
   "KEYBOARD STOP",
-  "KEYBOARD F1", 
+  "KEYBOARD F1",
   "KEYBOARD F2",
   "KEYBOARD F3",
   "KEYBOARD F4", //80
@@ -154,15 +154,15 @@ u8 showMessage(char *szCh1, char *szCh2)
     u16 iTx, iTy;
     u8 uRet=ID_SHM_CANCEL;
     u8 ucGau=0x00, ucDro=0x00,ucGauS=0x00, ucDroS=0x00, ucCho = ID_SHM_YES;
-    
+
     BottomScreenOptions();
-    
+
     DSPrint(16-strlen(szCh1)/2,10,6,szCh1);
     DSPrint(16-strlen(szCh2)/2,12,6,szCh2);
     DSPrint(8,14,6,("> YES <"));
     DSPrint(20,14,6,("  NO   "));
     while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-    
+
     while (uRet == ID_SHM_CANCEL)
     {
       WAITVBL;
@@ -206,7 +206,7 @@ u8 showMessage(char *szCh1, char *szCh2)
         ucDroS = 0;
         ucGauS = 0;
       }
-    
+
       if (keysCurrent() & KEY_LEFT){
         if (!ucGau) {
           ucGau = 1;
@@ -250,9 +250,9 @@ u8 showMessage(char *szCh1, char *szCh2)
       }
     }
     while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-    
+
     BottomScreenKeypad();  // Could be generic or overlay...
-    
+
     return uRet;
 }
 
@@ -285,7 +285,7 @@ void ShowRandomPreviewSnaps(void)
 {
     u16 *pusEcran=(u16*) bgGetMapPtr(bg1);
     u32 uX,uY;
-    
+
     if (vusCptVBL>=5*60) {
       u8 uEcran = rand() % 6;
       vusCptVBL = 0;
@@ -336,7 +336,7 @@ void SaveFavorites(void)
     {
         mkdir("/data", 0777);   // Doesn't exist - make it...
     }
-        
+
     FILE *fp = fopen("/data/Hachibitto.fav", "wb");
     if (fp)
     {
@@ -348,7 +348,7 @@ void SaveFavorites(void)
 u8 IsFavorite(char *name)
 {
     u32 filename_crc32 = getCRC32((u8 *)name, strlen(name));
-    
+
     for (int i=0; i<MAX_FAVS; i++)
     {
         if ((myFavs[i].name_hash & 0xFFFFFFFE) == (filename_crc32 & 0xFFFFFFFE)) return (1 + (myFavs[i].name_hash&1));
@@ -360,7 +360,7 @@ void ToggleFavorite(char *name)
 {
     int firstZero = 0;
     u32 filename_crc32 = getCRC32((u8 *)name, strlen(name));
-    
+
     for (int i=0; i<MAX_FAVS; i++)
     {
         // We use the lower bit of the filename hash (CRC32) as the flag for 'like' vs 'love'
@@ -381,13 +381,13 @@ void ToggleFavorite(char *name)
                 return;
             }
         }
-        
+
         if (myFavs[i].name_hash == 0x00000000)
         {
             if (!firstZero) firstZero = i;
         }
     }
-    
+
     myFavs[firstZero].name_hash = (filename_crc32 & 0xFFFFFFFE);
 }
 
@@ -399,12 +399,12 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
 {
     u16 ucBcl,ucGame;
     u8 maxLen;
-    
+
     DSPrint(30,5,0,(NoDebGame>0 ? "<" : " "));
     DSPrint(30,22,0,(NoDebGame+16<countMSX ? ">" : " "));
     sprintf(szName,"%03d/%03d FILES AVAILABLE     ",ucSel+1+NoDebGame,countMSX);
     DSPrint(4,4,0, szName);
-    
+
     for (ucBcl=0;ucBcl<16; ucBcl++)
     {
       ucGame= ucBcl+NoDebGame;
@@ -425,7 +425,7 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
         {
           sprintf(szName,"%-30s",strupr(szName));
           DSPrint(1,6+ucBcl,(ucSel == ucBcl ? 2 : 0 ),szName);
-          
+
           if (IsFavorite(gpFic[ucGame].szName))
           {
               DSPrint(0,6+ucBcl,(IsFavorite(gpFic[ucGame].szName) == 1) ? 0:2,(char*)"@");
@@ -433,7 +433,7 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
           else
           {
               DSPrint(0,6+ucBcl,0,(char*)" ");
-          }       
+          }
         }
       }
       else
@@ -452,7 +452,7 @@ int msxFilescmp (const void *c1, const void *c2)
 {
     FI_MSX *p1 = (FI_MSX *) c1;
     FI_MSX *p2 = (FI_MSX *) c2;
-    
+
     if (p1->szName[0] == '.' && p2->szName[0] != '.')
         return -1;
     if (p2->szName[0] == '.' && p1->szName[0] != '.')
@@ -472,15 +472,15 @@ void HachibittoFindFiles(void)
     u32 uNbFile;
     DIR *dir;
     struct dirent *pent;
-    
+
     uNbFile=0;
     countMSX=0;
-    
+
     dir = opendir(".");
     while (((pent=readdir(dir))!=NULL) && (uNbFile<MAX_ROMS))
     {
       strcpy(szFile,pent->d_name);
-    
+
       if(pent->d_type == DT_DIR)
       {
         if (!((szFile[0] == '.') && (strlen(szFile) == 1)))
@@ -520,7 +520,7 @@ void HachibittoFindFiles(void)
       }
     }
     closedir(dir);
-    
+
     // ----------------------------------------------
     // If we found any files, go sort the list...
     // ----------------------------------------------
@@ -539,21 +539,21 @@ u8 HachibittoChooseFile(void)
     bool bDone=false;
     u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
     s16 uLenFic=0, ucFlip=0, ucFlop=0;
-    
+
     // Show the menu...
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B))!=0);
     unsigned short dmaVal =  *(bgGetMapPtr(bg0b) + 24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
-    
+
     DSPrint(3,23,0,"A=LOAD, SELECT=FAV, B=EXIT");
-    
+
     HachibittoFindFiles();
-    
+
     ucGameChoice = -1;
-    
+
     nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
     uNbRSPage = (countMSX>=5 ? 5 : countMSX);
-    
+
     if (ucGameAct>countMSX-nbRomPerPage)
     {
       firstRomDisplay=countMSX-nbRomPerPage;
@@ -565,7 +565,7 @@ u8 HachibittoChooseFile(void)
       romSelected=0;
     }
     dsDisplayFiles(firstRomDisplay,romSelected);
-    
+
     // -----------------------------------------------------
     // Until the user selects a file or exits the menu...
     // -----------------------------------------------------
@@ -591,7 +591,7 @@ u8 HachibittoChooseFile(void)
           dsDisplayFiles(firstRomDisplay,romSelected);
         }
         else {
-    
+
           ucHaut++;
           if (ucHaut>10) ucHaut=0;
         }
@@ -629,7 +629,7 @@ u8 HachibittoChooseFile(void)
       else {
         ucBas = 0;
       }
-    
+
       // -------------------------------------------------------------
       // Left and Right on the D-Pad will scroll 1 page at a time...
       // -------------------------------------------------------------
@@ -654,7 +654,7 @@ u8 HachibittoChooseFile(void)
       else {
         ucSBas = 0;
       }
-    
+
       // -------------------------------------------------------------
       // Left and Right on the D-Pad will scroll 1 page at a time...
       // -------------------------------------------------------------
@@ -680,7 +680,7 @@ u8 HachibittoChooseFile(void)
       else {
         ucSHaut = 0;
       }
-    
+
       // The SELECT key will toggle favorites
       if (keysCurrent() & KEY_SELECT)
       {
@@ -695,7 +695,7 @@ u8 HachibittoChooseFile(void)
               }
           }
       }
-      
+
       // -------------------------------------------------------------------------
       // The B key will exit out of the ROM selection without picking a new game
       // -------------------------------------------------------------------------
@@ -704,7 +704,7 @@ u8 HachibittoChooseFile(void)
         bDone=true;
         while (keysCurrent() & KEY_B);
       }
-    
+
       // -------------------------------------------------------------------
       // Any of these keys will pick the current ROM and try to load it...
       // -------------------------------------------------------------------
@@ -735,7 +735,7 @@ u8 HachibittoChooseFile(void)
           while (keysCurrent() & KEY_A);
         }
       }
-    
+
       // --------------------------------------------
       // If the filename is too long... scroll it.
       // --------------------------------------------
@@ -765,10 +765,10 @@ u8 HachibittoChooseFile(void)
       ShowRandomPreviewSnaps();
       swiWaitForVBlank();
     }
-    
+
     // Wait for key to be released before returning
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
-    
+
     return 0x01;
 }
 
@@ -923,10 +923,10 @@ void SetDefaultGameConfig(void)
     myConfig.yOffset      = 0;                           // Default is no Y offset
     myConfig.expansion    = 0;                           // Default is no expansion
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
-    myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines 
+    myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.msxMusic     = 0;                           // 0=Disabled, 1=Enabled
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
-    myConfig.reserved4    = 0;
+    myConfig.maskBorders  = 0;                           // No border masking by default
     myConfig.reserved5    = 0;
     myConfig.reserved6    = 0;
     myConfig.reserved7    = 0;
@@ -1024,7 +1024,7 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
-        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K", 
+        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
                             "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                              &myConfig.msxMapper,      19},
         {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                 &myConfig.machineType,    3},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
@@ -1033,11 +1033,12 @@ const struct options_t Option_Table[1][20] =
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
-        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},        
+        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
         {"SCC+ CART",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.expansion,      2},
-{"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},        
+        {"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
-        {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},        
+        {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
+        {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
         {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},

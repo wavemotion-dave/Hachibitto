@@ -1000,6 +1000,7 @@ ITCM_CODE void CommitLine(u8 Y)
     // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
     u32 * restrict dst = (u32*)(XBuf + ((u16)Y << 8));
     const u8 * restrict src = (const u8*)(LineScratch + LS_BASE);
+    
     for (int i=0; i<8;i++)
     {
         *dst++ = (XPal[src[0]]  << 0) | (XPal[src[1]]  << 8) | (XPal[src[2]]  << 16) | (XPal[src[3]]  << 24);
@@ -1105,6 +1106,15 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
       }
    
       ColorSprites(Y, P-32);
+
+      // See if user wants us to mask off 8 pixels on left/right to help mask scrolling issues
+      if (myConfig.maskBorders)
+      {
+          u32 *src32 = (u32*)(LineScratch + LS_BASE);
+          if (myConfig.maskBorders & 1) {src32[0] = 0; src32[1] = 0;}
+          if (myConfig.maskBorders & 2) {src32[62] = 0; src32[63] = 0;}
+      }
+
       CommitLine(Y);
     }
 }
@@ -1133,7 +1143,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
             u32 * restrict dst32 = (u32*)P;
             const u32 * restrict src32 = (u32*)src;
 
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 4; i++)
             {
                 u32 s0 = src32[0];
                 u32 s1 = src32[1];
@@ -1151,7 +1161,23 @@ ITCM_CODE void RefreshLine5(register u8 uY)
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
                 
-                src32 += 4;
+                s0 = src32[4];
+                s1 = src32[5];
+                
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                s0 = src32[6];
+                s1 = src32[7];
+                
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                src32 += 8;
             }
         }
         else
@@ -1177,6 +1203,15 @@ ITCM_CODE void RefreshLine5(register u8 uY)
         }
 
         ColorSprites(uY, P-32);
+
+        // See if user wants us to mask off 8 pixels on left/right to help mask scrolling issues
+        if (myConfig.maskBorders)
+        {
+            u32 *src32 = (u32*)(LineScratch + LS_BASE);
+            if (myConfig.maskBorders & 1) {src32[0] = 0; src32[1] = 0;}
+            if (myConfig.maskBorders & 2) {src32[62] = 0; src32[63] = 0;}
+        }
+
         CommitLine(uY);
     }
 }

@@ -433,7 +433,7 @@ void HandleAscii16_SRAM8(u32* src, u8 block, u16 address, u8 value)
     }
 }
 
-ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
+void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 {
     // --------------------------------------------------------
     // Konami 8K mapper with SCC
@@ -507,7 +507,7 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 // 4000h~7FFFh  via writes to 6000h to 67FFh
 // 8000h~BFFFh  via writes to 7000h to 77FFh
 // -------------------------------------------------------------------------
-ITCM_CODE void HandleAscii16K(u32* src, u8 block, u16 address)
+void HandleAscii16K(u32* src, u8 block, u16 address)
 {
     if (bCartInPage[1] && (address & 0xF800) == 0x6000)
     {

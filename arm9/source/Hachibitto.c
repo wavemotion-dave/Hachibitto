@@ -2001,7 +2001,7 @@ void msxRun(void)
  * reduce visual tearing and other artifacts. It's not strictly necessary
  * and that does slow down the loop a bit... but DSi can handle it.
  ********************************************************************************/
-ITCM_CODE void msxUpdateScreen(void)
+void msxUpdateScreen(void)
 {
     if (DelayFirstOutput)
     {
