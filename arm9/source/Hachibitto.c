@@ -2102,7 +2102,7 @@ void PatchZ80(register Z80 *r)
 /** VDP and checking for interrupt requests.                 **/
 /**************************************************************/
 int mid_frame_interrupt=0;
-ITCM_CODE u32 LoopZ80()
+u32 LoopZ80()
 {
   // Execute 1 scanline worth of CPU instructions
   u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + (myConfig.cpuBoost * 20) + CPU.CycleDeficit;

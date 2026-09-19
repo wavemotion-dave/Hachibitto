@@ -1032,38 +1032,77 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
       T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
       I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
    
+      // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
+      // doesn't change mid-line), so check it once rather than per-pixel.
+      int misaligned = ((uintptr_t)P & 3) != 0;
+   
       uint32_t *P32 = (uint32_t*)P;
-      
+      uint16_t *P16 = (uint16_t*)P;
+   
       uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
       uint32_t p0 = 0, p1 = 0;
    
       int X = 32;
    
-      do
+      if (!misaligned)
       {
-        uint32_t t_val = *(uint8_t*)T;
-        T = (uint32_t*)((uint8_t*)T + 1);
-
-        if (t_val != lastT)
-        {
-            lastT = t_val;
-            J = (int)t_val << 3;
-            uint32_t idx = (I + J);
-
-            uint32_t K_col = ColTab[idx & ColTabM];
-            uint32_t FC    = K_col >> 4;
-            uint32_t BC    = K_col & 0x0F;
-
-            K = ChrGen[idx & ChrGenM];
-
-            p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-            p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-        }
-
-        P32[0] = p0;
-        P32[1] = p1;
-        P32 += 2;
-      } while (--X);
+          do
+          {
+            uint32_t t_val = *(uint8_t*)T;
+            T = (uint32_t*)((uint8_t*)T + 1);
+   
+            if (t_val != lastT)
+            {
+                lastT = t_val;
+                J = (int)t_val << 3;
+                uint32_t idx = (I + J);
+   
+                uint32_t K_col = ColTab[idx & ColTabM];
+                uint32_t FC    = K_col >> 4;
+                uint32_t BC    = K_col & 0x0F;
+   
+                K = ChrGen[idx & ChrGenM];
+   
+                p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+                p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+            }
+   
+            P32[0] = p0;
+            P32[1] = p1;
+            P32 += 2;
+   
+          } while (--X);
+      }
+      else
+      {
+          do
+          {
+              uint32_t t_val = *(uint8_t*)T;
+              T = (uint32_t*)((uint8_t*)T + 1);
+              
+              if (t_val != lastT)
+              {
+                  lastT = t_val;
+                  J = (int)t_val << 3;
+                  uint32_t idx = (I + J);
+              
+                  uint32_t K_col = ColTab[idx & ColTabM];
+                  uint32_t FC    = K_col >> 4;
+                  uint32_t BC    = K_col & 0x0F;
+              
+                  K = ChrGen[idx & ChrGenM];
+              
+                  p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
+                  p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+              }
+              
+              P16[0] = (uint16_t)p0;
+              P16[1] = (uint16_t)(p0 >> 16);
+              P16[2] = (uint16_t)p1;
+              P16[3] = (uint16_t)(p1 >> 16);
+              P16 += 4;
+          } while (--X);
+      }
    
       ColorSprites(Y, P-32);
       CommitLine(Y);
@@ -1083,46 +1122,58 @@ ITCM_CODE void RefreshLine5(register u8 uY)
         uint8_t *P = RefreshBorder(uY);
 
         const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
-        if (FlipEvenOdd && OddPage && (VDP_Memory <= src - 0x8000)) src -= 0x8000;
+        if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
 
-        u32 * restrict dst32 = (u32*)P;
-        const u32 * restrict src32 = (u32*)src;
+        // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
+        // doesn't change mid-line), so check it once rather than per-pixel.
+        int misaligned = ((uintptr_t)P & 3) != 0;
 
-        for (int i = 0; i < 4; i++)
+        if (!misaligned)
         {
-            u32 s0 = src32[0];
-            u32 s1 = src32[1];
-            
-            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+            u32 * restrict dst32 = (u32*)P;
+            const u32 * restrict src32 = (u32*)src;
 
-            s0 = src32[2];
-            s1 = src32[3];
-            
-            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-            
-            s0 = src32[4];
-            s1 = src32[5];
-            
-            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+            for (int i = 0; i < 8; i++)
+            {
+                u32 s0 = src32[0];
+                u32 s1 = src32[1];
+                
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
 
-            s0 = src32[6];
-            s1 = src32[7];
-            
-            *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-            *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                s0 = src32[2];
+                s1 = src32[3];
+                
+                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                
+                src32 += 4;
+            }
+        }
+        else
+        {
+            u16 *dst16 = (u16*)P;
 
-            src32 += 8;
+            for (int i = 0; i < 128; i += 8)
+            {
+                u32 s0 = *(u32*)(src + i);
+                u32 s1 = *(u32*)(src + i + 4);
+
+                u32 r0 = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
+                u32 r1 = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
+                u32 r2 = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
+                u32 r3 = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+
+                dst16[0]=(u16)r0; dst16[1]=(u16)(r0>>16);
+                dst16[2]=(u16)r1; dst16[3]=(u16)(r1>>16);
+                dst16[4]=(u16)r2; dst16[5]=(u16)(r2>>16);
+                dst16[6]=(u16)r3; dst16[7]=(u16)(r3>>16);
+                dst16 += 8;
+            }
         }
 
         ColorSprites(uY, P-32);
