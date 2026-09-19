@@ -1035,7 +1035,7 @@ const struct options_t Option_Table[1][20] =
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},        
         {"SCC+ CART",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.expansion,      2},
-//TODO: {"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},        
+{"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},        
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},        
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},

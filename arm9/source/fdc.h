@@ -34,6 +34,7 @@ struct FDC_t
     u8  stepDirection;
     u8  int_req;
     u8  read_timeout;
+    u8  seekDestination;
     u8  track_dirty[2];         // True if at least 1 track is dirty on this disk
     u8  track_buffer[10240];    // Enough for 16+ sectors of 512 bytes or 10 sectors of 1024 bytes
     u16 track_buffer_idx;

@@ -48,12 +48,12 @@ u32 DX = 0;
 u32 DY = 0;
 
 volatile u32 dsVSyncCount = 0;
-u32 last_vsync_count __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
-s8  temp_offset      __attribute__((section(".dtcm"))) = 0;
-u8  slide_dampen     __attribute__((section(".dtcm"))) = 0;
-u8  DelayFirstOutput __attribute__((section(".dtcm"))) = 0;
-u8  bFirstSCCEnable  __attribute__((section(".dtcm"))) = 1;
-u8  skip_render      __attribute__((section(".dtcm"))) = 0;
+u32 last_vsync_count    __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
+s8  temp_offset         __attribute__((section(".dtcm"))) = 0;
+u8  slide_dampen        __attribute__((section(".dtcm"))) = 0;
+u8  DelayFirstOutput    __attribute__((section(".dtcm"))) = 0;
+u8  bFirstSoundOutput   __attribute__((section(".dtcm"))) = 1;
+u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // All emulated systems have ROM, RAM and possibly BIOS or SRAM. So we create generic buffers
@@ -267,15 +267,16 @@ void ProcessBeeper(mm_word len, mm_addr dest)
 {
     s16 beeperTone = 0;
     
-    if (beeperFreq > 16) beeperFreq = 16;
-    int toggle = len / beeperFreq;
+    if (beeperFreq > 32) beeperFreq = 32;
+    int toggle = (len / beeperFreq);
+    if (toggle) beeperTone ^= 0x2000;
     for (int i=0; i<len; i++)
     {
         if (toggle)
         {
             if (--toggle == 0)
             {
-                beeperTone ^= 0x1000;
+                beeperTone ^= 0x2000;
                 toggle = len / beeperFreq;
             }
         }
@@ -285,50 +286,49 @@ void ProcessBeeper(mm_word len, mm_addr dest)
     beeperFreq = 0;    
 }
 
-// ------------------------------------------------------------
-// When we first enable the SCC, there is a sharp click heard.
-// This smooths that over a bit so it's much less harsh.
-// ------------------------------------------------------------
-void SmoothStartSCC(mm_word len, mm_addr dest)
+// -----------------------------------------------------------------------------
+// When we first enable the sound driver, there is a sharp click heard because
+// the new mixer was instantly driving the first sample up to some baseline
+// value. This routine is called when we first enable SCC or MSX-MUSIC and
+// smooths that over a bit so it's much less harsh. Basically we perform a 
+// dummy sampling and then we march the last sample towards that.
+// -----------------------------------------------------------------------------
+void SmoothStartSound(mm_word len, mm_addr dest)
 {
-    s32 combined_smoothed = last_sample;
-
     ay38910Mixer(len*2, mixbuf1, &myAY);
-    SCCMixer(len*2, mixbuf2, &mySCC);
-
-    s16 *p = (s16*)dest;
-    for (int i = 0; i < len*2; i++)
+    
+    if (msx_music_capable_game)
     {
-        // >>1 instead of /2 - signed division makes GCC emit sign-correction
-        // code even for a constant divisor of 2; a plain shift is one instruction.
-        s32 scc_sample = ((s32)mixbuf2[i]);
-
-        // Same cost as the old >>1 attenuation - just a different shift amount,
-        // so this loudness fix is free relative to what you had.
-        s32 ay_sample = (s32)mixbuf1[i] - ((s32)mixbuf1[i] >> 2);
-        scc_sample    = scc_sample - (scc_sample >> 2);
-
-        s32 combined = ay_sample + scc_sample;
-
-        // Plain hard clamp - GCC turns this diamond pattern into CMP+MOVGT/MOVLT
-        // on ARMv5, i.e. predicated instructions with no branch and no misprediction
-        // cost at all, not an actual conditional jump. Cheaper than a soft-knee,
-        // which adds real arithmetic (subtract/shift/add) any time it's touched.
-        if (combined > 32767)  combined = 32767;
-        if (combined < -32768) combined = -32768;
-
-        // ---------------------------------------------------------------------
-        // For any large steps we want to smooth this out so that we don't hear
-        // the AY produce any sharp pops or clicks... this helps but costs CPU.
-        // ---------------------------------------------------------------------
-        s32 diff = (s32)combined - combined_smoothed;
-        if (diff >  MAX_STEP) diff =  MAX_STEP;
-        if (diff < -MAX_STEP) diff = -MAX_STEP;
-        combined_smoothed += diff;
-        *p++ = (s16)combined_smoothed;
+        FMPACMixer(len*2, mixbuf1, &myYM); // Mix on top of AY
+        memset(mixbuf2, 0x00, len*2); // Nothing more to mix...
     }
-    p--;
-    last_sample = *p;
+    else if (msx_scc_capable_game)
+    {
+        SCCMixer(len*2, mixbuf2, &mySCC);
+    }
+    else
+    {
+        memset(mixbuf2, 0x00, len*2); // Nothing more to mix...
+    }
+    
+    // >>1 instead of /2 - signed division makes GCC emit sign-correction
+    // code even for a constant divisor of 2; a plain shift is one instruction.
+    s32 sound_sample = ((s32)mixbuf2[256]);
+
+    // Same cost as the old >>1 attenuation - just a different shift amount,
+    // so this loudness fix is free relative to what you had.
+    s32 ay_sample = (s32)mixbuf1[256] - ((s32)mixbuf1[256] >> 2);
+    sound_sample    = sound_sample - (sound_sample >> 2);
+
+    s32 target_sound = ay_sample + sound_sample;    
+    
+    s16 *p = (s16*)dest;
+    for (int i=0; i<len*2; i++)
+    {
+        if (last_sample < target_sound) last_sample += 64;
+        else last_sample -= 64;
+        *p++ = (s16)last_sample;
+    }
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -349,19 +349,26 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
     {
         if (msx_music_capable_game) // If MSX-MUSIC is enabled, we mix AY with the FM channels
         {
-            ay38910Mixer(len*2, dest, &myAY); //todo: RESTORE AY
-            //for (int i=0; i<len*2; i++) ((u16*)dest)[i]=0x00; // clear mixer
+            if (bFirstSoundOutput)
+            {
+                SmoothStartSound(len, dest);
+                bFirstSoundOutput = 0;
+                return len;
+            }
+            
+            ay38910Mixer(len*2, dest, &myAY);
             FMPACMixer(len*2, dest, &myYM);
+            last_sample = ((s16*)dest)[len*2 - 1];
         }
         else if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
         {
-            if (bFirstSCCEnable)
+            if (bFirstSoundOutput)
             {
-                SmoothStartSCC(len, dest);
-                bFirstSCCEnable = 0;
+                SmoothStartSound(len, dest);
+                bFirstSoundOutput = 0;
                 return len;
             }
-
+            
             ay38910Mixer(len*2, mixbuf1, &myAY);
 
             // ---------------------------------------------------------------------
@@ -494,7 +501,7 @@ void sound_chip_reset()
     
     msx_scc_capable_game = 0;
     msx_music_capable_game = 0;
-    bFirstSCCEnable = 1;
+    bFirstSoundOutput = 1;
     SoundPause();
     
     //  --------------------------------------------------------------------
@@ -1969,8 +1976,8 @@ u8 msxInit(char *szGame)
 
     if (RetFct)
     {
-    // Perform a standard system RESET
-    ResetMSX();
+      // Perform a standard system RESET
+      ResetMSX();
     }
 
     // Return with result
