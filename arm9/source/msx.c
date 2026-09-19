@@ -115,7 +115,7 @@ uint8_t read_port_B5(void) {
 }
 
 // --------------------------------------------------------------------
-// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals 
+// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
 // --------------------------------------------------------------------
 ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
@@ -602,7 +602,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            
+
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
@@ -641,7 +641,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
             MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing ever maps here.
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
             MemoryMap[4] = Unmapped_Memory;
@@ -669,8 +669,8 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing ever maps here.
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
+        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF 
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
@@ -709,7 +709,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
                 MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
             }
-            else // Other subslots map nothing 
+            else // Other subslots map nothing
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
@@ -752,7 +752,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
             }
-            else // Other subslots map nothing 
+            else // Other subslots map nothing
             {
                 MemoryMap[2] = Unmapped_Memory;
                 MemoryMap[3] = Unmapped_Memory;
@@ -809,7 +809,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (this is our expanded slot)
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE;
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF 
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
@@ -905,7 +905,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         u8 page = Port-0xFC;
         u8 bank = Value & 7;
-        
+
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
@@ -1001,7 +1001,7 @@ void msxWipeRAM(void)
         u8 randbyte = rand() & 0xFF;
         RAM_Memory[i] = (myConfig.memWipe ? 0x00 : randbyte);
     }
-  
+
     // SRAM memory gets 0xFF
     for (int i=0; i<sizeof(SRAM_Memory); i++)
     {
@@ -1031,16 +1031,16 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         Unmapped_Memory[i] = 0xFF;
     }
-    
+
     // -------------------------------------
     // Make sure the MSX ports are clear
     // -------------------------------------
     Port_PPI_A = 0x00;
     Port_PPI_B = 0x00;
     Port_PPI_C = 0x00;
-    
+
     msx_music_writes = 0;
-    
+
     special_ram_access = 0x00;
 
     msx_subslot = myConfig.machineType ? 0x00 : 0xFF;
@@ -1465,7 +1465,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // Some mappers have 8K blocks, some have 16K blocks... sort that out here.
     // --------------------------------------------------------------------------
     msx_block_size = (Is16kBanking() ? 0x4000:0x2000);
-                       
+
     // ---------------------------------------------------------------------------------------------------------
     // If we are dealing with one of the rare SRAM games, read the SRAM file from the SD card back into memory.
     // ---------------------------------------------------------------------------------------------------------
@@ -1509,8 +1509,6 @@ void SCC_LegacyWrite(u8 value, u16 address)
 // ---------------------------------------------------------------
 void msx_restore_bios(void)
 {
-    memset(BIOS_Memory, 0xFF, sizeof(BIOS_Memory));
-
     if (myConfig.machineType == MACHINE_MSX1)
     {
         memcpy(BIOS_Memory, MSXBios_MSX1, 0x8000);
@@ -1520,6 +1518,7 @@ void msx_restore_bios(void)
         memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
     }
 
+    // Slot 0 - BIOS is mapped in to start...
     MemoryMap[0] = BIOS_Memory + 0x0000;
     MemoryMap[1] = BIOS_Memory + 0x2000;
     MemoryMap[2] = BIOS_Memory + 0x4000;
@@ -1527,10 +1526,8 @@ void msx_restore_bios(void)
 
     MemoryMap[4] = Unmapped_Memory;
     MemoryMap[5] = Unmapped_Memory;
-
-    bRAMInPage[3] = 1;
-    MemoryMap[6] = RAM_Memory + 0xC000;
-    MemoryMap[7] = RAM_Memory + 0xE000;
+    MemoryMap[6] = Unmapped_Memory;
+    MemoryMap[7] = Unmapped_Memory;
 }
 
 
@@ -1544,7 +1541,7 @@ void msx_reset(void)
     msx_basic = 0x0000;
 
     MSX_InitialMemoryLayout(msx_last_file_size);
-    
+
     if (msx_mode == MSX_MODE_DISK) // .dsk based MSX
     {
         fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);

@@ -165,6 +165,11 @@ void LoopFDC(void)
     }
 }
 
+// --------------------------------------------------------------------------
+// This is the heart of the FDC controller. The state machine is clocked on 
+// every write or read to the FDC controller but is gated by BUSY and whether
+// enough CPU time has passed to process the next iteration.
+// --------------------------------------------------------------------------
 void fdc_state_machine(void)
 {
     // Cycle-based busy gate: bail out, touching nothing, until the deadline

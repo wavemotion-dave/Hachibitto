@@ -105,10 +105,10 @@ extern struct GlobalConfig_t myGlobalConfig;
 
 extern u8 special_ram_access;
 
-#define SPEC_RAM_SUBSLOT_ACTIVE     0x01
-#define SPEC_RAM_SCC_ENABLED        0x02
-#define SPEC_RAM_SCC_PLUS_ENABLED   0x04
-#define SPEC_RAM_SUPERLR_ACTIVE     0x08
+#define SPEC_RAM_SUBSLOT_ACTIVE     0x01        // Allows read/write to special SubSlot register at 0xFFFF
+#define SPEC_RAM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
+#define SPEC_RAM_SCC_PLUS_ENABLED   0x04        // SCC+ is enabled and requires memory traps
+#define SPEC_RAM_SUPERLR_ACTIVE     0x08        // Super Lode Runner traps on writes to 0x0000 even if the cart isn't mapped in!
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -181,7 +181,6 @@ extern FMPAC   myYM;
 extern u8 msx_scc_enable;
 extern u8 JoyMode;
 extern u32 JoyState;
-extern u8 last_mega_bank;
 extern u16 msx_block_size;
 extern u32 file_crc;
 extern u8 Port_PPI_A;
@@ -191,12 +190,10 @@ extern void ProcessBufferedKeys(void);
 extern u8 BufferedKeys[32];
 extern u8 BufferedKeysWriteIdx;
 extern u8 BufferedKeysReadIdx;
-extern u8 lastBank;
 extern u8 key_shift;
 extern u8 key_ctrl;
 extern u8 key_code;
 extern u8 key_graph;
-extern u8 key_dia;
 extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;
 extern u8 msx_music_capable_game;
