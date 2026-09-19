@@ -135,6 +135,8 @@ typedef struct
 	u8 testReg;				// $0F, storage only
 	u8 addressLatch;			// last value written to the address-select port (caller's convenience)
 	u32 noiseLFSR;				// shared noise generator feeding HH/SD/TOP-CY - must never be seeded 0
+	s32 noiseHoldValue;			// current held noise sample - see FMPAC_NOISE_HOLD_SAMPLES in FMPAC.c
+	u8  noiseHoldCounter;			// counts up to FMPAC_NOISE_HOLD_SAMPLES before drawing a new value
 	FMPAC_Oscillator rhythmSD;		// rhythm mode only: channel 7's SECOND voice (HH uses channels[7].osc)
 	FMPAC_Oscillator rhythmTCY;		// rhythm mode only: channel 8's SECOND voice (TOM uses channels[8].osc)
 } FMPAC;
