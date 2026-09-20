@@ -1719,7 +1719,7 @@ void HachibittoInitCPU(void)
 // some basic vSYNC timing so that we lock the DS screen updates
 // and the MSX screen updates to avoid tearing as much as possible.
 // -----------------------------------------------------------------
-void irqVBlank(void)
+ITCM_CODE void irqVBlank(void)
 {
     int ydyBG = 0x0100; // Default to no screen scale
     int shifty = 0;
@@ -1734,7 +1734,6 @@ void irqVBlank(void)
     // ---------------------------------------------------------------------
     if (!(VDP[9] & 0x80)) // High bit set if we are in 212 mode
     {
-        debug[3]++;
         cyBG = 0;       // No shift
         shifty = 0;     // No shift
     }

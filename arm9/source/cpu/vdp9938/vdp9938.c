@@ -1658,7 +1658,7 @@ void RefereshPreviousLine(void)
 /** screen buffer. Loop9938() returns 1 if an interrupt is  **/
 /** to be generated, 0 otherwise.                           **/
 /*************************************************************/
-void Loop9938(void)
+ITCM_CODE void Loop9938(void)
 {
   // 1. Get the 0-indexed display scanline relative to the active display area
   int scanline = CurLine - VDP9938_START_LINE;

@@ -116,69 +116,8 @@ uint8_t read_port_B5(void) {
     return val;
 }
 
-// --------------------------------------------------------------------
-// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
-// including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
-// --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
+u8 readport_keyboard(void)
 {
-  // MSX ports are 8-bit
-  Port &= 0x00FF;
-
-  //98h~9Bh   Access to the VDP I/O ports.
-  if      (Port == 0x98) return RdData9938();
-  else if (Port == 0x99) return RdCtrl9938();
-  else if (Port == 0xB5) {return read_port_B5();}
-  else if (Port == 0xA2)  // PSG Read... might be joypad data
-  {
-      // -------------------------------------------
-      // Only port 1 is used for the first Joystick
-      // -------------------------------------------
-      if (myAY.ayRegIndex == 14)
-      {
-          u8 joy1 = 0x00;
-
-          // -------------------------------------------------------------
-          // Only port 1... not port 2. AY register 15 (PortB) bit 6 is
-          // set to 0 for the port 1 joystick and that's the only one
-          // this emulator will respond to...
-          // -------------------------------------------------------------
-          if ((myAY.ayPortBOut & 0x40) == 0)
-          {
-              if (myConfig.dpad == DPAD_NORMAL)
-              {
-                  if (JoyState & JST_UP)    joy1 |= 0x01;
-                  if (JoyState & JST_DOWN)  joy1 |= 0x02;
-                  if (JoyState & JST_LEFT)  joy1 |= 0x04;
-                  if (JoyState & JST_RIGHT) joy1 |= 0x08;
-
-                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
-                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
-              }
-              else if (myConfig.dpad == DPAD_DIAGONALS)
-              {
-                  if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
-                  if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
-                  if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
-                  if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
-
-                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
-                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
-              }
-          }
-
-          myAY.ayPortAIn = ~joy1;
-      }
-      else if (myAY.ayRegIndex == 15)
-      {
-          // When reading PORTB of the PSG, just echo back the last value written (the MSX BIOS needs this as it will preserve the KANA LED bit)
-          myAY.ayPortBIn = myAY.ayPortBOut;
-      }
-      return ay38910DataR(&myAY);
-  }
-  else if (Port == 0xA8) return Port_PPI_A;
-  else if (Port == 0xA9)
-  {
       // ----------------------------------------------------------
       // Keyboard Port (international and US)
       //  Row   Bit_7 Bit_6 Bit_5 Bit_4 Bit_3 Bit_2 Bit_1 Bit_0
@@ -370,6 +309,71 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
           }
       }
       return ~key1;
+}
+// --------------------------------------------------------------------
+// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
+// including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
+// --------------------------------------------------------------------
+ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
+{
+  // MSX ports are 8-bit
+  Port &= 0x00FF;
+
+  //98h~9Bh   Access to the VDP I/O ports.
+  if      (Port == 0x98) return RdData9938();
+  else if (Port == 0x99) return RdCtrl9938();
+  else if (Port == 0xB5) {return read_port_B5();}
+  else if (Port == 0xA2)  // PSG Read... might be joypad data
+  {
+      // -------------------------------------------
+      // Only port 1 is used for the first Joystick
+      // -------------------------------------------
+      if (myAY.ayRegIndex == 14)
+      {
+          u8 joy1 = 0x00;
+
+          // -------------------------------------------------------------
+          // Only port 1... not port 2. AY register 15 (PortB) bit 6 is
+          // set to 0 for the port 1 joystick and that's the only one
+          // this emulator will respond to...
+          // -------------------------------------------------------------
+          if ((myAY.ayPortBOut & 0x40) == 0)
+          {
+              if (myConfig.dpad == DPAD_NORMAL)
+              {
+                  if (JoyState & JST_UP)    joy1 |= 0x01;
+                  if (JoyState & JST_DOWN)  joy1 |= 0x02;
+                  if (JoyState & JST_LEFT)  joy1 |= 0x04;
+                  if (JoyState & JST_RIGHT) joy1 |= 0x08;
+
+                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
+                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
+              }
+              else if (myConfig.dpad == DPAD_DIAGONALS)
+              {
+                  if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
+                  if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
+                  if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
+                  if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
+
+                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
+                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
+              }
+          }
+
+          myAY.ayPortAIn = ~joy1;
+      }
+      else if (myAY.ayRegIndex == 15)
+      {
+          // When reading PORTB of the PSG, just echo back the last value written (the MSX BIOS needs this as it will preserve the KANA LED bit)
+          myAY.ayPortBIn = myAY.ayPortBOut;
+      }
+      return ay38910DataR(&myAY);
+  }
+  else if (Port == 0xA8) return Port_PPI_A;
+  else if (Port == 0xA9)
+  {
+      return readport_keyboard();
   }
   else if (Port == 0xAA)
   {
