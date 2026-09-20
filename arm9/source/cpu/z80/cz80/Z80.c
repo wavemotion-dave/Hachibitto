@@ -502,7 +502,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=OpZ80(CPU.PC.W++);
       CPU.ICount-=Cycles[I];
-      
+
       CPU.TotalInstructions++;  // Only counting base instructions... good enough for FDC timing
 
       /* Interpret opcode */

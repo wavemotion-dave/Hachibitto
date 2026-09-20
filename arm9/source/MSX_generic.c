@@ -28,6 +28,7 @@ int countMSX     = 0;
 int ucGameAct    = 0;
 int ucGameChoice = -1;
 u32 file_size    = 0;
+
 FI_MSX gpFic[MAX_ROMS];
 char szName[256];
 char szFile[256];
@@ -66,7 +67,7 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "KEYBOARD A", //12
   "KEYBOARD B",
   "KEYBOARD C",
-  "KEYBOARD D",
+  "KEYBOARD D", //15
   "KEYBOARD E",
   "KEYBOARD F",
   "KEYBOARD G",
@@ -739,10 +740,10 @@ u8 HachibittoChooseFile(void)
       // --------------------------------------------
       // If the filename is too long... scroll it.
       // --------------------------------------------
-      if (strlen(gpFic[ucGameAct].szName) > 32)
+      if (strlen(gpFic[ucGameAct].szName) > 31)
       {
         ucFlip++;
-        if (ucFlip >= 25)
+        if (ucFlip >= 10)
         {
           ucFlip = 0;
           uLenFic++;
@@ -751,11 +752,14 @@ u8 HachibittoChooseFile(void)
             ucFlop++;
             if (ucFlop >= 15)
             {
-              uLenFic=0;
-              ucFlop = 0;
+              uLenFic = 0;
+              ucFlop  = 0;
+              ucFlip  = -35;
             }
             else
+            {
               uLenFic--;
+            }
           }
           strncpy(szName,gpFic[ucGameAct].szName+uLenFic,30);
           szName[30] = '\0';
@@ -1621,6 +1625,28 @@ void DSPrint(int iX,int iY,int iScr,char *szMessage)
       usCharac=*(pusMap+32+(ch)-'@');       // Character from A-Z
     *pusScreen++=usCharac;
   }
+}
+
+void DSPrint_fps(u16 fps)
+{
+    u16 *pusScreen,*pusMap;
+    char tmpStr[4];
+  
+    if (fps/100) tmpStr[0] = '0' + fps/100;
+    else tmpStr[0] = ' ';
+    tmpStr[1] = '0' + (fps%100) / 10;
+    tmpStr[2] = '0' + (fps%100) % 10;
+    tmpStr[3] = 0;
+
+    pusScreen=(u16*) bgGetMapPtr(bg1b);
+    pusMap=(u16*) bgGetMapPtr(bg0b)+24*32;
+    char *cPtr = tmpStr;
+
+    while((*cPtr )!='\0' )
+    {
+        char ch = *cPtr++;
+        *pusScreen++=*(pusMap+(ch)-' ');          // Number from 0-9 or punctuation
+    }
 }
 
 /******************************************************************************

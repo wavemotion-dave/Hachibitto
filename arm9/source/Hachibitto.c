@@ -29,6 +29,7 @@
 #include "msx_kbd.h"
 #include "alpha_kbd.h"
 #include "debug_ovl.h"
+#include "instructions.h"
 #include "options.h"
 #include "topscreen.h"
 #include "fdc.h"
@@ -47,7 +48,8 @@ u32 debug[0x10]={0};
 u32 DX = 0;
 u32 DY = 0;
 
-volatile u32 dsVSyncCount = 0;
+volatile u32 dsVSyncCount = 0;  // So compiler doesn't cache this as it changes dynamically with interrupt calls
+
 u32 last_vsync_count    __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
 s8  temp_offset         __attribute__((section(".dtcm"))) = 0;
 u8  slide_dampen        __attribute__((section(".dtcm"))) = 0;
@@ -68,6 +70,7 @@ u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 // -------------------------------------------------------------------------------------------
 
 u32 MAX_CART_SIZE = 1256;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
+
 u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]                ALIGN(32) = {0};        // To hold our BIOS and related OS memory - always in the lower 32K memory region
@@ -80,9 +83,6 @@ static char cmd_line_file[256];
 char initial_file[MAX_ROM_NAME] = "";
 char initial_file_upper[MAX_ROM_NAME] = "";
 char initial_path[MAX_ROM_NAME] = "";
-
-u8 msx_caps_lock        = 0;
-u8 msx_kana_lock        = 0;
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -113,9 +113,11 @@ u8 kbd_keys[12]      __attribute__((section(".dtcm")));           // Up to 12 po
 
 u8 bStartSoundEngine = false;  // Set to true to unmute sound after 1 frame of rendering...
 int bg0, bg1, bg0b, bg1b;      // Some vars for NDS background screen handling
-volatile u16 vusCptVBL = 0;    // We use this as a basic timer for the Mario sprite... could be removed if another timer can be utilized
-u8 touch_debounce = 0;         // A bit of touch-screen debounce
-u8 key_debounce = 0;           // A bit of key debounce
+volatile u16 vusCptVBL  = 0;   // We use this as a basic timer for the Mario sprite... could be removed if another timer can be utilized
+u8 touch_debounce       = 0;   // A bit of touch-screen debounce
+u8 key_debounce         = 0;   // A bit of key debounce
+u8 msx_caps_lock        = 0;   // Set to 1 when MSX caps lock is active
+u8 msx_kana_lock        = 0;   // Set to 1 when MSX kana lock is active
 
 // The DS/DSi has 12 keys that can be mapped
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
@@ -243,11 +245,11 @@ void SoundUnPause(void)
 mm_ds_system sys   __attribute__((section(".dtcm")));
 mm_stream myStream __attribute__((section(".dtcm")));
 
-s16 mixbuf1[buffer_size+4] __attribute__((section(".dtcm")));      // When we have AY sound and SCC possible... so 8 channels.
-s16 mixbuf2[buffer_size+4] __attribute__((section(".dtcm")));      // into a single output so we render to mix buffers first.
+s16 mixbuf1[buffer_size+4] __attribute__((section(".dtcm")));      // When we have AY sound and SCC/YM possible... so we need to
+s16 mixbuf2[buffer_size+4] __attribute__((section(".dtcm")));      // mix into a single output so we render to mix buffers first.
 
 static s32 ay_smoothed __attribute__((section(".dtcm"))) = 0;
-const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste
+const s32 MAX_STEP = 1600;   // tune by ear - start here, adjust to taste. This cuts out sharp pops/clicks in the output.
 
 // -------------------------------------------------------------------------------------------
 // maxmod will call this routine when the buffer is half-empty and requests that
@@ -259,14 +261,14 @@ s16 last_sample __attribute__((section(".dtcm"))) = 0;
 // -----------------------------------------------------------------------------------------------
 // A simplified beeper handler. Very few MSX games use the 1-bit beeper. It's mainly "lazy"
 // ZX Spectrum conversions. Almost no software designed originally for the MSX uses the beeper.
-// So this does a simple job - we know how many times the beeper bit on Port C was "hit" by 
+// So this does a simple job - we know how many times the beeper bit on Port C was "hit" by
 // the program. We basically use that to know how often to toggle a square wave sound and mix
 // it into the existing sound output buffer. It's crude but gets the job done and is good enough.
 // -----------------------------------------------------------------------------------------------
 void ProcessBeeper(mm_word len, mm_addr dest)
 {
     s16 beeperTone = 0;
-    
+
     if (beeperFreq > 32) beeperFreq = 32;
     int toggle = (len / beeperFreq);
     if (toggle) beeperTone ^= 0x2000;
@@ -283,20 +285,20 @@ void ProcessBeeper(mm_word len, mm_addr dest)
         ((s16*)dest)[(i*2)+0] += beeperTone;
         ((s16*)dest)[(i*2)+1] += beeperTone;
     }
-    beeperFreq = 0;    
+    beeperFreq = 0;
 }
 
 // -----------------------------------------------------------------------------
 // When we first enable the sound driver, there is a sharp click heard because
 // the new mixer was instantly driving the first sample up to some baseline
 // value. This routine is called when we first enable SCC or MSX-MUSIC and
-// smooths that over a bit so it's much less harsh. Basically we perform a 
+// smooths that over a bit so it's much less harsh. Basically we perform a
 // dummy sampling and then we march the last sample towards that.
 // -----------------------------------------------------------------------------
 void SmoothStartSound(mm_word len, mm_addr dest)
 {
     ay38910Mixer(len*2, mixbuf1, &myAY);
-    
+
     if (msx_music_capable_game)
     {
         FMPACMixer(len*2, mixbuf1, &myYM); // Mix on top of AY
@@ -310,7 +312,7 @@ void SmoothStartSound(mm_word len, mm_addr dest)
     {
         memset(mixbuf2, 0x00, len*2); // Nothing more to mix...
     }
-    
+
     // >>1 instead of /2 - signed division makes GCC emit sign-correction
     // code even for a constant divisor of 2; a plain shift is one instruction.
     s32 sound_sample = ((s32)mixbuf2[256]);
@@ -320,8 +322,8 @@ void SmoothStartSound(mm_word len, mm_addr dest)
     s32 ay_sample = (s32)mixbuf1[256] - ((s32)mixbuf1[256] >> 2);
     sound_sample    = sound_sample - (sound_sample >> 2);
 
-    s32 target_sound = ay_sample + sound_sample;    
-    
+    s32 target_sound = ay_sample + sound_sample;
+
     s16 *p = (s16*)dest;
     for (int i=0; i<len*2; i++)
     {
@@ -355,7 +357,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 bFirstSoundOutput = 0;
                 return len;
             }
-            
+
             ay38910Mixer(len*2, dest, &myAY);
             FMPACMixer(len*2, dest, &myYM);
             last_sample = ((s16*)dest)[len*2 - 1];
@@ -368,7 +370,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 bFirstSoundOutput = 0;
                 return len;
             }
-            
+
             ay38910Mixer(len*2, mixbuf1, &myAY);
 
             // ---------------------------------------------------------------------
@@ -420,7 +422,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         else  // Pretty simple... just AY (and maybe beeper)
         {
             ay38910Mixer(len * 2, dest, &myAY);
-            
+
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
             if (beeperFreq)
             {
@@ -463,12 +465,12 @@ void setupStream(void)
     //  initialize maxmod with our small 5-effect soundbank
     //----------------------------------------------------------------
     mmInitDefaultMem((mm_addr)soundbank_bin);
-    
+
     mmLoadEffect(SFX_CLICKNOQUIT);
     mmLoadEffect(SFX_KEYCLICK);
     mmLoadEffect(SFX_MUS_INTRO);
     mmLoadEffect(SFX_FLOPPY);
-    
+
     //----------------------------------------------------------------
     //  open stream
     //----------------------------------------------------------------
@@ -479,7 +481,7 @@ void setupStream(void)
     myStream.timer          = MM_TIMER0;              // use hardware timer 0
     myStream.manual         = false;                  // use automatic filling
     mmStreamOpen(&myStream);
-    
+
     //----------------------------------------------------------------
     //  when using 'automatic' filling, your callback will be triggered
     //  every time half of the wave buffer is processed.
@@ -494,24 +496,27 @@ void setupStream(void)
     //----------------------------------------------------------------
 }
 
+// ----------------------------------------------------------------------------------
+// Ensure the sound chips are reset and associated helper variables are initialized.
+// ----------------------------------------------------------------------------------
 void sound_chip_reset()
 {
     memset(mixbuf1, 0x00, sizeof(mixbuf1));
     memset(mixbuf2, 0x00, sizeof(mixbuf2));
-    
+
     msx_scc_capable_game = 0;
     msx_music_capable_game = 0;
     bFirstSoundOutput = 1;
     SoundPause();
-    
-    //  --------------------------------------------------------------------
-    //  The AY sound chip is for Super Game Module and MSX sound handling
-    //  --------------------------------------------------------------------
+
+    //  -----------------------------------------------------------
+    //  The AY sound chip is for our baseline MSX sound handling.
+    //  -----------------------------------------------------------
     ay38910Reset(&myAY);             // Reset the "AY" sound chip
     ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
     ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
-    
+
     // -----------------------------------------------------------------
     // The SCC sound chip is just for a few select Konami MSX1 games
     // -----------------------------------------------------------------
@@ -536,40 +541,35 @@ void dsInstallSoundEmuFIFO(void)
 }
 
 //*****************************************************************************
-// Reset the MSX - mostly CPU and memory...
+// Reset the MSX - mostly CPU and memory plus some timer vars for housekeeping.
 //*****************************************************************************
-
-// --------------------------------------------------------------
-// When we first load a ROM/CASSETTE or when the user presses
-// the RESET button on the touch-screen...
-// --------------------------------------------------------------
 void ResetMSX(void)
 {
     JoyMode=JOYMODE_JOYSTICK;             // Joystick mode key
     JoyState = 0x00000000;                // Nothing pressed to start
-    
+
     Reset9938();                          // Reset the video chip
-    
+
     sound_chip_reset();                   // Reset the SN, AY and SCC chips
-    
+
     Z80_Interface_Reset();                // Reset the Z80 Interface
     ResetZ80(&CPU);                       // Reset the Z80 CPU core
-    
+
     msx_reset();                          // Reset the MSX specific vars
-    
+
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
-    
+
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it
-    
+
     // -----------------------------------------------------------
     // Timer 1 is used to time frame-to-frame of actual emulation
     // -----------------------------------------------------------
     TIMER1_CR = 0;
     TIMER1_DATA=0;
     TIMER1_CR=TIMER_ENABLE  | TIMER_DIV_1024;
-    
+
     // -----------------------------------------------------------
     // Timer 2 is used to time once per second events
     // -----------------------------------------------------------
@@ -579,7 +579,7 @@ void ResetMSX(void)
     timingFrames  = 0;
     skip_render = 0;
     io_show_status = 0;
-    sram_show_status = 0;    
+    sram_show_status = 0;
 }
 
 //*********************************************************************************
@@ -673,7 +673,7 @@ void DisplayStatusLine(bool bForce)
     {
         if (io_show_status)
         {
-            if (io_show_status == 5) // Disk Write
+            if (io_show_status == 5)     // Disk Write
             {
                 DSPrint(20,0,2, "678");  // Show Disk icon
                 DSPrint(20,1,2, "VWX");  // Show Disk icon
@@ -704,7 +704,7 @@ void DisplayStatusLine(bool bForce)
             if (--sram_show_status == 0)
             {
                 // Save EE now!
-                msxSaveEEPROM();                
+                msxSaveEEPROM();
             }
         }
         else
@@ -714,6 +714,10 @@ void DisplayStatusLine(bool bForce)
         }
     }
 
+    // ------------------------------------------------------
+    // If we aren't showing the disk icon above, we can show
+    // one of the various music symbols for SCC or MSX-MUSIC.
+    // ------------------------------------------------------
     if ((io_show_status == 0) && (sram_show_status == 0))
     {
         if (msx_scc_capable_game)
@@ -735,7 +739,11 @@ void DisplayStatusLine(bool bForce)
         }
     }
 
-    if (myConfig.keyboard == OVL_FULLKBD) // Is full keyboard showing?
+    // -----------------------------------------------------------------
+    // If the full MSX keyboard is showing, we can show some symbols
+    // to indicate if the CAPS lock is enabled, shift/ctrl/graph, etc.
+    // -----------------------------------------------------------------
+    if (myConfig.keyboard == OVL_FULLKBD)
     {
         // Caps Lock
         DSPrint(1,23,0, (msx_caps_lock ? "@":" "));
@@ -795,12 +803,12 @@ u8 MiniMenu(void)
 {
     u8 retVal = MENU_CHOICE_NONE;
     u8 menuSelection = 0;
-   
+
     SoundPause();
     while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
-   
+
     MiniMenuShow(true, menuSelection);
-   
+
     while (true)
     {
       nds_key = keysCurrent();
@@ -835,26 +843,26 @@ u8 MiniMenu(void)
               retVal = MENU_CHOICE_NONE;
               break;
           }
-   
+
           while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
           WAITVBL;WAITVBL;
       }
     }
-   
+
     while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
     WAITVBL;WAITVBL;
-   
+
     BottomScreenKeypad();  // Could be generic or overlay...
-   
+
     SoundUnPause();
-   
+
     return retVal;
 }
 
 
-// ------------------------------------------------------------------------
-// Return 1 if we are showing full keyboard... otherwise 0
-// ------------------------------------------------------------------------
+// ------------------------------------------------------
+// Handle the MSX virtual keyboard on the bottom screen.
+// ------------------------------------------------------
 u8 last_special_key = 0;
 u8 last_special_key_dampen = 0;
 u8 last_kbd_key = 0;
@@ -1062,13 +1070,15 @@ void Hachibitto_main(void)
   static u32 lastUN = 0;
   static u8 dampenClick = 0;
   u8 meta_key = 0;
+  u8 screen_position_dampen = 0;
+  u8 save_config = 0;
 
   // Setup the debug buffer for DSi use
   debug_init();
 
   // Returns when  user has asked for a game to run...
   BottomScreenOptions();
-  
+
   // Clear top screen
   BG_PALETTE[0] = RGB15(0,0,0);
   memset((u8*)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
@@ -1114,8 +1124,6 @@ void Hachibitto_main(void)
         // -------------------------------------------------------------
         if (TIMER1_DATA >= 32728)   //  1000MS (1 sec)
         {
-            char szChai[4];
-
             TIMER1_CR = 0;
             TIMER1_DATA = 0;
             TIMER1_CR=TIMER_ENABLE | TIMER_DIV_1024;
@@ -1127,21 +1135,16 @@ void Hachibitto_main(void)
                     if (emuFps == 61) emuFps=60;
                     else if (emuFps == 59) emuFps=60;
                 }
-                if (emuFps/100) szChai[0] = '0' + emuFps/100;
-                else szChai[0] = ' ';
-                szChai[1] = '0' + (emuFps%100) / 10;
-                szChai[2] = '0' + (emuFps%100) % 10;
-                szChai[3] = 0;
-                DSPrint(0,0,6,szChai);
+                DSPrint_fps(emuFps);
             }
             DisplayStatusLine(false);
             emuActFrames = 0;
         }
         emuActFrames++;
 
-        // -----------------------------------
-        // We only support NTSC 60 frames...
-        // -----------------------------------
+        // ---------------------------------------------
+        // We only support NTSC 60 frames per second...
+        // ---------------------------------------------
         if (++timingFrames == 60)
         {
             TIMER2_CR=0;
@@ -1209,9 +1212,9 @@ void Hachibitto_main(void)
                   {
                       if (myConfig.keyboard == OVL_ALPHAKBD)
                         meta_key = handle_alpha_keyboard_press(iTx, iTy);
-                      else 
+                      else
                         meta_key = handle_msx_keyboard_press(iTx, iTy);
-                      
+
                   }
 
                   if (kbd_key != 0)
@@ -1366,6 +1369,7 @@ void Hachibitto_main(void)
 
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
       {
+            // Screen swap top/bottom
             lcdSwap();
             WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
       }
@@ -1379,6 +1383,28 @@ void Hachibitto_main(void)
             WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
             DSPrint(20,0,6, "   ");
             DSPrint(20,1,6, "   ");
+      }
+      else if ((nds_key & KEY_R) && (nds_key & (KEY_UP | KEY_DOWN))) // Move screen
+      {
+          if (!screen_position_dampen)
+          {
+              if (nds_key & KEY_UP)
+              {
+                  if (myConfig.yOffset < 20)
+                  {
+                      myConfig.yOffset++;
+                  }
+              }
+              else if (nds_key & KEY_DOWN)
+              {
+                  if (myConfig.yOffset > 0)
+                  {
+                      myConfig.yOffset--;
+                  }
+              }
+              screen_position_dampen = 8;
+              save_config = 0;
+          }
       }
       else if  (nds_key & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_START | KEY_SELECT | KEY_R | KEY_L | KEY_X | KEY_Y))
       {
@@ -1499,8 +1525,23 @@ void Hachibitto_main(void)
           if (slide_n_glide_key_left)  slide_n_glide_key_left--;
           if (slide_n_glide_key_right) slide_n_glide_key_right--;
           last_mapped_key = 0;
+
+          if (save_config)
+          {
+              if (--save_config == 0)
+              {
+                  SaveConfig(FALSE);
+              }
+          }
       }
 
+      if (screen_position_dampen)
+      {
+          if (--screen_position_dampen == 0)
+          {
+              save_config = 60; // Save config in 1 second
+          }
+      }
 
       // ------------------------------------------------------------------------------------------
       // Finally, check if there are any buffered keys that need to go into the keyboard handling.
@@ -1542,6 +1583,28 @@ void useVRAM(void)
     vramSetBankI(VRAM_I_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x068A0000 -   16K Used for the VDP Look Up Table
 }
 
+void ShowInstructions(void)
+{
+    swiWaitForVBlank();
+
+    bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+    bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29,0);
+    bgSetPriority(bg0b,1);bgSetPriority(bg1b,0);
+    decompress(instructionsTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+    decompress(instructionsMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+    dmaCopy((void*) instructionsPal,(void*) BG_PALETTE_SUB,256*2);
+    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
+    
+    while ((keysCurrent() & KEY_START) == 0)
+    {
+        ShowRandomPreviewSnaps();
+        swiWaitForVBlank();
+    }
+    // Wait for key to be released before returning
+    while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
+}
+
 /*********************************************************************************
  * Init DS Emulator - setup VRAM banks and background screen rendering banks
  ********************************************************************************/
@@ -1566,6 +1629,8 @@ void HachibittoInit(void)
     dmaCopy((void*) topscreenPal,(void*)  BG_PALETTE,256*2);
     unsigned  short dmaVal =*(bgGetMapPtr(bg0)+51*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1),32*24*2);
+    
+    ShowInstructions();
 
     // Put up the options screen
     BottomScreenOptions();
@@ -1575,13 +1640,13 @@ void HachibittoInit(void)
 }
 
 
+// ---------------------------------------------------------------------------
+// Setup the bottom screen - mostly for menu, high scores, options, etc.
+// ---------------------------------------------------------------------------
 void BottomScreenOptions(void)
 {
     swiWaitForVBlank();
 
-    // ---------------------------------------------------
-    // Put up the options select screen background...
-    // ---------------------------------------------------
     bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
     bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29,0);
     bgSetPriority(bg0b,1);bgSetPriority(bg1b,0);
@@ -1593,7 +1658,7 @@ void BottomScreenOptions(void)
 }
 
 // ---------------------------------------------------------------------------
-// Setup the bottom screen - mostly for menu, high scores, options, etc.
+// Setup the bottom screen with the correct virtual keyboard.
 // ---------------------------------------------------------------------------
 void BottomScreenKeypad(void)
 {
@@ -1649,35 +1714,40 @@ void HachibittoInitCPU(void)
     msx_restore_bios();
 }
 
-// -------------------------------------------------------------
-// Only used for basic timing of moving the Mario sprite...
-// -------------------------------------------------------------
+// -----------------------------------------------------------------
+// This is where we handle our pan/scan up and down as well as
+// some basic vSYNC timing so that we lock the DS screen updates
+// and the MSX screen updates to avoid tearing as much as possible.
+// -----------------------------------------------------------------
 void irqVBlank(void)
 {
     int ydyBG = 0x0100; // Default to no screen scale
     int shifty = 0;
+    int cyBG = 0;
     
     // Manage time and true vSync on display output to reduce tearing...
     vusCptVBL++;
     dsVSyncCount++;
 
-    int cyBG = ((s16)myConfig.yOffset+temp_offset) << 8;
-    
     // ---------------------------------------------------------------------
     // Are we in 192 scanline mode? If so, we don't need ANY screen panning.
     // ---------------------------------------------------------------------
-    if (!(VDP[9] & 0x80))
+    if (!(VDP[9] & 0x80)) // High bit set if we are in 212 mode
     {
-        cyBG = 0;
+        debug[3]++;
+        cyBG = 0;       // No shift
+        shifty = 0;     // No shift
     }
     else
     {
+        cyBG = ((s16)myConfig.yOffset+temp_offset) << 8;
+        
         // --------------------------------------------------------------------
-        // Compress screen (yuck!). We do a little bit of DS magic here to 
-        // shift one of the two DS video pointers so that we end up with a 
+        // Compress screen (yuck!). We do a little bit of DS magic here to
+        // shift one of the two DS video pointers so that we end up with a
         // tiny bit of vertical blurring that helps games that have static
         // screens so that some lines repeat a pixel rather than just losing
-        // it completely. This produces squatter/fatter text but generally 
+        // it completely. This produces squatter/fatter text but generally
         // looks better than a line of missing pixels. It's not perfect.
         // --------------------------------------------------------------------
         if (myConfig.scaleScreen)
@@ -1715,13 +1785,13 @@ int main(int argc, char **argv)
 {
     // Init sound so we get an intro jingle...
     consoleDemoInit();
-   
+
     // Initialize the old FAT16 library for use with the SD card
     if  (!fatInitDefault()) {
        iprintf("Unable to initialize libfat!\n");
        return -1;
     }
-   
+
     // -----------------------------------------------------------------
     // Allocate the Large DSi buffer for expanded RAM banking...
     // -----------------------------------------------------------------
@@ -1735,49 +1805,49 @@ int main(int argc, char **argv)
         MAX_CART_SIZE = 1256;
         ROM_Memory = malloc(MAX_CART_SIZE * 1024);
     }
-   
+
     // ------------------------------------------
     // Load the High Score table into memory...
     highscore_init();
     // ------------------------------------------
-   
+
     // ---------------------------------------------------------------
     // The main game action is on the top screen, keyboard on bottom
     // ---------------------------------------------------------------
     lcdMainOnTop();
-   
+
     //  Init timer for frame management
     TIMER2_DATA=0;
     TIMER2_CR=TIMER_ENABLE|TIMER_DIV_1024;
-   
+
     // Install the sound driver for emulated AY/SCC sound
     SoundPause();
     dsInstallSoundEmuFIFO();
-   
+
     //  Show the fade-away intro logo...
     intro_logo();
-   
+
     SetYtrigger(180); //trigger 12 lines before true DS vsync
-   
+
     irqSet(IRQ_VBLANK,  irqVBlank);
     irqEnable(IRQ_VBLANK);
-   
+
     // -------------------------------------------
     // Setup our DS VRAM - most banks go unused.
     // -------------------------------------------
     useVRAM();
-   
+
     // -----------------------------------------------------------------
     // And do an initial load of configuration... We'll match it up
     // with the game that was selected later... Mostly need globals.
     // -----------------------------------------------------------------
     LoadConfig();
-   
+
     // -----------------------------------------
     // Do an initial load of the Favorites file
     // -----------------------------------------
     LoadFavorites();
-   
+
     // --------------------------------------------------
     //  Handle command line argument... mostly for TWL++
     // --------------------------------------------------
@@ -1806,19 +1876,19 @@ int main(int argc, char **argv)
         chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
         chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
     }
-   
+
     // -----------------------------------------------------
     // Make sure we have true-ish random number generation
     // -----------------------------------------------------
     srand(time(NULL));
-   
+
     //  ------------------------------------------------------------
     //  We run this loop forever until game exit is selected...
     //  ------------------------------------------------------------
     while(1)
     {
         HachibittoInit();
-        
+
         while(1)
         {
             SoundPause();
@@ -1835,7 +1905,7 @@ int main(int argc, char **argv)
             {
                 HachibittoChangeOptions();
             }
-            
+
             //  Run Machine
             HachibittoInitCPU();
             Hachibitto_main();
@@ -1953,7 +2023,7 @@ u8 msxInit(char *szGame)
     REG_BG2PD = (1<<8);
     REG_BG2X = 0;
     REG_BG2Y = 0;
-    
+
     REG_BG3PA = (1<<8);
     REG_BG3PB = 0;
     REG_BG3PC = 0;
@@ -2027,7 +2097,7 @@ void getfile_crc(const char *filename)
 
     // -------------------------------------------------------------------
     // This reads the file into ROM_Memory[] and computes the CRC32 which
-    // is used for favorites, high score saves and configuration data. 
+    // is used for favorites, high score saves and configuration data.
     // For large files (> 1MB), this can take several seconds.
     // -------------------------------------------------------------------
     file_crc = getFileCrc(filename);
@@ -2050,7 +2120,7 @@ u8 loadrom(const char *filename)
         // Save the initial filename and file - we need it for save/restore of state
         strcpy(initial_file, filename);
         strcpy(initial_file_upper, filename);
-        for (int i=0; i<strlen(initial_file_upper); i++) 
+        for (int i=0; i<strlen(initial_file_upper); i++)
         {
             initial_file_upper[i] = toupper(initial_file_upper[i]);     // Uppercase string
         }
@@ -2092,7 +2162,7 @@ u8 loadrom(const char *filename)
 // -------------------------------------------------------------------------
 void PatchZ80(register Z80 *r)
 {
-
+    // Not used at this time...
 }
 
 
@@ -2144,9 +2214,6 @@ u32 LoopZ80()
   }
   return 1;
 }
-
-// End of file
-
 
 // -----------------------------------------------------------------------
 // We steal 256K off the back end of the big ROM_Memory[] buffer for

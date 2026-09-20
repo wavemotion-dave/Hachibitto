@@ -240,6 +240,7 @@ extern void HachibittoInitScreenUp(void);
 extern void HachibittoFindFiles(void);
 extern void HachibittoChangeOptions(void);
 extern void DSPrint(int iX,int iY,int iScr,char *szMessage);
+extern void DSPrint_fps(u16 fps);
 extern void HachibittoChangeKeymap(void);
 extern void HachibittoGameOptions(bool);
 extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
@@ -251,5 +252,7 @@ extern u8   msxInit(char *szGame);
 extern u8   loadrom(const char *path);
 extern u32  LoopZ80();
 extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
+extern void SaveConfig(bool bShow);
+extern void ShowRandomPreviewSnaps(void);
 
 #endif

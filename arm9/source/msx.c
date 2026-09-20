@@ -73,8 +73,10 @@ static uint8_t rtc_ram[4][16] = {
     // Bank 0: Time/Date & Mode Regs
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 },
 
-    // Bank 1: Screen Mode / Colors
-    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 },
+    // Bank 1: Screen Mode / Colors (60Hz / NTSC Setup)
+    // Index 9 is set to 0x00 (forcing 60Hz / NTSC)
+    // Other indices define default foreground, background, border colors, and text width (e.g., 80 chars)
+    { 0x0F, 0x04, 0x04, 0x01, 0x00, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0, 0 },
 
     // Bank 2: Palette Data + Valid MSX2 ROM Checksum in Reg 12/13
     { 0x04, 0x04, 0x07, 0x05, 0x02, 0x02, 0x07, 0x07,
@@ -670,7 +672,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF 
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
@@ -809,7 +811,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (this is our expanded slot)
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF 
+            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;

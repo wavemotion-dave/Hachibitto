@@ -44,7 +44,7 @@ u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
 u8 screen7LUT[256]       __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
-{   
+{
     u8 new_bg_color = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
 
     // Only update the table if the XPal[] palette table is changing...
@@ -65,7 +65,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     else
     {
         u8 new_color = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
-        
+
         // Only update the table if the XPal[] palette table is changing...
         if (XPal[index] != new_color)
         {
@@ -78,22 +78,22 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
 // When CPU writes to Port 0x9A
 // Note that in real hardware, Port 0x9A shares the
 // same 'first byte' register with ports 0x9A and 0x99
-// and so that is handled here by reuse of ALatch. They 
+// and so that is handled here by reuse of ALatch. They
 // do use separate flip-flops however.
 void write_port_9A(uint8_t data)
 {
-    if (!palette_latch) 
+    if (!palette_latch)
     {
         // First Byte: Red (bits 6-4) and Blue (bits 2-0)
         ALatch = data;
         palette_latch = true;
     }
-    else 
+    else
     {
         // ----------------------------------------
         // We need to get this into GGGRRRBB format
         // ----------------------------------------
-        
+
         // Second Byte: Green (bits 2-0)
         uint8_t index = VDP[16] & 0x0F;
         uint8_t color_grb = ((ALatch & 0x70) >> 2) | ((ALatch>>1) & 3) | ((data & 7) << 5);
@@ -774,13 +774,13 @@ void RefreshLine0(u8 Y)
   register byte *T,K,Offset;
   register byte *P,FC,BC;
   u16 word1=0, word2=0, word3=0;
-  
+
   DEBUG_REFRESH(0);
-  
+
   P=XBuf+(Y<<8);
   BC = XPal[BGColor];
   FC = XPal[FGColor];
-  
+
   if(!ScreenON)
     memset(P,XPal[BGColor],256);
   else
@@ -834,9 +834,9 @@ void RefreshLine1(u8 uY)
   register u8 *T;
   register u32 *P;
   u8 lastT;
-  
+
   DEBUG_REFRESH(1);
-  
+
   P=(u32*) (XBuf+(uY<<8));
   u32 ptLow = 0; u32 ptHigh = 0;
 
@@ -874,13 +874,13 @@ void RefreshLine1(u8 uY)
 /** Refresh line Y (0..191) of SCREEN2, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-ITCM_CODE void RefreshLine2(u8 uY) 
+ITCM_CODE void RefreshLine2(u8 uY)
 {
   u32 *P;
   register byte FC,BC;
   register byte K,*T;
   u16 J,I;
-  
+
   DEBUG_REFRESH(2);
 
   P=(u32*)(XBuf+(uY<<8));
@@ -892,7 +892,7 @@ ITCM_CODE void RefreshLine2(u8 uY)
   else
   {
     u32 ptLow = 0; u32 ptHigh = 0;
-    
+
     J   = ((u16)((u16)uY&0xC0)<<5)+(uY&0x07);
     T   = ChrTab+((u16)((u16)uY&0xF8)<<2);
     u8 lastT = ~(*T);
@@ -924,12 +924,12 @@ ITCM_CODE void RefreshLine2(u8 uY)
 /** Refresh line Y (0..191) of SCREEN3, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-void RefreshLine3(u8 uY) // Purposely no ITCM_CODE as this is the least used Screen Mode and we need the ITCM space!
+void RefreshLine3(u8 uY)
 {
   byte X,K,Offset;
   byte *P,*T;
   u8 lastT;
-  
+
   DEBUG_REFRESH(3);
 
   P=XBuf+(uY<<8);
@@ -938,7 +938,7 @@ void RefreshLine3(u8 uY) // Purposely no ITCM_CODE as this is the least used Scr
   {
     memset(XBuf + (uY<<8), XPal[BGColor], 256);
   }
-  else 
+  else
   {
     u8 ptLow = 0; u8 ptHigh = 0;
     T=ChrTab+((int)(uY&0xF8)<<2);
@@ -1000,7 +1000,7 @@ ITCM_CODE void CommitLine(u8 Y)
     // LineScratch+LS_BASE are both multiples of 4) -- no shift math here at all.
     u32 * restrict dst = (u32*)(XBuf + ((u16)Y << 8));
     const u8 * restrict src = (const u8*)(LineScratch + LS_BASE);
-    
+
     for (int i=0; i<8;i++)
     {
         *dst++ = (XPal[src[0]]  << 0) | (XPal[src[1]]  << 8) | (XPal[src[2]]  << 16) | (XPal[src[3]]  << 24);
@@ -1019,7 +1019,7 @@ ITCM_CODE void CommitLine(u8 Y)
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
     DEBUG_REFRESH(4);
-   
+
     if (!ScreenON)
     {
       memset(XBuf + (Y<<8), XPal[BGColor], 256);
@@ -1032,46 +1032,46 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
       uint32_t srcY = Y + VScroll;
       T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
       I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
-   
+
       // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
       // doesn't change mid-line), so check it once rather than per-pixel.
       int misaligned = ((uintptr_t)P & 3) != 0;
-   
+
       uint32_t *P32 = (uint32_t*)P;
       uint16_t *P16 = (uint16_t*)P;
-   
+
       uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
       uint32_t p0 = 0, p1 = 0;
-   
+
       int X = 32;
-   
+
       if (!misaligned)
       {
           do
           {
             uint32_t t_val = *(uint8_t*)T;
             T = (uint32_t*)((uint8_t*)T + 1);
-   
+
             if (t_val != lastT)
             {
                 lastT = t_val;
                 J = (int)t_val << 3;
                 uint32_t idx = (I + J);
-   
+
                 uint32_t K_col = ColTab[idx & ColTabM];
                 uint32_t FC    = K_col >> 4;
                 uint32_t BC    = K_col & 0x0F;
-   
+
                 K = ChrGen[idx & ChrGenM];
-   
+
                 p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
                 p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
             }
-   
+
             P32[0] = p0;
             P32[1] = p1;
             P32 += 2;
-   
+
           } while (--X);
       }
       else
@@ -1080,23 +1080,23 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
           {
               uint32_t t_val = *(uint8_t*)T;
               T = (uint32_t*)((uint8_t*)T + 1);
-              
+
               if (t_val != lastT)
               {
                   lastT = t_val;
                   J = (int)t_val << 3;
                   uint32_t idx = (I + J);
-              
+
                   uint32_t K_col = ColTab[idx & ColTabM];
                   uint32_t FC    = K_col >> 4;
                   uint32_t BC    = K_col & 0x0F;
-              
+
                   K = ChrGen[idx & ChrGenM];
-              
+
                   p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
                   p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
               }
-              
+
               P16[0] = (uint16_t)p0;
               P16[1] = (uint16_t)(p0 >> 16);
               P16[2] = (uint16_t)p1;
@@ -1104,7 +1104,7 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
               P16 += 4;
           } while (--X);
       }
-   
+
       ColorSprites(Y, P-32);
 
       // See if user wants us to mask off 8 pixels on left/right to help mask scrolling issues
@@ -1119,7 +1119,7 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
     }
 }
 
-ITCM_CODE void RefreshLine5(register u8 uY)
+ITCM_CODE void RefreshLine5(u8 uY)
 {
     DEBUG_REFRESH(5);
 
@@ -1147,7 +1147,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
             {
                 u32 s0 = src32[0];
                 u32 s1 = src32[1];
-                
+
                 *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
@@ -1155,15 +1155,15 @@ ITCM_CODE void RefreshLine5(register u8 uY)
 
                 s0 = src32[2];
                 s1 = src32[3];
-                
+
                 *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
-                
+
                 s0 = src32[4];
                 s1 = src32[5];
-                
+
                 *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
@@ -1171,7 +1171,7 @@ ITCM_CODE void RefreshLine5(register u8 uY)
 
                 s0 = src32[6];
                 s1 = src32[7];
-                
+
                 *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
                 *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
@@ -1219,10 +1219,10 @@ ITCM_CODE void RefreshLine5(register u8 uY)
 /** RefreshLine6() ********************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
 /*************************************************************/
-ITCM_CODE void RefreshLine6(register u8 uY)
+ITCM_CODE void RefreshLine6(u8 uY)
 {
     uint8_t *P = RefreshBorder(uY);
-    
+
     DEBUG_REFRESH(6);
 
     if (!ScreenON)
@@ -1237,7 +1237,7 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 
         // Loops 64 times. Processes exactly 128 source bytes.
         // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
-        for (int i = 0; i < 128; i += 2) 
+        for (int i = 0; i < 128; i += 2)
         {
             u32 b0 = srcPtr[i];
             u32 b1 = srcPtr[i+1];
@@ -1262,10 +1262,10 @@ ITCM_CODE void RefreshLine6(register u8 uY)
 /** RefreshLine7() ********************************************/
 /** Refresh VDP9938 Screen 7: 512x212, 16 colors bitmap    **/
 /*************************************************************/
-ITCM_CODE void RefreshLine7(register u8 uY)
+ITCM_CODE void RefreshLine7(u8 uY)
 {
     DEBUG_REFRESH(7);
-    
+
     if (!ScreenON)
     {
        memset(XBuf + (uY<<8), XPal[BGColor], 256);
@@ -1296,7 +1296,7 @@ ITCM_CODE void RefreshLine7(register u8 uY)
             *dst32++ = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
             *dst32++ = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
         }
-        
+
         ColorSprites(uY, P-32);
         CommitLine(uY);
     }
@@ -1306,14 +1306,14 @@ ITCM_CODE void RefreshLine7(register u8 uY)
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
 /*************************************************************/
-ITCM_CODE void RefreshLine8(register u8 uY)
+ITCM_CODE void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
     // -------------------------------------------------------------------
     // We purposely don't call RefreshLine() as we need the speed of a
-    // direct rendering into XBuf[]. This could cause problems if we 
+    // direct rendering into XBuf[]. This could cause problems if we
     // have sprites that clip at the left edge... but what can you do?!
-    // It's unlikely there will be any kind of sprite tricks happening 
+    // It's unlikely there will be any kind of sprite tricks happening
     // for the Screen 8 mode so we're probably okay. Emulation isn't easy.
     // -------------------------------------------------------------------
     if (!ScreenON)
@@ -1392,13 +1392,13 @@ void CheckNewMode(void)
     case 0x12: newMode=0;break; // Really 80 columns but ...
     default:   newMode=ScrMode;break;
   }
-  
+
   // If we just switched into a legacy mode, rebuild the table
   if ((ScrMode != newMode) && (newMode < 4))
   {
       RebuildLutTablehh();
   }
-  
+
   ScrMode=newMode;
 
   RefreshLine = SCR[ScrMode].Refresh;
@@ -1413,7 +1413,7 @@ void CheckNewMode(void)
       ChrGen=VDP_Memory+(((int)(VDP[4]&SCR[ScrMode].R4)<<11)&VRAMMask);
       SprTab=VDP_Memory+(((int)(VDP[5]&SCR[ScrMode].R5)<<7)&VRAMMask);
       SprGen=VDP_Memory+(((int)(VDP[6])<<11)&VRAMMask);
-        
+
       ChrTabM = ((int)(VDP[2]|(u8)~SCR[ScrMode].M2)<<10)|0x03FF;
       ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x003F;
       ChrGenM = ((int)(VDP[4]|(u8)~SCR[ScrMode].M4)<<11)|0x07FF;
@@ -1433,7 +1433,7 @@ void CheckNewMode(void)
       ColTabM = ((int)(VDP[3]|(u8)~SCR[ScrMode].M3)<<6) |0x1C03F;
       SprTabM = ((int)(VDP[5]|(u8)~SCR[ScrMode].M5)<<7) |0x1807F;
   }
-  
+
   handle_transparency();
 }
 
@@ -1550,28 +1550,27 @@ ITCM_CODE void WrCtrl9938(byte value)
   {
     VDPCtrlLatch=0; // Set the VDP flip-flop so we do the low byte next
 
-    switch(value&0xC0)
+    if (value & 0x80)
     {
-      case 0x80:
-      case 0xC0:
-        Write9938(value&0x3F, ALatch); // Write VDP9938: registers 0-63
-        break;
+        // Covers 0x80 and 0xC0 (Bit 7 is set)
+        Write9938(value & 0x3F, ALatch);
+    }
+    else
+    {
+        // Covers 0x00 and 0x40 (Bit 7 is cleared)
+        VAddr = (((uint16_t)value << 8) + ALatch) & 0x3FFF;
 
-      case 0x00:
-      case 0x40:
-        VAddr=(((uint16_t)value<<8)+ALatch)&0x3FFF;
-        /* When set for reading, perform first read */
-        if(!(value&0x40))
+        /* When set for reading (Bit 6 is 0, i.e., case 0x00), perform first read */
+        if (!(value & 0x40))
         {
             VDPDlatch = VPAGE[VAddr];
-            VAddr = (VAddr+1)&0x3FFF;
-            if(!VAddr&&(ScrMode>3))
+            VAddr = (VAddr + 1) & 0x3FFF;
+            if (!VAddr && (ScrMode > 3))
             {
-                VDP[14]=(VDP[14]+1)&7;
-                VPAGE=VDP_Memory+((int)VDP[14]<<14);
+                VDP[14] = (VDP[14] + 1) & 7;
+                VPAGE = VDP_Memory + ((int)VDP[14] << 14);
             }
         }
-        break;
     }
   }
   else  // Write the low byte of the video address / control register
@@ -1605,7 +1604,7 @@ ITCM_CODE byte RdCtrl9938(void)
       // Check if we are in the visible screen area
       if (CurLine < VDP9938_START_LINE || CurLine >= VDP9938_END_LINE)
       {
-          data |= 0x40; // We are in VBLANK 
+          data |= 0x40; // We are in VBLANK
       }
       else
       {
@@ -1623,7 +1622,7 @@ ITCM_CODE byte RdCtrl9938(void)
       {
           data &= ~0x20; // We are in active scanline
       }
-      
+
       if (frame_number & 1) data |= 0x02; else data &= ~0x02; // Even vs Odd frame
   }
   else if (VDP[15] == 7)
@@ -1694,7 +1693,7 @@ void Loop9938(void)
   if ((CurLine >= VDP9938_START_LINE) && (CurLine < VDP9938_END_LINE))
   {
       u8 scan_sprites = 0;
-      
+
       // ---------------------------------------------------------------
       // On the DS-Lite/Phat, we have to frameskip every other frame...
       // ---------------------------------------------------------------
@@ -1709,8 +1708,9 @@ void Loop9938(void)
           // We can only show 192 lines... so only refresh the line if the
           // line will actually be one of the ones rendered to the DS LCD.
           // ---------------------------------------------------------------
-          int first_visible_line = VDP9938_START_LINE+myConfig.yOffset+temp_offset;
-          
+          int first_visible_line = VDP9938_START_LINE;
+          if (VDP[9] & 0x80) first_visible_line += myConfig.yOffset+temp_offset;
+
           if ((CurLine >= first_visible_line) &&  (CurLine < (first_visible_line+(myConfig.scaleScreen ? 212:192))))
           {
               RefreshLine(CurLine - VDP9938_START_LINE);
@@ -1722,7 +1722,7 @@ void Loop9938(void)
       }
 
       // ----------------------------------------------------------
-      // If we are not rendering this scanline for whatever reason 
+      // If we are not rendering this scanline for whatever reason
       // directly above, we still scan the spites on the line...
       // ----------------------------------------------------------
       if (scan_sprites)
@@ -1730,7 +1730,7 @@ void Loop9938(void)
           unsigned int tmp;
           if (ScrMode < 4)
             ScanSprites(CurLine - VDP9938_START_LINE, &tmp);    // Skip rendering - but still scan sprites for the 5th sprite flag
-          else 
+          else
             ScanColorSprites(CurLine - VDP9938_START_LINE);     // Skip rendering - but still scan sprites for the 9th sprite flag
       }
 
@@ -1786,9 +1786,9 @@ void Reset9938(void)
 
         BG_PALETTE[idx] = RGB15(red<<2,green<<2,blue<<3);
     }
-    
+
     BG_PALETTE[4] = RGB15(1,1,1);   // We need a real black... and index 4 was already very close!
-    
+
     // Set the XPal[] palette index array for Legacy colors
     for (int idx=0; idx<16; idx++)
     {
@@ -1799,9 +1799,9 @@ void Reset9938(void)
         u8 byte = (g3 << 5) | (r3 << 2) | b2;
         XPal[idx] = byte ? byte : 4; // Never land back on transparent. Index 4 is our black.
     }
-    
+
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start
-    
+
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
@@ -1809,7 +1809,7 @@ void Reset9938(void)
 
     BuildNibbleLUT();
     BuildScreen7LUT();
-    
+
     // ---------------------------------------------------------------------------------------------
     // For the DS-Lite/Phat we need some level of frameskip... the MSX2 has just too much happening!
     // ---------------------------------------------------------------------------------------------
@@ -1820,7 +1820,7 @@ void Reset9938(void)
     else
     {
         frame_skip_mask = 1;
-        
+
         // Snatcher and Manbow need help...
         if (strstr(initial_file_upper, "MANBOW"))
         {
@@ -1831,7 +1831,7 @@ void Reset9938(void)
             frame_skip_mask = 3;
         }
     }
-    
+
     if (myConfig.machineType == MACHINE_MSX1)
     {
         VDP[0] = 0x00;                      // Control Bits I:  Graphics Mode 1 (M3... M1,M2 in VDP[1])
@@ -1875,7 +1875,7 @@ void Reset9938(void)
     RefreshLine = RefreshLine0;
 
     OH = IH = 0;
-    
+
     // ---------------------------------------------------------------
     // Our background/foreground color table makes computations FAST!
     // ---------------------------------------------------------------

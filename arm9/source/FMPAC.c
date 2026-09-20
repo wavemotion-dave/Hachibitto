@@ -16,38 +16,31 @@
 #define FMPAC_SIN_SHIFT			24		// phase>>24 -> 8-bit (256 entry) table index
 #define FMPAC_GAIN_RAMP_STEP		16		// ATTACK rate: gain moves this much per sample toward
 							// full on key-on - ~16 samples (~0.6ms), fast/click-free
-#define FMPAC_NOISE_HOLD_SAMPLES	4		// draw a new noise value only every N samples, like real
-							// chip noise generators (SN76489/AY) do, instead of every
-							// single sample - gives a lower, "grainier" hiss instead
-							// of full-bandwidth harsh static, at the same perceived
-							// loudness. Retune if percussion still sounds too harsh
-							// (raise this) or too dull/clicky (lower it).
-#define FMPAC_RELEASE_STEP		3984		// RELEASE rate: 16.16 fixed-point step targeting a ~150ms
-							// fade to silence on key-off, not an instant cutoff. This
-							// is the fix for FM music sounding "thin"/"cut" - real FM
+#define FMPAC_RELEASE_STEP		3984		// MELODIC release rate: 16.16 fixed-point step targeting a
+							// ~150ms fade to silence on key-off, not an instant cutoff.
+							// This is the fix for FM music sounding "thin"/"cut" - real FM
 							// pieces lean on overlapping decay tails for their fullness
 							// (unlike AY music, which doesn't use per-note envelopes at
 							// all), and cutting every note off in <1ms removed exactly
 							// that. Retune this constant if it still isn't right - up
 							// for a lusher/longer tail, down if notes start blurring
 							// together too much.
-#define FMPAC_OUT_SHIFT			8		// melodic channel output headroom - reverted to the
-							// original value. The earlier bump to 10 was a mistake:
-							// it was meant to avoid clipping when summed with AY/SCC,
-							// but the replay tool had ALREADY measured zero clipped
-							// samples even at this original level - there was no
-							// clipping problem to fix, and the bump just made
-							// everything quieter for no reason.
-#define FMPAC_NOISE_OUT_SHIFT		8		// same level as melodic channels for now. This was
-							// previously 10 (4x quieter), tuned against "harsh
-							// static" - but that testing happened before the AY
-							// sign-bias bug (see FMPACMixer) was found and fixed,
-							// which was likely making everything in the buffer sound
-							// distorted, not just the noise drums specifically. Now
-							// reads as "percussion missing/inaudible" instead, which
-							// points at over-attenuation rather than a real harshness
-							// problem. Retune from here based on how it actually sounds
-							// now that the buffer isn't being clobbered.
+#define FMPAC_PERCUSSION_RELEASE_STEP	19920		// PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
+							// Real drums (hi-hat especially) decay in tens of ms, not
+							// hundreds - using the melodic rate here made consecutive
+							// hits (fired every 100-150ms in a normal rhythm pattern)
+							// overlap and blend continuously instead of sounding like
+							// distinct hits. Applies to BD/TOM and HH/SD/TOP-CY alike.
+#define FMPAC_OUT_SHIFT			8		// output headroom for everything - melodic channels AND
+							// percussion now both go through FMPAC_SinTable via real
+							// phase-selection logic (see FMPACMixer), not a separate
+							// noise path, so one shared shift is enough. The earlier
+							// bump to 10 (and a separate, further-attenuated shift just
+							// for percussion) were both compensating for problems that
+							// turned out to have other causes (an AY sign-bias bug, and
+							// generic-noise percussion overlapping continuously) -
+							// neither issue exists anymore, so this is back to a single
+							// plain constant.
 
 //@----------------------------------------------------------------------------
 //@ 256-entry waveform table, amplitude -127..127. One lookup per active
@@ -160,7 +153,7 @@ static void FMPAC_UpdateCustomUsers(FMPAC *chip)
 //@ the earlier ADSR version, just for one rate instead of a per-instrument
 //@ table.
 //@----------------------------------------------------------------------------
-static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn)
+static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep)
 {
 	if (keyOn)
 	{
@@ -173,7 +166,7 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn)
 	}
 	else if (osc->gain > 0)
 	{
-		osc->releaseAccum += FMPAC_RELEASE_STEP;
+		osc->releaseAccum += releaseStep;
 		while (osc->releaseAccum >= 0x10000)
 		{
 			osc->releaseAccum -= 0x10000;
@@ -184,15 +177,18 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn)
 }
 
 //@----------------------------------------------------------------------------
+//@ One oscillator, one sample. No FM, no ADSR - just a tone with a gain
 //@ that ramps toward its key-on/off target. Takes keyOn/volume explicitly
 //@ (rather than reading a channel struct's fields directly) so the same
 //@ function serves both ordinary melodic channels and the tonal rhythm
 //@ voices (BD, TOM), which need their key-on state computed fresh from
 //@ the rhythm register each sample rather than stored on the channel.
+//@ isMelodic selects which release rate applies - see FMPAC_RELEASE_STEP
+//@ vs FMPAC_PERCUSSION_RELEASE_STEP.
 //@----------------------------------------------------------------------------
-static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume)
+static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume, int isMelodic)
 {
-	FMPAC_UpdateGain(osc, keyOn);
+	FMPAC_UpdateGain(osc, keyOn, isMelodic ? FMPAC_RELEASE_STEP : FMPAC_PERCUSSION_RELEASE_STEP);
 	if (osc->gain == 0) return 0;	// still idle/silent - skip the phase/table work
 
 	osc->phase += osc->phaseIncrement;
@@ -201,40 +197,18 @@ static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume)
 }
 
 //@----------------------------------------------------------------------------
-//@ Advances the shared noise generator by exactly one sample's worth -
-//@ called once per sample from FMPACMixer, not from FMPAC_RenderNoiseDrum,
-//@ so the effective noise rate doesn't depend on how many drum voices
-//@ happen to be active. Only actually draws a new value/steps the LFSR
-//@ every FMPAC_NOISE_HOLD_SAMPLES samples - see that constant's comment.
+//@ Advances the shared noise LFSR by one bit per sample. Used only as a
+//@ single tie-breaker bit by the real HH/SD phase-selection algorithm in
+//@ FMPACMixer (see there) - real hardware does exactly this, reading
+//@ (noise_rng>>0)&1 fresh each sample, not a "held"/bandwidth-reduced
+//@ value. No separate noise waveform synthesis needed anymore.
 //@----------------------------------------------------------------------------
 static void FMPAC_AdvanceNoise(FMPAC *chip)
 {
-	chip->noiseHoldCounter++;
-	if (chip->noiseHoldCounter < FMPAC_NOISE_HOLD_SAMPLES) return;
-	chip->noiseHoldCounter = 0;
-
 	u32 lfsr = chip->noiseLFSR;
 	u32 bit = ((lfsr >> 0) ^ (lfsr >> 3)) & 1;
 	lfsr = (lfsr >> 1) | (bit << 16);
 	chip->noiseLFSR = lfsr;
-
-	chip->noiseHoldValue = (s32)(lfsr & 0xFF) - 128;	// -128..127
-}
-
-//@----------------------------------------------------------------------------
-//@ One noise-based drum voice (HH/SD/TOP-CY), one sample. The actual random
-//@ value is drawn once per sample by FMPACMixer (see FMPAC_AdvanceNoise
-//@ below) and shared here - NOT redrawn per call, since up to 3 of these
-//@ can be active in the same sample and each call updating the LFSR
-//@ independently would make the effective noise rate depend on how many
-//@ drums happen to be playing at once, which isn't what we want.
-//@----------------------------------------------------------------------------
-static s32 FMPAC_RenderNoiseDrum(FMPAC *chip, FMPAC_Oscillator *osc, u8 keyOn, u8 volume)
-{
-	FMPAC_UpdateGain(osc, keyOn);
-	if (osc->gain == 0) return 0;
-
-	return (chip->noiseHoldValue * (15 - (volume & 0x0F)) * osc->gain) >> FMPAC_NOISE_OUT_SHIFT;
 }
 
 //@----------------------------------------------------------------------------
@@ -359,7 +333,7 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 		{
 			FMPAC_Channel *cc = &chip->channels[ch];
 			if (!cc->keyOn && cc->osc.gain == 0) continue;	// fully idle - skip entirely
-			sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume);
+			sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1);
 		}
 
 		if (rhythmOn)
@@ -374,17 +348,64 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 			u8 tcyOn = (chip->rhythmReg & FMPAC_RHYTHM_TCY_BIT) ? 1 : 0;
 
 			if (bd->keyOn || bd->osc.gain != 0)
-				sample += FMPAC_RenderChannel(&bd->osc, bd->keyOn, chip->rhythmVolBD);
+				sample += FMPAC_RenderChannel(&bd->osc, bd->keyOn, chip->rhythmVolBD, 0);
+
+			// Real HH/SD/TOM/TOP-CY are NOT generic noise - they're built from specific
+			// bits of channels 7 & 8's own frequency phase (verified against a real
+			// reference OPLL core), which is why real percussion has a "tick"/metallic
+			// character rather than a plain "shhh". The phase generators for channels 7
+			// & 8 must keep running every sample regardless of their own key state, since
+			// HH/TOP-CY derive their sound from them even when TOM/the tonal part isn't
+			// itself sounding.
+			hs->osc.phase += hs->osc.phaseIncrement;
+			tt->osc.phase += tt->osc.phaseIncrement;
+
+			u32 idx7 = (hs->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF;
+			u32 idx8 = (tt->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF;
+			// Bit positions below are the reference's (7,3,2,8,5,3), each shifted down by
+			// 2 to account for our table being 256 entries instead of the reference's 1024.
+			u32 hbit7 = (idx7 >> 5) & 1, hbit3 = (idx7 >> 1) & 1, hbit2 = idx7 & 1;
+			u32 res1 = (hbit2 ^ hbit7) | hbit3;
+			u32 gbit5 = (idx8 >> 3) & 1, gbit3 = (idx8 >> 1) & 1;
+			u32 res2 = gbit3 | gbit5;
+			u32 highBranch = res2 ? 1 : res1;
+			u32 noiseBit = chip->noiseLFSR & 1;
 
 			if (hhOn || hs->osc.gain != 0)
-				sample += FMPAC_RenderNoiseDrum(chip, &hs->osc, hhOn, chip->rhythmVolHH);
+			{
+				FMPAC_UpdateGain(&hs->osc, hhOn, FMPAC_PERCUSSION_RELEASE_STEP);
+				if (hs->osc.gain != 0)
+				{
+					u8 phase = highBranch ? (noiseBit ? 180 : 141) : (noiseBit ? 13 : 52);
+					s32 s = FMPAC_SinTable[phase];
+					sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
+				}
+			}
 			if (sdOn || chip->rhythmSD.gain != 0)
-				sample += FMPAC_RenderNoiseDrum(chip, &chip->rhythmSD, sdOn, chip->rhythmVolSD);
+			{
+				FMPAC_UpdateGain(&chip->rhythmSD, sdOn, FMPAC_PERCUSSION_RELEASE_STEP);
+				if (chip->rhythmSD.gain != 0)
+				{
+					u32 hbit8 = (idx7 >> 6) & 1;
+					u8 phase = (u8)((hbit8 ? 128 : 64) ^ (noiseBit ? 64 : 0));
+					s32 s = FMPAC_SinTable[phase];
+					sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
+				}
+			}
 
 			if (tomOn || tt->osc.gain != 0)
-				sample += FMPAC_RenderChannel(&tt->osc, tomOn, chip->rhythmVolTOM);
+				sample += FMPAC_RenderChannel(&tt->osc, tomOn, chip->rhythmVolTOM, 0);
+
 			if (tcyOn || chip->rhythmTCY.gain != 0)
-				sample += FMPAC_RenderNoiseDrum(chip, &chip->rhythmTCY, tcyOn, chip->rhythmVolTCY);
+			{
+				FMPAC_UpdateGain(&chip->rhythmTCY, tcyOn, FMPAC_PERCUSSION_RELEASE_STEP);
+				if (chip->rhythmTCY.gain != 0)
+				{
+					u8 phase = (u8)(highBranch ? 192 : 64);
+					s32 s = FMPAC_SinTable[phase];
+					sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
+				}
+			}
 		}
 
 		// AY driver outputs unsigned-centered PCM (silence = 32768) but writes it into
