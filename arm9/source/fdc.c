@@ -25,7 +25,7 @@
 
 // -----------------------------------------------------------------------------------------
 // WD2793-only Floppy Drive Controller for the CDX2-FDD interface (MSX2-compatible).
-// Handles basic seeks, sector reads, sector writes, and track formatting -- enough
+// Handles basic seeks, sector reads, sector writes, and force interrupt -- enough
 // for the vast majority of MSX2 .dsk-based disk games to play properly.
 // -----------------------------------------------------------------------------------------
 struct FDC_t            FDC;
@@ -342,7 +342,7 @@ u8 fdc_read(u8 addr)
             if (FDC.status & ST_INDEX_DRQ)   // Are we waiting for the CPU to read a byte?
             {
                 FDC.status &= ~ST_INDEX_DRQ; // Clear Data Request flag
-                FDC.wait_for_read = 0;       // Clock in next byte (or end sequence if we're read all there is)
+                FDC.wait_for_read = 0;       // Clock in next byte (or end sequence if we have read all there is)
             }
             return FDC.data;                 // Return data to caller
         }

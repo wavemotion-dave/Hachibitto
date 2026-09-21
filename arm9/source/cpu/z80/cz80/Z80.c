@@ -122,8 +122,8 @@ inline byte RdZ80(word A)   {return (special_ram_access ? cpu_readmem16(A) : *(M
   CPU.PC.W=J.W; \
   JumpZ80(J.W)
 
-#define M_JP  CPU.PC.W = (u32)OpZ80(CPU.PC.W) | ((u32)OpZ80(CPU.PC.W+1) << 8);
-#define M_JR  CPU.PC.W+=(offset)OpZ80(CPU.PC.W)+1;JumpZ80(CPU.PC.W)
+#define M_JP  CPU.PC.W = (u32)OpZ80(CPU.PC.W) | ((u32)OpZ80((CPU.PC.W+1)&0xFFFF) << 8);
+#define M_JR  CPU.PC.W+=(offset)OpZ80(CPU.PC.W)+1;CPU.PC.W &= 0xFFFF; JumpZ80(CPU.PC.W)
 #define M_RET CPU.PC.B.l=OpZ80(CPU.SP.W++);CPU.PC.B.h=OpZ80(CPU.SP.W++);JumpZ80(CPU.PC.W)
 
 #define M_RST(Ad)      \

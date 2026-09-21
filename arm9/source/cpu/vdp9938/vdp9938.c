@@ -80,7 +80,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
 // same 'first byte' register with ports 0x9A and 0x99
 // and so that is handled here by reuse of ALatch. They
 // do use separate flip-flops however.
-void write_port_9A(uint8_t data)
+void write_port_palette(uint8_t data)
 {
     if (!palette_latch)
     {
@@ -1516,10 +1516,10 @@ ITCM_CODE byte RdData9938(void)
 }
 
 
-/** DirectRegWrite9938() *************************************/
+/** IndirectRegWrite9938() ***********************************/
 /** VDP9938 direct register write via port 0x9B             **/
 /*************************************************************/
-ITCM_CODE void DirectRegWrite9938(u8 Value)
+ITCM_CODE void IndirectRegWrite9938(u8 Value)
 {
     u8 reg = VDP[17] & 0x3F;
 
@@ -1631,7 +1631,7 @@ ITCM_CODE byte RdCtrl9938(void)
   }
   else
   {
-      debug[VDP[15]]++;
+      //debug[VDP[15]]++;
   }
 
   return(data);

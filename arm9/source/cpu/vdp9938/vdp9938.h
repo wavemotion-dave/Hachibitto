@@ -91,7 +91,7 @@ extern void CheckNewMode(void);
 
 // When CPU writes to Port 0x9A:
 extern u8 palette_latch;
-extern void write_port_9A(uint8_t data);
+extern void write_port_palette(uint8_t data);
 
 extern u16 CurLine;                            // Current Scanline
 extern u8 VDP[64],VDPStatus[10],VDPDlatch;     // VDP registers

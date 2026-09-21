@@ -2215,14 +2215,14 @@ u32 LoopZ80()
 }
 
 // -----------------------------------------------------------------------
-// We steal 256K off the back end of the big ROM_Memory[] buffer for
-// debug use. If some giant cart is using that, debugging won't go well.
+// A bit of memory reserved to store debug information... Reduce this 
+// when we are stable and don't have much need for it anymore.
 // -----------------------------------------------------------------------
 
-#define MAX_DPRINTF_STR_SIZE  256
-u32     MAX_DEBUG_BUF_SIZE  = (256*1024);
+#define MAX_DPRINTF_STR_SIZE  128
+#define MAX_DEBUG_BUF_SIZE   (128*1024)
 
-#define DEBUG_BUFFER     ((char*) (ROM_Memory + MAX_CART_SIZE - MAX_DEBUG_BUF_SIZE))
+char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;
 extern char szName[]; // Reuse buffer which has no other in-game use
 

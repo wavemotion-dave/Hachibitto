@@ -11,8 +11,8 @@
 //@----------------------------------------------------------------------------
 //@ Tunables.
 //@----------------------------------------------------------------------------
-#define FMPAC_SAMPLE_RATE		27965.0		// confirmed value, matches the AY driver's rate
-#define FMPAC_MASTER_CLOCK		3579545.0	// MSX standard clock, same as SCC's
+#define FMPAC_SAMPLE_RATE		27965		// confirmed value, matches the AY driver's rate
+#define FMPAC_MASTER_CLOCK		3579545		// MSX standard clock, same as SCC's
 #define FMPAC_SIN_SHIFT			24		// phase>>24 -> 8-bit (256 entry) table index
 #define FMPAC_GAIN_RAMP_STEP		16		// ATTACK rate: gain moves this much per sample toward
 							// full on key-on - ~16 samples (~0.6ms), fast/click-free
@@ -74,6 +74,42 @@ static const s8 FMPAC_SinTable[256] =
 };
 
 //@----------------------------------------------------------------------------
+//@ Plain sine table, used ONLY by the HH/SD/TOP-CY phase-selection algorithm
+//@ in FMPACMixer (see there). That algorithm picks between a small set of
+//@ FIXED phase positions expecting them to land at genuinely different
+//@ amplitudes (roughly +-40 and +-122 on a real sine) - real hardware's
+//@ own hi-hat "shimmer" depends on that variety. FMPAC_SinTable above is a
+//@ square-wave-ish shape (added for melodic brightness) that saturates
+//@ near its extremes much faster than a sine does, so those same four
+//@ positions land at ~+-114/123 on it - basically two values differing
+//@ only in sign. That flattened the entire selection algorithm into a
+//@ crude two-level flip-flop, which is what was producing a "wall of
+//@ noise" sound instead of a real hi-hat tick. Keeping this separate
+//@ rather than changing FMPAC_SinTable itself, since that table's
+//@ brightness was a deliberate, separately-validated fix for melodic
+//@ channels sounding muffled.
+//@----------------------------------------------------------------------------
+static const s8 FMPAC_RhythmSinTable[256] =
+{
+	   0,    3,    6,    9,   12,   16,   19,   22,   25,   28,   31,   34,   37,   40,   43,   46,
+	  49,   51,   54,   57,   60,   63,   65,   68,   71,   73,   76,   78,   81,   83,   85,   88,
+	  90,   92,   94,   96,   98,  100,  102,  104,  106,  107,  109,  111,  112,  113,  115,  116,
+	 117,  118,  120,  121,  122,  122,  123,  124,  125,  125,  126,  126,  126,  127,  127,  127,
+	 127,  127,  127,  127,  126,  126,  126,  125,  125,  124,  123,  122,  122,  121,  120,  118,
+	 117,  116,  115,  113,  112,  111,  109,  107,  106,  104,  102,  100,   98,   96,   94,   92,
+	  90,   88,   85,   83,   81,   78,   76,   73,   71,   68,   65,   63,   60,   57,   54,   51,
+	  49,   46,   43,   40,   37,   34,   31,   28,   25,   22,   19,   16,   12,    9,    6,    3,
+	   0,   -3,   -6,   -9,  -12,  -16,  -19,  -22,  -25,  -28,  -31,  -34,  -37,  -40,  -43,  -46,
+	 -49,  -51,  -54,  -57,  -60,  -63,  -65,  -68,  -71,  -73,  -76,  -78,  -81,  -83,  -85,  -88,
+	 -90,  -92,  -94,  -96,  -98, -100, -102, -104, -106, -107, -109, -111, -112, -113, -115, -116,
+	-117, -118, -120, -121, -122, -122, -123, -124, -125, -125, -126, -126, -126, -127, -127, -127,
+	-127, -127, -127, -127, -126, -126, -126, -125, -125, -124, -123, -122, -122, -121, -120, -118,
+	-117, -116, -115, -113, -112, -111, -109, -107, -106, -104, -102, -100,  -98,  -96,  -94,  -92,
+	 -90,  -88,  -85,  -83,  -81,  -78,  -76,  -73,  -71,  -68,  -65,  -63,  -60,  -57,  -54,  -51,
+	 -49,  -46,  -43,  -40,  -37,  -34,  -31,  -28,  -25,  -22,  -19,  -16,  -12,   -9,   -6,   -3,
+};
+
+//@----------------------------------------------------------------------------
 //@ Real Yamaha MUL table, doubled (so index 0's real x0.5 is a whole number).
 //@----------------------------------------------------------------------------
 static const u8 FMPAC_MulTableX2[16] =
@@ -119,11 +155,12 @@ static u32 FMPAC_ComputePhaseIncrement(u16 fNumber, u8 block, u8 mulNibble)
 {
 	// Integer-only: inc = F * 2^block * mulX2 * (masterClock << 12) / (72 * sampleRate)
 	// See chat history for the derivation - matches the Yamaha application manual's
-	// fmus formula, just rearranged to avoid floating point entirely.
+	// fmus formula, just rearranged to avoid floating point entirely. Both constants
+	// are plain integers now (no lingering compile-time-folded double literals).
 	unsigned long long num = (unsigned long long)fNumber * (unsigned long long)FMPAC_MulTableX2[mulNibble & 0x0F];
 	num <<= block;
-	num *= (unsigned long long)(FMPAC_MASTER_CLOCK) << 12;
-	unsigned long long inc = num / (unsigned long long)(72.0 * FMPAC_SAMPLE_RATE);
+	num *= (unsigned long long)FMPAC_MASTER_CLOCK << 12;
+	unsigned long long inc = num / ((unsigned long long)72 * (unsigned long long)FMPAC_SAMPLE_RATE);
 	if (inc > 0xFFFFFFFFULL) inc = 0xFFFFFFFFULL;
 	return (u32)inc;
 }
@@ -377,7 +414,7 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 				if (hs->osc.gain != 0)
 				{
 					u8 phase = highBranch ? (noiseBit ? 180 : 141) : (noiseBit ? 13 : 52);
-					s32 s = FMPAC_SinTable[phase];
+					s32 s = FMPAC_RhythmSinTable[phase];
 					sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
 				}
 			}
@@ -388,7 +425,7 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 				{
 					u32 hbit8 = (idx7 >> 6) & 1;
 					u8 phase = (u8)((hbit8 ? 128 : 64) ^ (noiseBit ? 64 : 0));
-					s32 s = FMPAC_SinTable[phase];
+					s32 s = FMPAC_RhythmSinTable[phase];
 					sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
 				}
 			}
@@ -402,7 +439,7 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 				if (chip->rhythmTCY.gain != 0)
 				{
 					u8 phase = (u8)(highBranch ? 192 : 64);
-					s32 s = FMPAC_SinTable[phase];
+					s32 s = FMPAC_RhythmSinTable[phase];
 					sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
 				}
 			}

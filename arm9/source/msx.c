@@ -37,18 +37,20 @@ u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
-u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;
 u8 special_ram_access       __attribute__((section(".dtcm"))) = 0x00;
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
+u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
-FMPAC   myYM                __attribute__((section(".dtcm")));          // Declare new YM module for MSX games that use it
+FMPAC   myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
-static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values
+static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
+
+u8 mirror_ram_bank[4] = {0,1,2,3};
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -63,7 +65,7 @@ u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
 u32 msx_last_file_size  = 0;
 
-extern u8 DirectRegWrite9938(u8 Value);
+extern u8 IndirectRegWrite9938(u8 Value);
 
 static uint8_t rtc_reg = 0;       // Selected register index (0-15)
 static uint8_t rtc_bank = 0;      // Active bank selected by Reg 13 (0-3)
@@ -87,12 +89,14 @@ static uint8_t rtc_ram[4][16] = {
 };
 
 // WRITE PORT 0xB4: Selects Register Index ONLY
-void write_port_B4(uint8_t data) {
+void write_port_RTC_index(uint8_t data)
+{
     rtc_reg = data & 0x0F; // Only lower 4 bits pick the register!
 }
 
 // WRITE PORT 0xB5: Writes Data into the current Bank & Register
-void write_port_B5(uint8_t data) {
+void write_port_RTC_data(uint8_t data)
+{
     uint8_t val = data & 0x0F;
 
     // Store data in current active bank
@@ -104,18 +108,77 @@ void write_port_B5(uint8_t data) {
     }
 }
 
+// RTC Register Layout Constants for the date/time handling
+#define R_1_SEC    0
+#define R_10_SEC   1
+#define R_1_MIN    2
+#define R_10_MIN   3
+#define R_1_HOUR   4
+#define R_10_HOUR  5
+#define R_WEEK     6
+#define R_1_DAY    7
+#define R_10_DAY   8
+#define R_1_MON    9
+#define R_10_MON   10
+#define R_1_YEAR   11
+#define R_10_YEAR  12
+
+/**
+ * Splits a decimal value into individual 4-bit BCD nibbles
+ * and stores them sequentially into the RTC RAM array.
+ */
+void store_nibbles(uint8_t rtc_sub_ram[], int index_1, int index_10, int val)
+{
+    rtc_sub_ram[index_1]  = (uint8_t)(val % 10);        // Lower 4-bits (Units)
+    rtc_sub_ram[index_10] = (uint8_t)((val / 10) % 10); // Upper 4-bits (Tens)
+}
+
+// ---------------------------------------------------------------------------------------
+// Grab system time/date and populate RTC registers... unlikely any program really cares.
+// ---------------------------------------------------------------------------------------
+void populate_msx_rtc()
+{
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+
+    // 1. Time Components
+    store_nibbles(rtc_ram[0], R_1_SEC, R_10_SEC, t->tm_sec);
+    store_nibbles(rtc_ram[0], R_1_MIN, R_10_MIN, t->tm_min);
+    store_nibbles(rtc_ram[0], R_1_HOUR, R_10_HOUR, t->tm_hour);
+
+    // 2. Day of the Week (0 = Sunday, 6 = Saturday)
+    // Matches the native C struct tm standard perfectly for MSX2.
+    rtc_ram[0][R_WEEK] = (uint8_t)t->tm_wday;
+
+    // 3. Calendar Components (struct tm uses 0-11 for months; RP5C01 expects 1-12)
+    store_nibbles(rtc_ram[0], R_1_DAY, R_10_DAY, t->tm_mday);
+    store_nibbles(rtc_ram[0], R_1_MON, R_10_MON, t->tm_mon + 1);
+
+    // 4. Year Tracking (2-digit, 00-99)
+    int year_2_digits = t->tm_year % 100;
+    store_nibbles(rtc_ram[0], R_1_YEAR, R_10_YEAR, year_2_digits);
+}
+
 // READ PORT 0xB5: Reads Data from current Bank & Register
-uint8_t read_port_B5(void) {
+uint8_t read_port_RTC_data(void)
+{
+    populate_msx_rtc(); // Get current system time/date and populate RTC
+
     uint8_t val = rtc_ram[rtc_bank][rtc_reg] & 0x0F;
 
     // Reg 13 (Mode Register): Force BUSY flag (Bit 1) to 0
-    if (rtc_reg == 13 || rtc_reg == 0x0D) {
+    if (rtc_reg == 13)
+    {
         val &= ~0x02; // Bit 1 = 0 (NOT BUSY)
     }
 
     return val;
 }
 
+// ------------------------------------------------------------------------------------------
+// Keyboard / Joystick reading is generally done every frame so at most 60 times per second. 
+// It's fine to keep this out of ITCM fast memory as it's not a hot spot for emulation.
+// ------------------------------------------------------------------------------------------
 u8 readport_keyboard(void)
 {
       // ----------------------------------------------------------
@@ -320,9 +383,9 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
   Port &= 0x00FF;
 
   //98h~9Bh   Access to the VDP I/O ports.
-  if      (Port == 0x98) return RdData9938();
-  else if (Port == 0x99) return RdCtrl9938();
-  else if (Port == 0xB5) {return read_port_B5();}
+  if      (Port == 0x98) return RdData9938();               // VDP Data
+  else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
+  else if (Port == 0xB5) {return read_port_RTC_data();}     // RTC Data
   else if (Port == 0xA2)  // PSG Read... might be joypad data
   {
       // -------------------------------------------
@@ -382,6 +445,10 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
   else if (Port >= 0xD0 && Port <= 0xD7)  // Floppy Drive Controller
   {
       return fdc_read(Port & 0x07);
+  }
+  else if (Port >= 0xFC && Port <= 0xFF)  // Mirror of RAM select. Not all MSX2 machine return this but we do.
+  {
+      return mirror_ram_bank[Port - 0xFC];
   }
 
   // No such port
@@ -851,14 +918,14 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     // MSX ports are 8-bit
     Port &= 0x00FF;
 
-    if      (Port == 0x98) {WrData9938(Value);}
-    else if (Port == 0x99) {WrCtrl9938(Value);}
-    else if (Port == 0x9A) {write_port_9A(Value);}
-    else if (Port == 0x9B) {DirectRegWrite9938(Value);}         // Indirect Register Area
+    if      (Port == 0x98) {WrData9938(Value);}                 // VDP Data
+    else if (Port == 0x99) {WrCtrl9938(Value);}                 // VDP Control
+    else if (Port == 0x9A) {write_port_palette(Value);}         // VDP Palette
+    else if (Port == 0x9B) {IndirectRegWrite9938(Value);}       // Indirect Register Area
     else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
     else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}        // PSG Area
-    else if (Port == 0xB4) {write_port_B4(Value);}              // Palette Area
-    else if (Port == 0xB5) {write_port_B5(Value);}              // Palette Area
+    else if (Port == 0xB4) {write_port_RTC_index(Value);}       // RTC Area (index register)
+    else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
     else if (Port == 0xA8) // Slot system for MSX
     {
         switch (myConfig.machineType)
@@ -883,7 +950,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         if (Value & 0x80)  // Beeper ON
         {
-            if ((Port_PPI_C & 0x80) == 0) beeperFreq++;
+            if (((Port_PPI_C ^ Value) & 0x80) == 0) beeperFreq++;
         }
         Port_PPI_C = Value;
         msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
@@ -892,7 +959,8 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         if ((Value & 0x0E) == 0x0E) // Are we hitting the Beeper ON/OFF bit?
         {
-            if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;   // Beeper ON
+            if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;   // Beeper toggle
+            else if (!(Value & 1) && ((Port_PPI_C & 0x80))) beeperFreq++;   // Beeper toggle
         }
 
         // Set or clear the proper bit in PORTC
@@ -912,6 +980,8 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         u8 page = Port-0xFC;
         u8 bank = Value & 7;
 
+        mirror_ram_bank[page] = bank;
+        
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
@@ -931,8 +1001,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     }
     else // Unhandled port write...
     {
-        //debug[15]++;
-        //debug[DX++ & 7] = Port;
+        //debug[DX++ & 0xF] = Port;
     }
 }
 
