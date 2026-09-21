@@ -121,6 +121,7 @@ extern s8 temp_offset;
 extern FI_MSX gpFic[MAX_ROMS];
 extern int ucGameAct;
 extern int ucGameChoice;
+extern u8 mirror_ram_bank[4];
 
 #define MSX_MODE_CART   1
 #define MSX_MODE_DISK   2
@@ -254,5 +255,6 @@ extern u32  LoopZ80();
 extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
 extern void SaveConfig(bool bShow);
 extern void ShowRandomPreviewSnaps(void);
+extern void IndirectRegWrite9938(u8 Value);
 
 #endif

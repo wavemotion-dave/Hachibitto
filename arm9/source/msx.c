@@ -42,7 +42,7 @@ u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;
 u8 special_ram_access       __attribute__((section(".dtcm"))) = 0x00;
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
-u8 msx_subslot              __attribute__((section(".dtcm"))) = 0xFF;
+u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
@@ -50,7 +50,7 @@ FMPAC   myYM                __attribute__((section(".dtcm")));          // Decla
 
 static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
 
-u8 mirror_ram_bank[4] = {0,1,2,3};
+u8 mirror_ram_bank[4] = {0,1,2,3}; // For port readback mostly... though not all MSX2 machines report it back.
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -65,9 +65,7 @@ u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
 u32 msx_last_file_size  = 0;
 
-extern u8 IndirectRegWrite9938(u8 Value);
-
-static uint8_t rtc_reg = 0;       // Selected register index (0-15)
+static uint8_t rtc_reg  = 0;      // Selected register index (0-15)
 static uint8_t rtc_bank = 0;      // Active bank selected by Reg 13 (0-3)
 
 // Complete 4-bank RAM array initialized with valid MSX2 checksums
@@ -472,8 +470,7 @@ void msx_slot_map_msx1(unsigned char Value)
     // Slot 2 is empty (0xFF read always)
     // Slot 3 is our main RAM. We emulate 64K of RAM in MSX1 mode
     // ---------------------------------------------------------------------
-    if (((Value>>0) & 0x03) != ((Port_PPI_A>>0) & 0x03))
-    switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
+    switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[0] = 0;
@@ -501,8 +498,7 @@ void msx_slot_map_msx1(unsigned char Value)
             break;
     }
 
-    if (((Value>>2) & 0x03) != ((Port_PPI_A>>2) & 0x03))
-    switch ((Value>>2) & 0x03)  // [0x4000~0x7FFF]
+    switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[1] = 0;
@@ -544,8 +540,7 @@ void msx_slot_map_msx1(unsigned char Value)
             break;
     }
 
-    if (((Value>>4) & 0x03) != ((Port_PPI_A>>4) & 0x03))
-    switch ((Value>>4) & 0x03)  // [0x8000~0xBFFF]
+    switch ((Value>>4) & 0x03)  // Page 2 [0x8000~0xBFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[2] = 0;
@@ -573,8 +568,7 @@ void msx_slot_map_msx1(unsigned char Value)
             break;
     }
 
-    if (((Value>>6) & 0x03) != ((Port_PPI_A>>6) & 0x03))
-    switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
+    switch ((Value>>6) & 0x03)  // Page 3 [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[3] = 0;
@@ -616,7 +610,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 {
     special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE; // Until proven otherwise below...
 
-    switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
+    switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[0] = 0;
@@ -652,7 +646,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             break;
     }
 
-    switch ((Value>>2) & 0x03)  // [0x4000~0x7FFF]
+    switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[1] = 0;
@@ -694,7 +688,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             break;
     }
 
-    switch ((Value>>4) & 0x03)  // [0x8000~0xBFFF]
+    switch ((Value>>4) & 0x03)  // Page 2 [0x8000~0xBFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[2] = 0;
@@ -722,7 +716,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             break;
     }
 
-    switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
+    switch ((Value>>6) & 0x03)  // Page 3 [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[3] = 0;
@@ -765,7 +759,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 {
     special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
 
-    switch ((Value>>0) & 0x03)  // [0x0000~0x3FFF]
+    switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM - this is an expanded slot
             if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0-0 has main BIOS
@@ -810,7 +804,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             break;
     }
 
-    switch ((Value>>2) & 0x03)  // [0x4000~0x7FFF]
+    switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[1] = 0;
@@ -851,7 +845,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             break;
     }
 
-    switch ((Value>>4) & 0x03)  // [0x8000~0xBFFF]
+    switch ((Value>>4) & 0x03)  // Page 2 [0x8000~0xBFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (Expanded slot but nothing maps to this page)
             bCartInPage[2] = 0;
@@ -879,7 +873,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             break;
     }
 
-    switch ((Value>>6) & 0x03)  // [0xC000~0xFFFF]
+    switch ((Value>>6) & 0x03)  // Page 3 [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (this is our expanded slot)
             special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
@@ -1115,10 +1109,8 @@ void MSX_InitialMemoryLayout(u32 romSize)
     Port_PPI_C = 0x00;
 
     msx_music_writes = 0;
-
     special_ram_access = 0x00;
-
-    msx_subslot = myConfig.machineType ? 0x00 : 0xFF;
+    msx_subslot = 0x00;
 
     // ---------------------------------------------
     // Start with reset memory - fill in MSX slots

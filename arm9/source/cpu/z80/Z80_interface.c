@@ -738,7 +738,6 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
     {
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-        return;
     }
     else if (mapperMask) // Check if the cart has some special mapper properties (ASC8, ASC16, KON8, etc)
     {
