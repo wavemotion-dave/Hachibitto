@@ -74,42 +74,6 @@ static const s8 FMPAC_SinTable[256] =
 };
 
 //@----------------------------------------------------------------------------
-//@ Plain sine table, used ONLY by the HH/SD/TOP-CY phase-selection algorithm
-//@ in FMPACMixer (see there). That algorithm picks between a small set of
-//@ FIXED phase positions expecting them to land at genuinely different
-//@ amplitudes (roughly +-40 and +-122 on a real sine) - real hardware's
-//@ own hi-hat "shimmer" depends on that variety. FMPAC_SinTable above is a
-//@ square-wave-ish shape (added for melodic brightness) that saturates
-//@ near its extremes much faster than a sine does, so those same four
-//@ positions land at ~+-114/123 on it - basically two values differing
-//@ only in sign. That flattened the entire selection algorithm into a
-//@ crude two-level flip-flop, which is what was producing a "wall of
-//@ noise" sound instead of a real hi-hat tick. Keeping this separate
-//@ rather than changing FMPAC_SinTable itself, since that table's
-//@ brightness was a deliberate, separately-validated fix for melodic
-//@ channels sounding muffled.
-//@----------------------------------------------------------------------------
-static const s8 FMPAC_RhythmSinTable[256] =
-{
-	   0,    3,    6,    9,   12,   16,   19,   22,   25,   28,   31,   34,   37,   40,   43,   46,
-	  49,   51,   54,   57,   60,   63,   65,   68,   71,   73,   76,   78,   81,   83,   85,   88,
-	  90,   92,   94,   96,   98,  100,  102,  104,  106,  107,  109,  111,  112,  113,  115,  116,
-	 117,  118,  120,  121,  122,  122,  123,  124,  125,  125,  126,  126,  126,  127,  127,  127,
-	 127,  127,  127,  127,  126,  126,  126,  125,  125,  124,  123,  122,  122,  121,  120,  118,
-	 117,  116,  115,  113,  112,  111,  109,  107,  106,  104,  102,  100,   98,   96,   94,   92,
-	  90,   88,   85,   83,   81,   78,   76,   73,   71,   68,   65,   63,   60,   57,   54,   51,
-	  49,   46,   43,   40,   37,   34,   31,   28,   25,   22,   19,   16,   12,    9,    6,    3,
-	   0,   -3,   -6,   -9,  -12,  -16,  -19,  -22,  -25,  -28,  -31,  -34,  -37,  -40,  -43,  -46,
-	 -49,  -51,  -54,  -57,  -60,  -63,  -65,  -68,  -71,  -73,  -76,  -78,  -81,  -83,  -85,  -88,
-	 -90,  -92,  -94,  -96,  -98, -100, -102, -104, -106, -107, -109, -111, -112, -113, -115, -116,
-	-117, -118, -120, -121, -122, -122, -123, -124, -125, -125, -126, -126, -126, -127, -127, -127,
-	-127, -127, -127, -127, -126, -126, -126, -125, -125, -124, -123, -122, -122, -121, -120, -118,
-	-117, -116, -115, -113, -112, -111, -109, -107, -106, -104, -102, -100,  -98,  -96,  -94,  -92,
-	 -90,  -88,  -85,  -83,  -81,  -78,  -76,  -73,  -71,  -68,  -65,  -63,  -60,  -57,  -54,  -51,
-	 -49,  -46,  -43,  -40,  -37,  -34,  -31,  -28,  -25,  -22,  -19,  -16,  -12,   -9,   -6,   -3,
-};
-
-//@----------------------------------------------------------------------------
 //@ Real Yamaha MUL table, doubled (so index 0's real x0.5 is a whole number).
 //@----------------------------------------------------------------------------
 static const u8 FMPAC_MulTableX2[16] =
@@ -234,21 +198,6 @@ static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume, int i
 }
 
 //@----------------------------------------------------------------------------
-//@ Advances the shared noise LFSR by one bit per sample. Used only as a
-//@ single tie-breaker bit by the real HH/SD phase-selection algorithm in
-//@ FMPACMixer (see there) - real hardware does exactly this, reading
-//@ (noise_rng>>0)&1 fresh each sample, not a "held"/bandwidth-reduced
-//@ value. No separate noise waveform synthesis needed anymore.
-//@----------------------------------------------------------------------------
-static void FMPAC_AdvanceNoise(FMPAC *chip)
-{
-	u32 lfsr = chip->noiseLFSR;
-	u32 bit = ((lfsr >> 0) ^ (lfsr >> 3)) & 1;
-	lfsr = (lfsr >> 1) | (bit << 16);
-	chip->noiseLFSR = lfsr;
-}
-
-//@----------------------------------------------------------------------------
 //@ Public interface
 //@----------------------------------------------------------------------------
 void FMPACReset(FMPAC *chip)
@@ -364,8 +313,6 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 		s32 sample = 0;
 		int ch;
 
-		if (rhythmOn) FMPAC_AdvanceNoise(chip);
-
 		for (ch = 0; ch < lastMelodic; ch++)
 		{
 			FMPAC_Channel *cc = &chip->channels[ch];
@@ -387,60 +334,48 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 			if (bd->keyOn || bd->osc.gain != 0)
 				sample += FMPAC_RenderChannel(&bd->osc, bd->keyOn, chip->rhythmVolBD, 0);
 
-			// Real HH/SD/TOM/TOP-CY are NOT generic noise - they're built from specific
-			// bits of channels 7 & 8's own frequency phase (verified against a real
-			// reference OPLL core), which is why real percussion has a "tick"/metallic
-			// character rather than a plain "shhh". The phase generators for channels 7
-			// & 8 must keep running every sample regardless of their own key state, since
-			// HH/TOP-CY derive their sound from them even when TOM/the tonal part isn't
-			// itself sounding.
-			hs->osc.phase += hs->osc.phaseIncrement;
-			tt->osc.phase += tt->osc.phaseIncrement;
-
-			u32 idx7 = (hs->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF;
-			u32 idx8 = (tt->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF;
-			// Bit positions below are the reference's (7,3,2,8,5,3), each shifted down by
-			// 2 to account for our table being 256 entries instead of the reference's 1024.
-			u32 hbit7 = (idx7 >> 5) & 1, hbit3 = (idx7 >> 1) & 1, hbit2 = idx7 & 1;
-			u32 res1 = (hbit2 ^ hbit7) | hbit3;
-			u32 gbit5 = (idx8 >> 3) & 1, gbit3 = (idx8 >> 1) & 1;
-			u32 res2 = gbit3 | gbit5;
-			u32 highBranch = res2 ? 1 : res1;
-			u32 noiseBit = chip->noiseLFSR & 1;
-
-			if (hhOn || hs->osc.gain != 0)
-			{
-				FMPAC_UpdateGain(&hs->osc, hhOn, FMPAC_PERCUSSION_RELEASE_STEP);
-				if (hs->osc.gain != 0)
-				{
-					u8 phase = highBranch ? (noiseBit ? 180 : 141) : (noiseBit ? 13 : 52);
-					s32 s = FMPAC_RhythmSinTable[phase];
-					sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
-				}
-			}
-			if (sdOn || chip->rhythmSD.gain != 0)
-			{
-				FMPAC_UpdateGain(&chip->rhythmSD, sdOn, FMPAC_PERCUSSION_RELEASE_STEP);
-				if (chip->rhythmSD.gain != 0)
-				{
-					u32 hbit8 = (idx7 >> 6) & 1;
-					u8 phase = (u8)((hbit8 ? 128 : 64) ^ (noiseBit ? 64 : 0));
-					s32 s = FMPAC_RhythmSinTable[phase];
-					sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
-				}
-			}
-
 			if (tomOn || tt->osc.gain != 0)
 				sample += FMPAC_RenderChannel(&tt->osc, tomOn, chip->rhythmVolTOM, 0);
 
-			if (tcyOn || chip->rhythmTCY.gain != 0)
+			// HH/SD/TOP-CY: high-pass filtered noise. A plain LFSR alone sounded like flat
+			// "static" (too much low-frequency rumble mixed into the hiss, which reads as
+			// "swish"/"wash" rather than a crisp tick). A bit-exact replica of real
+			// hardware's phase-selection trick (tried in an earlier round) turned out too
+			// fragile to get right without being able to listen and verify every bit
+			// position. This is simpler and more robust: one subtraction between
+			// consecutive noise samples mathematically boosts high frequencies and cuts
+			// low ones - the opposite of the earlier "hold" attempt, which was a low-pass
+			// and made things duller. Real hi-hats/cymbals ARE fundamentally high-pass
+			// noise in most non-OPLL-specific chip and even acoustic contexts, so this
+			// should read as "bright/crisp" by construction, not by hoping several fragile
+			// constants all landed correctly.
+			if (hhOn || sdOn || tcyOn || hs->osc.gain != 0 || chip->rhythmSD.gain != 0 || chip->rhythmTCY.gain != 0)
 			{
-				FMPAC_UpdateGain(&chip->rhythmTCY, tcyOn, FMPAC_PERCUSSION_RELEASE_STEP);
-				if (chip->rhythmTCY.gain != 0)
+				u32 lfsr = chip->noiseLFSR;
+				u32 bit = ((lfsr >> 0) ^ (lfsr >> 3)) & 1;
+				lfsr = (lfsr >> 1) | (bit << 16);
+				chip->noiseLFSR = lfsr;
+				s32 rawNoise = (s32)(lfsr & 0xFF) - 128;	// -128..127
+				s32 hp = rawNoise - chip->rhythmPrevNoise;	// high-pass: boosts highs, cuts lows
+				chip->rhythmPrevNoise = rawNoise;
+
+				if (hhOn || hs->osc.gain != 0)
 				{
-					u8 phase = (u8)(highBranch ? 192 : 64);
-					s32 s = FMPAC_RhythmSinTable[phase];
-					sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
+					FMPAC_UpdateGain(&hs->osc, hhOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					if (hs->osc.gain != 0)
+						sample += (hp * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
+				}
+				if (sdOn || chip->rhythmSD.gain != 0)
+				{
+					FMPAC_UpdateGain(&chip->rhythmSD, sdOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					if (chip->rhythmSD.gain != 0)
+						sample += (hp * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
+				}
+				if (tcyOn || chip->rhythmTCY.gain != 0)
+				{
+					FMPAC_UpdateGain(&chip->rhythmTCY, tcyOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					if (chip->rhythmTCY.gain != 0)
+						sample += (hp * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
 				}
 			}
 		}

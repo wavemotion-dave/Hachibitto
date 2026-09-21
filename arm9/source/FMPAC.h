@@ -134,8 +134,10 @@ typedef struct
 	u8 rhythmVolTOM, rhythmVolTCY;		// $38 D7-4, D3-0
 	u8 testReg;				// $0F, storage only
 	u8 addressLatch;			// last value written to the address-select port (caller's convenience)
-	u32 noiseLFSR;				// single tie-breaker bit for HH/SD's real phase-selection algorithm
-						// (see FMPACMixer) - must never be seeded 0
+	u32 noiseLFSR;				// feeds HH/SD/TOP-CY's high-pass-filtered-noise texture -
+						// must never be seeded 0
+	s32 rhythmPrevNoise;			// previous raw noise sample - the one-sample delay used
+						// for the high-pass filter (output = current - previous)
 	FMPAC_Oscillator rhythmSD;		// rhythm mode only: channel 7's SECOND voice's envelope (HH uses
 						// channels[7].osc's envelope; both derive their actual waveform
 						// from channels 7 & 8's phase, not their own - see FMPACMixer)
