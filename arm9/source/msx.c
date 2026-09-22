@@ -48,10 +48,6 @@ SCC     mySCC               __attribute__((section(".dtcm")));          // Decla
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 FMPAC   myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
-static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
-
-u8 mirror_ram_bank[4] = {0,1,2,3}; // For port readback mostly... though not all MSX2 machines report it back.
-
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
 // ---------------------------------------------------------------------
@@ -64,6 +60,9 @@ u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/B
 u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
 u32 msx_last_file_size  = 0;
+u8 mirror_ram_bank[4]   = {3,2,1,0}; // For port readback mostly... though not all MSX2 machines report it back.
+
+static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
 
 static uint8_t rtc_reg  = 0;      // Selected register index (0-15)
 static uint8_t rtc_bank = 0;      // Active bank selected by Reg 13 (0-3)
@@ -675,7 +674,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             }
-            else if ((((msx_subslot & 0x0C) >> 2) == 2) && myConfig.msxMusic) // Subslot 2 has FM PAC
+            else if ((((msx_subslot & 0x0C) >> 2) == 2) && (myConfig.musicExpand == 1)) // Subslot 2 has FM PAC
             {
                 MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
@@ -814,7 +813,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[2] = BIOS_Memory + 0x4000;
                 MemoryMap[3] = BIOS_Memory + 0x6000;
             }
-            else if ((((msx_subslot & 0x0C) >> 2) == 1) && myConfig.msxMusic) // Subslot 0-1 has FM PAC
+            else if ((((msx_subslot & 0x0C) >> 2) == 1) && (myConfig.musicExpand == 1)) // Subslot 0-1 has FM PAC
             {
                 MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
@@ -974,10 +973,11 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         u8 page = Port-0xFC;
         u8 bank = Value & 7;
 
-        mirror_ram_bank[page] = bank;
+        mirror_ram_bank[page] = bank; // For read-back
         
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
+        
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
     else if (Port == 0x7C)
@@ -986,11 +986,11 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     }
     else if (Port == 0x7D)
     {
-        if (++msx_music_writes == 10)
+        if (++msx_music_writes == 10) // Arbitrary... if we hit it at least 10 times, we turn on MSX MUSIC output
         {
-            if (myConfig.msxMusic) msx_music_capable_game = 1;
+            if (myConfig.musicExpand == 1) msx_music_capable_game = 1;
         }
-
+        
         FMPACWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
     }
     else // Unhandled port write...
@@ -1126,9 +1126,23 @@ void MSX_InitialMemoryLayout(u32 romSize)
 
     for (u8 i=0; i<8; i++)
     {
-        MSXCartPtr[i] = Unmapped_Memory;             // Cart has nothing in it by default
-        MSXRamPtr[i] = RAM_Memory + (0x2000 * i);    // RAM defaults to first 64K by default
+        MSXCartPtr[i] = Unmapped_Memory;          // Cart has nothing in it by default
     }
+    
+    // ---------------------------------------------
+    // RAM maps backwards... for historical reasons.
+    // ---------------------------------------------
+    MSXRamPtr[0] = RAM_Memory + 0xC000;
+    MSXRamPtr[1] = RAM_Memory + 0xE000;
+
+    MSXRamPtr[2] = RAM_Memory + 0x8000;
+    MSXRamPtr[3] = RAM_Memory + 0xA000;
+
+    MSXRamPtr[4] = RAM_Memory + 0x4000;
+    MSXRamPtr[5] = RAM_Memory + 0x6000;
+
+    MSXRamPtr[6] = RAM_Memory + 0x0000;
+    MSXRamPtr[7] = RAM_Memory + 0x2000;
 
     // ---------------------------------------------
     // Restore the MSX BIOS and point to it
@@ -1140,7 +1154,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // -------------------------------------------------------------------------
     if (msx_mode == MSX_MODE_DISK)
     {
-        if (myConfig.expansion)
+        if (myConfig.musicExpand == 2) // SCC PLUS enabled?
         {
             mapperType = SCCPLUS_RAM;
             // ---------------------------------------------------------------
@@ -1167,7 +1181,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[6] = (u8*)Unmapped_Memory;        // Segment Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;        // Segment Unmapped
         }
-        else
+        else // No cart when disk is installed...
         {
             MSXCartPtr[0] = (u8*)Unmapped_Memory;       // Segment 0 Unmapped
             MSXCartPtr[1] = (u8*)Unmapped_Memory;       // Segment 1 Unmapped

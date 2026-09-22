@@ -447,7 +447,7 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
 
 // -------------------------------------------------------------------------
 // Standard qsort routine for the MSX game list - we sort all directory
-// listings first and then a case-insenstive sort of all games.
+// listings first and then a case-insensitive sort of all games.
 // -------------------------------------------------------------------------
 int msxFilescmp (const void *c1, const void *c2)
 {
@@ -925,10 +925,10 @@ void SetDefaultGameConfig(void)
     myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.memWipe      = 1;                           // Default to CLEAR memory (helps with save states)
     myConfig.yOffset      = 0;                           // Default is no Y offset
-    myConfig.expansion    = 0;                           // Default is no expansion
+    myConfig.musicExpand  = 0;                           // Default is no expansion. 1=MSX-MUSIC, 2=SCC+
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
-    myConfig.msxMusic     = 0;                           // 0=Disabled, 1=Enabled
+    myConfig.reserved4    = 0;                           
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
     myConfig.reserved5    = 0;
@@ -940,8 +940,8 @@ void SetDefaultGameConfig(void)
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
     // ----------------------------------------------------------------------------------
     if (file_crc == 0xee530ad2) myConfig.maxSprites  = 0;  // QBiqs
-    if (file_crc == 0x275c800e) myConfig.maxSprites  = 0;  // Antartic Adventure
-    if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 0;  // Antartic Adventure Prototype
+    if (file_crc == 0x275c800e) myConfig.maxSprites  = 0;  // Antarctic Adventure
+    if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 0;  // Antarctic Adventure Prototype
     if (file_crc == 0x6af19e75) myConfig.maxSprites  = 0;  // Adventures in the Park
     if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 0;  // Uridium
 }
@@ -1038,8 +1038,7 @@ const struct options_t Option_Table[1][20] =
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
-        {"SCC+ CART",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.expansion,      2},
-        {"MSX MUSIC",      {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.msxMusic,       2},
+        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS"},                                                                                                                   &myConfig.musicExpand,    3},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
@@ -1235,7 +1234,7 @@ void HachibittoChangeKeymap(void)
 
   // -----------------------------------------------------------------------
   // Clear out any keys that might be pressed on the way in - make sure
-  // NDS keys are not being pressed. This prevents the inadvertant A key
+  // NDS keys are not being pressed. This prevents the inadvertent A key
   // that enters this menu from also being acted on in the keymap...
   // -----------------------------------------------------------------------
   while ((keysCurrent() & (KEY_TOUCH | KEY_B | KEY_A | KEY_X | KEY_UP | KEY_DOWN))!=0)

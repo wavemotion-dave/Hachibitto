@@ -912,7 +912,6 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
 void Z80_Interface_Reset(void)
 {
     CPU.CycleDeficit      = 0;
-    msx_scc_capable_game  = 0;
     sram_write_enabled_a  = 0;
     sram_write_enabled_b  = 0;
 }

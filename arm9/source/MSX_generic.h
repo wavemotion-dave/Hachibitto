@@ -79,11 +79,11 @@ struct __attribute__((__packed__)) Config_t
     u8  maxSprites;
     u8  dpad;
     u8  memWipe;
-    u8  expansion;
+    u8  musicExpand;
     u8  yOffset;
     u8  cpuBoost;
     u8  splitRefresh;
-    u8  msxMusic;
+    u8  reserved4;
     u8  scaleScreen;
     u8  maskBorders;
     u8  reserved5;
@@ -250,7 +250,7 @@ extern u32  ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_off
 extern u8   HachibittoChooseFile(void);
 extern u8   showMessage(char *szCh1, char *szCh2);
 extern u8   msxInit(char *szGame);
-extern u8   loadrom(const char *path);
+extern u8   LoadGameRom(const char *path);
 extern u32  LoopZ80();
 extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
 extern void SaveConfig(bool bShow);

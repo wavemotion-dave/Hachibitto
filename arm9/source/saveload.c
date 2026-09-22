@@ -228,6 +228,7 @@ void msxSaveState(void)
         // Write sound chip data
         if (retVal) retVal = fwrite(&myAY,                  sizeof(myAY),                   1, handle);
         if (retVal) retVal = fwrite(&mySCC,                 sizeof(mySCC),                  1, handle);
+        if (retVal) retVal = fwrite(&myYM,                  sizeof(myYM),                   1, handle);
 
         // Write disk controller data
         if (retVal) retVal = fwrite(&FDC,                   sizeof(FDC),                    1, handle);
@@ -449,6 +450,7 @@ void msxLoadState(void)
             // Write sound chip data
             if (retVal) retVal = fread(&myAY,                  sizeof(myAY),                   1, handle);
             if (retVal) retVal = fread(&mySCC,                 sizeof(mySCC),                  1, handle);
+            if (retVal) retVal = fread(&myYM,                  sizeof(myYM),                   1, handle);
 
             // Write disk controller data
             if (retVal) retVal = fread(&FDC,                   sizeof(FDC),                    1, handle);

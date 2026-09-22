@@ -428,7 +428,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             {
                 ProcessBeeper(len, dest);
             }
-
+            else
             if (isDSiMode()) // DSi gets slight audio filter to remove clicks
             {
                 s16 *p = (s16*)dest;
@@ -660,11 +660,9 @@ void ShowDebugZ80(void)
 }
 
 
-// ------------------------------------------------------------
-// The status line shows the status of the Super Game Moudle,
-// AY sound chip support and MegaCart support.  Game players
-// probably don't care, but it's really helpful for devs.
-// ------------------------------------------------------------
+// ------------------------------------------------------------------------
+// The status line shows the status of the SCC, MSX-MUSIC, disk icons, etc. 
+// ------------------------------------------------------------------------
 void DisplayStatusLine(bool bForce)
 {
     if (myGlobalConfig.debugger) return; // If debugger, skip this
@@ -1180,7 +1178,7 @@ void Hachibitto_main(void)
         else
         {
             // -----------------------------------------------------------
-            // This is where we accumualte the keys pressed... up to 12!
+            // This is where we accumulate the keys pressed... up to 12!
             // -----------------------------------------------------------
             kbd_keys_pressed = 0;
             memset(kbd_keys, 0x00, sizeof(kbd_keys));
@@ -1467,7 +1465,7 @@ void Hachibitto_main(void)
                   {
                       JoyStickMap  |= keyCoresp[myConfig.keymap[i]];
                   }
-                  else // This is a keyboard maping... handle that here... just set the appopriate kbd_key
+                  else // This is a keyboard maping... handle that here... just set the appropriate kbd_key
                   {
                       if      ((keyCoresp[myConfig.keymap[i]] >= META_KBD_A) && (keyCoresp[myConfig.keymap[i]] <= META_KBD_Z))  kbd_key = ('A' + (keyCoresp[myConfig.keymap[i]] - META_KBD_A));
                       else if ((keyCoresp[myConfig.keymap[i]] >= META_KBD_0) && (keyCoresp[myConfig.keymap[i]] <= META_KBD_9))  kbd_key = ('0' + (keyCoresp[myConfig.keymap[i]] - META_KBD_0));
@@ -1940,7 +1938,7 @@ u32 JoyState       __attribute__((section(".dtcm"))) = 0;       // Joystick Stat
 // ------------------------------------------------------------
 // The CRC32 of the currently loaded game - useful for configs.
 // ------------------------------------------------------------
-u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;   // Our global file CRC32 to uniquiely identify this game
+u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;   // Our global file CRC32 to uniquely identify this game
 
 /*********************************************************************************
  * Keyboard Key Buffering Engine...
@@ -2037,8 +2035,8 @@ u8 msxInit(char *szGame)
      dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
     }
 
-    // loadrom() will figure out how big and where to load it...
-    RetFct = loadrom(szGame);
+    // LoadGameRom() will figure out how big and where to load it...
+    RetFct = LoadGameRom(szGame);
 
     // Wipe RAM area for the MSX
     msxWipeRAM();
@@ -2105,10 +2103,10 @@ void getfile_crc(const char *filename)
 }
 
 
-/** loadrom() ******************************************************************/
+/** LoadGameRom() **************************************************************/
 /* Open a rom file from file system and load it into the ROM_Memory[] buffer   */
 /*******************************************************************************/
-u8 loadrom(const char *filename)
+u8 LoadGameRom(const char *filename)
 {
     u8 bOK = 0;
     int romSize = 0;
@@ -2156,7 +2154,7 @@ u8 loadrom(const char *filename)
 }
 
 // -------------------------------------------------------------------------
-// For arious machines, we have patched the BIOS so that we trap calls
+// For various machines, we have patched the BIOS so that we trap calls
 // to various I/O routines: namely cassette access. We handle that here.
 // -------------------------------------------------------------------------
 void PatchZ80(register Z80 *r)
