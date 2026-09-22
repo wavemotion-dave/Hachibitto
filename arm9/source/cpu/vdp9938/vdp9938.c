@@ -971,7 +971,7 @@ void RefreshLine3(u8 uY)
 }
 
 #define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
-u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
+static u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
 
 uint8_t *RefreshBorder(uint8_t Y)
 {
@@ -1309,6 +1309,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
 ITCM_CODE void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
+    
     // -------------------------------------------------------------------
     // We purposely don't call RefreshLine() as we need the speed of a
     // direct rendering into XBuf[]. This could cause problems if we
@@ -1326,10 +1327,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
         uint8_t *S = (uint8_t *) ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=S-0x10000) S-=0x10000;
 
-        for (int i=0; i<128; i++)
-        {
-           *P++ = (S[(i*2)+1] << 8) + S[(i*2)+0];
-        }
+        memcpy(P, S, 256); // Blast all 256-pixels across into our destination buffer
 
         ColorSprites(uY, XBuf + (uY << 8)-32);
     }

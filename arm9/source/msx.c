@@ -597,7 +597,7 @@ void msx_slot_map_msx1(unsigned char Value)
 }
 
 //--------------------------------------------------------------------------------------------------
-// MSX2 Machine Type A Configuration: Slot 3 is expanded. Slot 2 contains RAM
+// MSX2 Machine Type A Configuration: Slot 3 is expanded. Slot 2 contains RAM. Slot 1 is Cartridge.
 //--------------------------------------------------------------------------------------------------
 // Memory          Slot 0       Slot 1      Slot 2      Slot 3-0   Slot 3-1    Slot 3-2    Slot 3-3
 // C000h~FFFFh      ---       Cartridge     16K RAM      ---        ---         ---         ---
@@ -746,13 +746,13 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 }
 
 //--------------------------------------------------------------------------------------------------
-// MSX2 Machine Type B Configuration: Slot 0 is expanded. Slot 3 contains RAM
+// MSX2 Machine Type B Configuration: Slot 0 is expanded. Slot 3 contains RAM. Slot 1 is Cartridge.
 //--------------------------------------------------------------------------------------------------
-// Memory         Slot 0-0   Slot 0-1    Slot 0-2    Slot 0-3     Slot 1      Slot 2      Slot 3
-// C000h~FFFFh     ---        ---         ---         ---          ---        Cartridge   16K RAM
-// 8000h~BFFFh     ---        ---         ---         ---          ---        Cartridge   16K RAM
-// 4000h~7FFFh     Main-ROM   ---         ---         ---          Disk-ROM   Cartridge   16K RAM
-// 0000h~3FFFh     Main-ROM   Ext-ROM     ---         ---          ---        Cartridge   16K RAM
+// Memory         Slot 0-0   Slot 0-1    Slot 0-2    Slot 0-3     Slot 1        Slot 2      Slot 3
+// C000h~FFFFh     ---        ---         ---         ---         Cartridge     ---         16K RAM
+// 8000h~BFFFh     ---        ---         ---         ---         Cartridge     ---         16K RAM
+// 4000h~7FFFh     Main-ROM   MSX-MUSIC   ---         ---         Cartridge     Disk-ROM    16K RAM
+// 0000h~3FFFh     Main-ROM   Ext-ROM     ---         ---         Cartridge     ---         16K RAM
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
@@ -783,17 +783,17 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[1] = Unmapped_Memory;
             }
             break;
-        case 0x01:  // Slot 1:  Maps to nothing
-            bCartInPage[0] = 0;
-            bRAMInPage[0] = 0;
-            MemoryMap[0] = Unmapped_Memory;
-            MemoryMap[1] = Unmapped_Memory;
-            break;
-        case 0x02:  // Slot 1:  Maps to Game Cart
+        case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
             bRAMInPage[0] = 0;
             MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
             MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            break;
+        case 0x02:  // Slot 2:  Maps to nothing
+            bCartInPage[0] = 0;
+            bRAMInPage[0] = 0;
+            MemoryMap[0] = Unmapped_Memory;
+            MemoryMap[1] = Unmapped_Memory;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[0] = 0;
@@ -824,17 +824,17 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[3] = Unmapped_Memory;
             }
             break;
-        case 0x01:  // Slot 1:  Maps to Disk Controller
-            bCartInPage[1] = 0;
-            bRAMInPage[1] = 0;
-            MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
-            MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
-            break;
-        case 0x02:  // Slot 2:  Maps to Game Cart
+        case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
             bRAMInPage[1] = 0;
             MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
             MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+            break;
+        case 0x02:  // Slot 2:  Maps to Disk Controller
+            bCartInPage[1] = 0;
+            bRAMInPage[1] = 0;
+            MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
+            MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[1] = 0;
@@ -852,17 +852,17 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             MemoryMap[4] = Unmapped_Memory;
             MemoryMap[5] = Unmapped_Memory;
             break;
-        case 0x01:  // Slot 1:  Maps to Nothing
-            bCartInPage[2] = 0;
-            bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
-            break;
-        case 0x02:  // Slot 2:  Maps to Game Cart
+        case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
             bRAMInPage[2] = 0;
             MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            break;
+        case 0x02:  // Slot 2:  Maps to Nothing
+            bCartInPage[2] = 0;
+            bRAMInPage[2] = 0;
+            MemoryMap[4] = Unmapped_Memory;
+            MemoryMap[5] = Unmapped_Memory;
             break;
         case 0x03:  // Slot 3:  Maps to our 64K of RAM
             bCartInPage[2] = 0;
@@ -881,17 +881,17 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             MemoryMap[6] = Unmapped_Memory;
             MemoryMap[7] = Unmapped_Memory;
             break;
-        case 0x01:  // Slot 1:  Maps to Nothing
-            bCartInPage[3] = 0;
-            bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
-            break;
-        case 0x02:  // Slot 2:  Maps to Game Cart
+        case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
             bRAMInPage[3] = 0;
             MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
             MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            break;
+        case 0x02:  // Slot 2:  Maps to Nothing
+            bCartInPage[3] = 0;
+            bRAMInPage[3] = 0;
+            MemoryMap[6] = Unmapped_Memory;
+            MemoryMap[7] = Unmapped_Memory;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[3] = 0;
@@ -943,7 +943,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     {
         if (Value & 0x80)  // Beeper ON
         {
-            if (((Port_PPI_C ^ Value) & 0x80) == 0) beeperFreq++;
+            if (((Port_PPI_C ^ Value) & 0x80) == 0) beeperFreq++; // Beeper toggle
         }
         Port_PPI_C = Value;
         msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
@@ -953,7 +953,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         if ((Value & 0x0E) == 0x0E) // Are we hitting the Beeper ON/OFF bit?
         {
             if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;   // Beeper toggle
-            else if (!(Value & 1) && ((Port_PPI_C & 0x80))) beeperFreq++;   // Beeper toggle
+            else if (!(Value & 1) && ((Port_PPI_C & 0x80))) beeperFreq++;  // Beeper toggle
         }
 
         // Set or clear the proper bit in PORTC
@@ -1108,21 +1108,24 @@ void MSX_InitialMemoryLayout(u32 romSize)
     Port_PPI_B = 0x00;
     Port_PPI_C = 0x00;
 
+    // ----------------------------------
+    // Some helper variables for the MSX
+    // ----------------------------------
     msx_music_writes = 0;
     special_ram_access = 0x00;
     msx_subslot = 0x00;
 
     // ---------------------------------------------
-    // Start with reset memory - fill in MSX slots
+    // Start with reset memory - fill in MSX slots.
+    // RAM wipe happens in msxWipeRAM().
     // ---------------------------------------------
-    memset(RAM_Memory,  0x00, sizeof(RAM_Memory));
     memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
 
     // -----------------------------------------
     // Setup RAM/ROM pointers back to defaults
     // -----------------------------------------
-    memset(bRAMInPage,  0, sizeof(bRAMInPage));   // Default to no RAM in slot until told so
-    memset(bCartInPage, 0, sizeof(bCartInPage));  // Default to no ROM in slot until told so
+    memset(bRAMInPage,  0, sizeof(bRAMInPage));   // Default to no RAM paged in until told so
+    memset(bCartInPage, 0, sizeof(bCartInPage));  // Default to no ROM paged in until told so
 
     for (u8 i=0; i<8; i++)
     {
@@ -1149,9 +1152,10 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // ---------------------------------------------
     msx_restore_bios();
 
-    // -------------------------------------------------------------------------
-    // If we are a .dsk we can point to nothing for the cart and return here...
-    // -------------------------------------------------------------------------
+    // -----------------------------------------------------------------
+    // If we are a .dsk we can point to nothing for the cart and return
+    // here unless we have the SCC PLUS expansion mapped in.
+    // -----------------------------------------------------------------
     if (msx_mode == MSX_MODE_DISK)
     {
         if (myConfig.musicExpand == 2) // SCC PLUS enabled?
@@ -1202,9 +1206,9 @@ void MSX_InitialMemoryLayout(u32 romSize)
         {
             // Look for the matching SHA1 in the ROM Database
             mapperType = RomDB_Lookup(romSize);
-            if (mapperType == 0xFF) // Not found... let's do our best to guess it...
+            if (mapperType == 0xFF && (romSize >= (64*1024))) // Not found... let's do our best to guess it...
             {
-                mapperType = MSX_GuessROMType(romSize);
+                mapperType = MSX_GuessROMType(romSize); // We only bother if the game is 64K or larger
             }
         }
         else // User has selected a specific mapper... who are we to argue?!
@@ -1218,16 +1222,16 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // ------------------------------------------------------------
     if (romSize == (8 * 1024))
     {
-        if (msx_basic)  // Basic Game loads at 0x8000 ONLY
+        if (msx_basic)  // Basic Game loads at 0x8000 ONLY (no mirrors)
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x8000;        // Segment 0
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x8000;        // Segment 1
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x8000;        // Segment 2
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x8000;        // Segment 3
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment 0
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment 1
+            MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment 2
+            MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment 3
             MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 4 - Actual ROM is here
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x8000;        // Segment 5
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x8000;        // Segment 6
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x8000;        // Segment 7
+            MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment 5
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment 6
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment 7
         }
         else            // Mirrors at every 8K
         {

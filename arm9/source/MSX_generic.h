@@ -96,9 +96,9 @@ struct __attribute__((__packed__)) Config_t
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
             
-#define MACHINE_MSX2_A              0x00
-#define MACHINE_MSX2_B              0x01
-#define MACHINE_MSX1                0x02
+#define MACHINE_MSX2_A              0x00    // Standard MSX2 slot layout (slot 3 expanded)
+#define MACHINE_MSX2_B              0x01    // Alternate MSX2 slot layout (slot 0 expanded)
+#define MACHINE_MSX1                0x02    // Standard MSX1 slot layout (nothing expanded)
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;

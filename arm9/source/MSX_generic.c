@@ -1533,6 +1533,8 @@ void HachibittoChangeOptions(void)
             if (ucGameChoice != -1)
             {
                 ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys
+                BottomScreenOptions();
+                dispInfoOptions(ucY);
                 DisplayFileName();      // And put up the filename on the bottom screen
             }
             ucY = 9;

@@ -30,6 +30,7 @@
 #include "alpha_kbd.h"
 #include "debug_ovl.h"
 #include "instructions.h"
+#include "loading.h"
 #include "options.h"
 #include "topscreen.h"
 #include "fdc.h"
@@ -1603,6 +1604,20 @@ void ShowInstructions(void)
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B | KEY_R | KEY_L | KEY_UP | KEY_DOWN))!=0);
 }
 
+void ShowLoading(void)
+{
+    swiWaitForVBlank();
+
+    bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+    bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29,0);
+    bgSetPriority(bg0b,1);bgSetPriority(bg1b,0);
+    decompress(loadingTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+    decompress(loadingMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+    dmaCopy((void*) loadingPal,(void*) BG_PALETTE_SUB,256*2);
+    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
+}
+
 /*********************************************************************************
  * Init DS Emulator - setup VRAM banks and background screen rendering banks
  ********************************************************************************/
@@ -2090,16 +2105,24 @@ void msxUpdateScreen(void)
  *******************************************************************************/
 void getfile_crc(const char *filename)
 {
-    DSPrint(11,13,6, "LOADING...");
-
+    ShowLoading();
+   
     // -------------------------------------------------------------------
     // This reads the file into ROM_Memory[] and computes the CRC32 which
     // is used for favorites, high score saves and configuration data.
     // For large files (> 1MB), this can take several seconds.
     // -------------------------------------------------------------------
     file_crc = getFileCrc(filename);
-
-    DSPrint(11,13,6, "          ");
+    
+    extern u32 file_size;
+    if (file_size <= (256 * 1024))  // Smaller files... add some wait on the Loading Screen
+    {
+        WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
+    }
+    else if (file_size <= (512 * 1024)) // Slightly larger files... add less wait
+    {
+        WAITVBL;WAITVBL;WAITVBL;WAITVBL;
+    }
 }
 
 
