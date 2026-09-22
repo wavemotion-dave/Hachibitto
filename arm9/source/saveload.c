@@ -112,7 +112,7 @@ void msxSaveState(void)
         // Save the Memory Map - we must only save offsets so that this is generic when we change code and memory shifts...
         for (u8 i=0; i<8; i++)
         {
-            if ((MemoryMap[i] >= ROM_Memory) && (MemoryMap[i] < ROM_Memory+MAX_CART_SIZE))
+            if ((MemoryMap[i] >= ROM_Memory) && (MemoryMap[i] < ROM_Memory+MAX_CART_SIZE_KB))
             {
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = MemoryMap[i] - ROM_Memory;

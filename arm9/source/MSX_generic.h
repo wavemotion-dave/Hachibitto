@@ -157,7 +157,7 @@ extern u8 msx_kana_lock;
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
-extern u32 MAX_CART_SIZE;
+extern u32 MAX_CART_SIZE_KB;
 
 extern u8 *ROM_Memory;
 extern u8 RAM_Memory[0x20000];
@@ -193,7 +193,7 @@ extern u8 BufferedKeysWriteIdx;
 extern u8 BufferedKeysReadIdx;
 extern u8 key_shift;
 extern u8 key_ctrl;
-extern u8 key_code;
+extern u8 key_kana;
 extern u8 key_graph;
 extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;

@@ -37,21 +37,15 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     // ----------------------------------------------------
     if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
-        if (bCartInPage[2]) // Is the cart mapped in?
-        {
-            return SCCRead(address, &mySCC);
-        }
+        if (bCartInPage[2]) return SCCRead(address, &mySCC);    // If the cart is mapped in, return value from it
     }
     else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
     {
-        if (bCartInPage[2]) return SCCRead(address, &mySCC);
+        if (bCartInPage[2]) return SCCRead(address, &mySCC);    // If the cart is mapped in, return value from it
     }
     else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
-        if (myConfig.machineType != MACHINE_MSX1)
-        {
-            return ~msx_subslot; // Compliment is returned
-        }
+        return ~msx_subslot; // Compliment is returned. MSX1 map will never set SPEC_RAM_SUBSLOT_ACTIVE.
     }
 
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
@@ -241,6 +235,7 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[2] = (u8*)src;  // Main ROM
             MSXCartPtr[6] = (u8*)src;  // Mirror
         }
+        
         MemoryMap[2] = MSXCartPtr[2];
         if (bCartInPage[3])
         {
@@ -343,6 +338,7 @@ void HandleAscii16_SRAM2(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[2] = (u8*)src;
             MSXCartPtr[3] = (u8*)src+0x2000;
         }
+        
         MemoryMap[2] = MSXCartPtr[2];
         MemoryMap[3] = MSXCartPtr[3];
     }
@@ -502,32 +498,6 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     }
 }
 
-// -------------------------------------------------------------------------
-// The ASCII 16K Mapper:
-// 4000h~7FFFh  via writes to 6000h to 67FFh
-// 8000h~BFFFh  via writes to 7000h to 77FFh
-// -------------------------------------------------------------------------
-void HandleAscii16K(u32* src, u8 block, u16 address)
-{
-    if (bCartInPage[1] && (address & 0xF800) == 0x6000)
-    {
-        MSXCartPtr[2] = (u8*)src;
-        MSXCartPtr[3] = (u8*)src+0x2000;
-        MemoryMap[2] = MSXCartPtr[2];
-        MemoryMap[3] = MSXCartPtr[3];
-    }
-    else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
-    {
-        MSXCartPtr[4] = (u8*)src;
-        MSXCartPtr[5] = (u8*)src+0x2000;
-        if (bCartInPage[2])
-        {
-            MemoryMap[4] = MSXCartPtr[4];
-            MemoryMap[5] = MSXCartPtr[5];
-        }
-    }
-}
-
 // ---------------------------------------------------------------------
 // Xevious and a few other related games have special cart mapping...
 // ---------------------------------------------------------------------
@@ -578,6 +548,9 @@ void HandleMajut(u32* src, u8 block, u16 address)
     }
 }
 
+// ---------------------------------------------------------------------
+// XBlam switches on hits to addres 0x4045 and swaps out 16K at 0x8000
+// ---------------------------------------------------------------------
 void HandleXBlam(u32* src, u8 block, u16 address)
 {
     if (address == 0x4045)
@@ -850,7 +823,28 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
         }
         else if (mapperType == ASC16)
         {
-            HandleAscii16K(src, block, address);
+            // -------------------------------------------------------------------------
+            // The ASCII 16K Mapper:
+            // 4000h~7FFFh  via writes to 6000h to 67FFh
+            // 8000h~BFFFh  via writes to 7000h to 77FFh
+            // -------------------------------------------------------------------------
+            if (bCartInPage[1] && (address & 0xF800) == 0x6000)
+            {
+                MSXCartPtr[2] = (u8*)src;
+                MSXCartPtr[3] = (u8*)src+0x2000;
+                MemoryMap[2] = MSXCartPtr[2];
+                MemoryMap[3] = MSXCartPtr[3];
+            }
+            else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
+            {
+                MSXCartPtr[4] = (u8*)src;
+                MSXCartPtr[5] = (u8*)src+0x2000;
+                if (bCartInPage[2])
+                {
+                    MemoryMap[4] = MSXCartPtr[4];
+                    MemoryMap[5] = MSXCartPtr[5];
+                }
+            }
         }
         else if (mapperType == ZEN8)
         {

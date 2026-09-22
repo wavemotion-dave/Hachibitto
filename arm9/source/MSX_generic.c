@@ -928,9 +928,9 @@ void SetDefaultGameConfig(void)
     myConfig.musicExpand  = 0;                           // Default is no expansion. 1=MSX-MUSIC, 2=SCC+
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
-    myConfig.reserved4    = 0;                           
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
+    myConfig.reserved4    = 0;                           
     myConfig.reserved5    = 0;
     myConfig.reserved6    = 0;
     myConfig.reserved7    = 0;
@@ -1401,7 +1401,7 @@ void ReadFileCRCAndConfig(void)
     // ----------------------------------------------------------------------------------
     // Clear the entire ROM buffer[] - fill with 0xFF to emulate non-responsive memory
     // ----------------------------------------------------------------------------------
-    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE * 1024));
+    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
 
     // Grab the all-important file CRC - this also loads the file into ROM_Memory[]
     getfile_crc(gpFic[ucGameChoice].szName);

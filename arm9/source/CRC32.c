@@ -97,7 +97,7 @@ u32 getCRC32(u8 *buf, u32 size)
 // Read the file in and compute CRC... it's a bit slow but good enough and accurate!
 // When this routine finishes, the file will be read into ROM_Memory[]
 // ------------------------------------------------------------------------------------
-extern u32 MAX_CART_SIZE;
+extern u32 MAX_CART_SIZE_KB;
 extern u8 *ROM_Memory;
 
 u32 getFileCrc(const char* filename)
@@ -120,7 +120,7 @@ u32 getFileCrc(const char* filename)
         file_size = 0;
         crc1 = 0xFFFFFFFF;
         FILE* file = fopen(filename, "rb");
-        while ((bytesRead1 = fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file)) > 0)
+        while ((bytesRead1 = fread(ROM_Memory, 1, (MAX_CART_SIZE_KB * 1024), file)) > 0)
         {
             file_size += bytesRead1;
             for (int i=0; i < bytesRead1; i++)
@@ -133,7 +133,7 @@ u32 getFileCrc(const char* filename)
         // Read #2
         crc2 = 0xFFFFFFFF;
         FILE* file2 = fopen(filename, "rb");
-        while ((bytesRead2 = fread(ROM_Memory, 1, (MAX_CART_SIZE * 1024), file2)) > 0)
+        while ((bytesRead2 = fread(ROM_Memory, 1, (MAX_CART_SIZE_KB * 1024), file2)) > 0)
         {
             for (int i=0; i < bytesRead2; i++)
             {

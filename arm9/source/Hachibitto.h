@@ -154,7 +154,7 @@ extern u32 DX, DY;
 #define KBD_KEY_CAPS        21
 #define KBD_KEY_TAB         22
 #define KBD_KEY_BS          23
-#define KBD_KEY_CODE        24
+#define KBD_KEY_KANA        24
 #define KBD_KEY_GRAPH       25
 #define KBD_KEY_DEAD        26
 #define KBD_KEY_YEN         27
@@ -179,7 +179,6 @@ extern u8 kbd_keys_pressed;
 extern u8 kbd_keys[12];
 extern volatile u16 vusCptVBL;
 extern u32 keyCoresp[MAX_KEY_OPTIONS];
-extern u16 NDS_keyMap[];
 extern u8 soundEmuPause;
 extern u8 skip_render;
 extern int bg0, bg1, bg0b, bg1b;

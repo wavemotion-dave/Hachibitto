@@ -59,23 +59,20 @@ u8  bFirstSoundOutput   __attribute__((section(".dtcm"))) = 1;
 u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
-// All emulated systems have ROM, RAM and possibly BIOS or SRAM. So we create generic buffers
+// The MSX systems have ROM, RAM, BIOS, Music Carts or SRAM. So we create generic buffers
 // for all this here... these are sized big enough to handle the largest memory necessary
-// to render games playable. There are a few MSX games that are larger than 512k but they
-// are mostly demos or foreign-language adventures... not enough interest to try to squeeze
-// in a larger ROM buffer to include them - we are still trying to keep compatible with the
-// smaller memory model of the original DS/DS-LITE.
+// to render games playable. We give enough room here to run 98% of the MSX catalog.
 //
 // These memory buffers will be pointed to by the MemoryMap[] array. This array contains 8
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE = 1256;                                     // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
-
-u8 *ROM_Memory;                                               // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
-u8 RAM_Memory[0x20000]                ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
-u8 BIOS_Memory[0x8000]                ALIGN(32) = {0};        // To hold our BIOS and related OS memory - always in the lower 32K memory region
-u8 SRAM_Memory[0x10000]               ALIGN(32) = {0};        // SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
+u32 MAX_CART_SIZE_KB = 1256;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
+                                
+u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
+u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
+u8 BIOS_Memory[0x8000]          ALIGN(32) = {0};        // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
+u8 SRAM_Memory[0x10000]         ALIGN(32) = {0};        // 'Special RAM' - SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
 
 u8 io_show_status = 0;      // Used to indicate a disk activity icons
 u8 sram_show_status = 0;    // Used to show SRAM icon
@@ -91,16 +88,16 @@ char initial_path[MAX_ROM_NAME] = "";
 // --------------------------------------------------------------------------
 u8 key_shift __attribute__((section(".dtcm"))) = false;
 u8 key_ctrl  __attribute__((section(".dtcm"))) = false;
-u8 key_code  __attribute__((section(".dtcm"))) = false;
+u8 key_kana  __attribute__((section(".dtcm"))) = false;
 u8 key_graph __attribute__((section(".dtcm"))) = false;
 
 // ---------------------------------------------------------------------------
-// Some timing and frame rate comutations to keep the emulation on pace...
+// Some timing and frame rate computations to keep the emulation on pace...
 // ---------------------------------------------------------------------------
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;
 
-u8 soundEmuPause     __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
+u8 soundEmuPause    __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
 
 // -----------------------------------------------------------------------------
 // This set of critical vars is what determines the game type is... ROM vs DSK
@@ -463,7 +460,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 void setupStream(void)
 {
     //----------------------------------------------------------------
-    //  initialize maxmod with our small 5-effect soundbank
+    //  initialize maxmod with our small 4-effect soundbank
     //----------------------------------------------------------------
     mmInitDefaultMem((mm_addr)soundbank_bin);
 
@@ -510,9 +507,9 @@ void sound_chip_reset()
     bFirstSoundOutput = 1;
     SoundPause();
 
-    //  -----------------------------------------------------------
-    //  The AY sound chip is for our baseline MSX sound handling.
-    //  -----------------------------------------------------------
+    // -----------------------------------------------------------
+    // The AY sound chip is for our baseline MSX sound handling.
+    // -----------------------------------------------------------
     ay38910Reset(&myAY);             // Reset the "AY" sound chip
     ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
@@ -662,7 +659,7 @@ void ShowDebugZ80(void)
 
 
 // ------------------------------------------------------------------------
-// The status line shows the status of the SCC, MSX-MUSIC, disk icons, etc. 
+// The status line shows the status of the SCC, MSX-MUSIC, disk icons, etc.
 // ------------------------------------------------------------------------
 void DisplayStatusLine(bool bForce)
 {
@@ -960,13 +957,8 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         if      ((iTx >= 1)   && (iTx < 30))   kbd_key = KBD_KEY_CAPS;
         else if ((iTx >= 30)  && (iTx < 53))   {kbd_key = KBD_KEY_GRAPH; last_special_key = KBD_KEY_GRAPH; last_special_key_dampen = 20;}
         else if ((iTx >= 53)  && (iTx < 163))  kbd_key = ' ';
-        else if ((iTx >= 163) && (iTx < 192))  kbd_key = KBD_KEY_CODE;
+        else if ((iTx >= 163) && (iTx < 192))  kbd_key = KBD_KEY_KANA;
         else if ((iTx >= 192) && (iTx < 255))  return MENU_CHOICE_MENU;
-    }
-
-    if ((kbd_key != 0) && (kbd_key != KBD_KEY_CODE))
-    {
-        DSPrint(4,0,6,"    ");
     }
 
     return MENU_CHOICE_NONE;
@@ -1322,7 +1314,7 @@ void Hachibitto_main(void)
                               {
                                   BottomScreenOptions();
                                   DSPrint(11,13,6, "LOADING...");
-                                  msx_last_file_size = ReadFileCarefully(gpFic[ucGameChoice].szName, ROM_Memory, (MAX_CART_SIZE * 1024), 0);
+                                  msx_last_file_size = ReadFileCarefully(gpFic[ucGameChoice].szName, ROM_Memory, (MAX_CART_SIZE_KB * 1024), 0);
                                   fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
                                   fdc_reset(false);
                               }
@@ -1360,7 +1352,7 @@ void Hachibitto_main(void)
       // ------------------------------------------------------------------------
       key_shift = false;
       key_ctrl = false;
-      key_code = false;
+      key_kana = false;
       key_graph = false;
 
       JoyStickMap  = 0;
@@ -1475,7 +1467,7 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_ESC)       kbd_key = KBD_KEY_ESC;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHIFT)     key_shift = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CTRL)      key_ctrl  = 1;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CODE)      key_code  = 1;
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CODE)      key_kana  = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_GRAPH)     key_graph = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_HOME)      kbd_key = KBD_KEY_HOME;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_UP)        kbd_key = KBD_KEY_UP;
@@ -1594,7 +1586,7 @@ void ShowInstructions(void)
     dmaCopy((void*) instructionsPal,(void*) BG_PALETTE_SUB,256*2);
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
-    
+
     while ((keysCurrent() & KEY_START) == 0)
     {
         ShowRandomPreviewSnaps();
@@ -1642,7 +1634,7 @@ void HachibittoInit(void)
     dmaCopy((void*) topscreenPal,(void*)  BG_PALETTE,256*2);
     unsigned  short dmaVal =*(bgGetMapPtr(bg0)+51*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1),32*24*2);
-    
+
     ShowInstructions();
 
     // Put up the options screen
@@ -1737,7 +1729,7 @@ ITCM_CODE void irqVBlank(void)
     int ydyBG = 0x0100; // Default to no screen scale
     int shifty = 0;
     int cyBG = 0;
-    
+
     // Manage time and true vSync on display output to reduce tearing...
     vusCptVBL++;
     dsVSyncCount++;
@@ -1753,7 +1745,7 @@ ITCM_CODE void irqVBlank(void)
     else
     {
         cyBG = ((s16)myConfig.yOffset+temp_offset) << 8;
-        
+
         // --------------------------------------------------------------------
         // Compress screen (yuck!). We do a little bit of DS magic here to
         // shift one of the two DS video pointers so that we end up with a
@@ -1809,13 +1801,13 @@ int main(int argc, char **argv)
     // -----------------------------------------------------------------
     if (isDSiMode())
     {
-        MAX_CART_SIZE = 4096; // 4MB is the max MSX cart size without tom-foolery
-        ROM_Memory = malloc(MAX_CART_SIZE * 1024);
+        MAX_CART_SIZE_KB = 4096; // 4MB is the max MSX cart size without tom-foolery
+        ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
     else // For older DS units... 1.25MB max
     {
-        MAX_CART_SIZE = 1256;
-        ROM_Memory = malloc(MAX_CART_SIZE * 1024);
+        MAX_CART_SIZE_KB = 1256;
+        ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
 
     // ------------------------------------------
@@ -2046,8 +2038,8 @@ u8 msxInit(char *szGame)
     // Init the page flipping buffer...
     for (uBcl=0;uBcl<255;uBcl++)
     {
-     uVide=0;
-     dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
+        uVide=0;
+        dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
     }
 
     // LoadGameRom() will figure out how big and where to load it...
@@ -2058,8 +2050,8 @@ u8 msxInit(char *szGame)
 
     if (RetFct)
     {
-      // Perform a standard system RESET
-      ResetMSX();
+        // Perform a standard system RESET
+        ResetMSX();
     }
 
     // Return with result
@@ -2106,14 +2098,14 @@ void msxUpdateScreen(void)
 void getfile_crc(const char *filename)
 {
     ShowLoading();
-   
+
     // -------------------------------------------------------------------
     // This reads the file into ROM_Memory[] and computes the CRC32 which
     // is used for favorites, high score saves and configuration data.
     // For large files (> 1MB), this can take several seconds.
     // -------------------------------------------------------------------
     file_crc = getFileCrc(filename);
-    
+
     extern u32 file_size;
     if (file_size <= (256 * 1024))  // Smaller files... add some wait on the Loading Screen
     {
@@ -2154,15 +2146,11 @@ u8 LoadGameRom(const char *filename)
         // Save the last file size...
         msx_last_file_size = romSize;
 
-        if (romSize <= (MAX_CART_SIZE * 1024))  // Max size cart is 1MB/4MB - that's pretty huge...
+        if (romSize <= (MAX_CART_SIZE_KB * 1024))  // Max size cart is 1MB/4MB - that's pretty huge...
         {
-            fclose(handle); // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
+            fclose(handle);     // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
 
-            mapperMask = 0x00;          // No MSX mapper mask
-
-            // Cache the first 256K of the ROM into fast VRAM for possible use...
-            u8 *fastROM = (u8*) (0x06860000);
-            memcpy(fastROM, ROM_Memory, (256 * 1024));
+            mapperMask = 0x00;  // No MSX mapper mask until we detect it
 
             // ------------------------------------------------------------------------------
             // For the MSX emulation, we setup the initial memory map based on ROM size
@@ -2236,7 +2224,7 @@ u32 LoopZ80()
 }
 
 // -----------------------------------------------------------------------
-// A bit of memory reserved to store debug information... Reduce this 
+// A bit of memory reserved to store debug information... Reduce this
 // when we are stable and don't have much need for it anymore.
 // -----------------------------------------------------------------------
 
@@ -2250,12 +2238,12 @@ extern char szName[]; // Reuse buffer which has no other in-game use
 void debug_init()
 {
     debug_len = 0;
+    memset(DEBUG_BUFFER, 0x00, MAX_DEBUG_BUF_SIZE);
 }
 
 void debug_printf(const char * str, ...)
 {
     if (debug_len >= (MAX_DEBUG_BUF_SIZE-MAX_DPRINTF_STR_SIZE)) return; // No more room!
-    if (debug_len == 0) DEBUG_BUFFER[debug_len] = 0;
 
     va_list ap = {0};
 

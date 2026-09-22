@@ -173,21 +173,21 @@ uint8_t read_port_RTC_data(void)
 }
 
 // ------------------------------------------------------------------------------------------
-// Keyboard / Joystick reading is generally done every frame so at most 60 times per second. 
+// Keyboard / Joystick reading is generally done every frame so at most 60 times per second.
 // It's fine to keep this out of ITCM fast memory as it's not a hot spot for emulation.
 // ------------------------------------------------------------------------------------------
 u8 readport_keyboard(void)
 {
       // ----------------------------------------------------------
-      // Keyboard Port (international and US)
+      // Keyboard Port (Japanese Layout)
       //  Row   Bit_7 Bit_6 Bit_5 Bit_4 Bit_3 Bit_2 Bit_1 Bit_0
       //   0     "7"   "6"   "5"   "4"   "3"   "2"   "1"   "0"
-      //   1     ";"   "]"   "["   "\"   "="   "-"   "9"   "8"
-      //   2     "B"   "A"  DEAD   "/"   "."   ","   "'"   "`"
+      //   1     ":"   ";"   "["   YEN   "="   "-"   "9"   "8"
+      //   2     "B"   "A"  DEAD   /     "."   ","   "]"  QUOTE
       //   3     "J"   "I"   "H"   "G"   "F"   "E"   "D"   "C"
       //   4     "R"   "Q"   "P"   "O"   "N"   "M"   "L"   "K"
       //   5     "Z"   "Y"   "X"   "W"   "V"   "U"   "T"   "S"
-      //   6     F3    F2    F1   CODE   CAP  GRAPH CTRL  SHIFT
+      //   6     F3    F2    F1   KANA   CAPS GRAPH CTRL  SHIFT
       //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
       //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
       // ----------------------------------------------------------
@@ -211,16 +211,16 @@ u8 readport_keyboard(void)
           {
             key_ctrl = 1;
           }
-          else if (last_special_key == KBD_KEY_CODE)
+          else if (last_special_key == KBD_KEY_KANA)
           {
-            key_code = 1;
+            key_kana = 1;
           }
           else if (last_special_key == KBD_KEY_GRAPH)
           {
             key_graph = 1;
           }
 
-          if ((kbd_key != 0) && (kbd_key != KBD_KEY_SHIFT) && (kbd_key != KBD_KEY_CTRL) && (kbd_key != KBD_KEY_CODE) && (kbd_key != KBD_KEY_GRAPH))
+          if ((kbd_key != 0) && (kbd_key != KBD_KEY_SHIFT) && (kbd_key != KBD_KEY_CTRL) && (kbd_key != KBD_KEY_KANA) && (kbd_key != KBD_KEY_GRAPH))
           {
               if (last_special_key_dampen == 20) last_special_key_dampen = 19;    // Start the SHIFT/CONTROL countdown... this should be enough time for it to register
           }
@@ -328,7 +328,7 @@ u8 readport_keyboard(void)
                   if (kbd_key == KBD_KEY_CTRL)  key1 |= 0x02;
                   if (kbd_key == KBD_KEY_GRAPH) key1 |= 0x04;
                   if (kbd_key == KBD_KEY_CAPS)  key1 |= 0x08;
-                  if (kbd_key == KBD_KEY_CODE)  key1 |= 0x10;
+                  if (kbd_key == KBD_KEY_KANA)  key1 |= 0x10;
                   if (kbd_key == KBD_KEY_F1)    key1 |= 0x20;
                   if (kbd_key == KBD_KEY_F2)    key1 |= 0x40;
                   if (kbd_key == KBD_KEY_F3)    key1 |= 0x80;
@@ -336,7 +336,7 @@ u8 readport_keyboard(void)
               if (key_shift)  key1 |= 0x01;  // SHIFT
               if (key_ctrl)   key1 |= 0x02;  // CTRL
               if (key_graph)  key1 |= 0x04;  // GRAPH
-              if (key_code)   key1 |= 0x10;  // CODE/KANA
+              if (key_kana)   key1 |= 0x10;  // KANA
           }
           else if ((Port_PPI_C & 0x0F) == 7) // Row 7
           {
@@ -350,10 +350,9 @@ u8 readport_keyboard(void)
                   if (kbd_key == KBD_KEY_BS)    key1 |= 0x20;
                   if (kbd_key == KBD_KEY_SEL)   key1 |= 0x40;
                   if (kbd_key == KBD_KEY_RET)   key1 |= 0x80;
-
               }
           }
-          else if ((Port_PPI_C & 0x0F) == 8) // Row 8  RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
+          else if ((Port_PPI_C & 0x0F) == 8) // Row 8
           {
               if (kbd_key)
               {
@@ -430,7 +429,10 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
       }
       return ay38910DataR(&myAY);
   }
-  else if (Port == 0xA8) return Port_PPI_A;
+  else if (Port == 0xA8)
+  {
+      return Port_PPI_A;
+  }
   else if (Port == 0xA9)
   {
       return readport_keyboard();
@@ -463,12 +465,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 //---------------------------------------------------------------
 void msx_slot_map_msx1(unsigned char Value)
 {
-    // ---------------------------------------------------------------------
-    // Slot 0 holds the 32K of MSX BIOS
-    // Slot 1 is where the Game Cartridge Lives (may contain a mapper)
-    // Slot 2 is empty (0xFF read always)
-    // Slot 3 is our main RAM. We emulate 64K of RAM in MSX1 mode
-    // ---------------------------------------------------------------------
+    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE; // MSX1 has no subslots
+    
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
         case 0x00:  // Slot 0:  Maps to BIOS Rom
@@ -908,6 +906,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
+    
     // MSX ports are 8-bit
     Port &= 0x00FF;
 
@@ -974,10 +973,10 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         u8 bank = Value & 7;
 
         mirror_ram_bank[page] = bank; // For read-back
-        
+
         MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
         MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
-        
+
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
     else if (Port == 0x7C)
@@ -990,7 +989,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         {
             if (myConfig.musicExpand == 1) msx_music_capable_game = 1;
         }
-        
+
         FMPACWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
     }
     else // Unhandled port write...
@@ -1078,7 +1077,10 @@ void msxWipeRAM(void)
     }
 }
 
+// -------------------------------------------------------------------
 // Return 1 if the mapperType indicates we are a 16K banking cart...
+// Otherwise the system will assume a standard 8K mapper.
+// -------------------------------------------------------------------
 u8 Is16kBanking(void)
 {
     if (mapperType == ASC16 || mapperType == ASC16SRAM2 || mapperType == ASC16SRAM8 || mapperType == ZEN16 || mapperType == XBLAM || mapperType == SUPERLR || mapperType == XEVIOUS)
@@ -1131,7 +1133,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         MSXCartPtr[i] = Unmapped_Memory;          // Cart has nothing in it by default
     }
-    
+
     // ---------------------------------------------
     // RAM maps backwards... for historical reasons.
     // ---------------------------------------------
@@ -1160,7 +1162,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         if (myConfig.musicExpand == 2) // SCC PLUS enabled?
         {
-            mapperType = SCCPLUS_RAM;
             // ---------------------------------------------------------------
             // This cart supplies its own private 64K of RAM (not ROM_Memory).
             // Pre-load the game image into it once, then map pages 0-3 into
@@ -1184,6 +1185,8 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[5] = SRAM_Memory + (3 * 0x2000);  // A000-BFFF -> page 3
             MSXCartPtr[6] = (u8*)Unmapped_Memory;        // Segment Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;        // Segment Unmapped
+
+            mapperType = SCCPLUS_RAM;
         }
         else // No cart when disk is installed...
         {
@@ -1195,6 +1198,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[5] = (u8*)Unmapped_Memory;       // Segment 5 Unmapped
             MSXCartPtr[6] = (u8*)Unmapped_Memory;       // Segment 6 Unmapped
             MSXCartPtr[7] = (u8*)Unmapped_Memory;       // Segment 7 Unmapped
+
             mapperType = 0;
         }
 
@@ -1224,25 +1228,25 @@ void MSX_InitialMemoryLayout(u32 romSize)
     {
         if (msx_basic)  // Basic Game loads at 0x8000 ONLY (no mirrors)
         {
-            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment 0
-            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment 1
-            MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment 2
-            MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment 3
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[3] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 4 - Actual ROM is here
-            MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment 5
-            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment 6
-            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment 7
+            MSXCartPtr[5] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Segment NA
         }
         else            // Mirrors at every 8K
         {
             MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 1
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 2
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x0000;        // Segment 3
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 4
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x0000;        // Segment 5
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 6
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 7
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0
+            MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0
         }
     }
     else if (romSize <= (16 * 1024) && (mapperType != SCC8))
@@ -1389,16 +1393,28 @@ void MSX_InitialMemoryLayout(u32 romSize)
             MSXCartPtr[7] = (u8*)ROM_Memory+0x0000;        // Segment 0
             mapperMask = 0x07;
         }
-        else if ((mapperType == ASC16) || (mapperType == ZEN16))
+        else if (myConfig.msxMapper == ASC16)
         {
-            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1
-            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1
-            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1
-            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0
-            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1
+            MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Unmapped
+            MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Unmapped
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[6] = (u8*)Unmapped_Memory;          // Unmapped
+            MSXCartPtr[7] = (u8*)Unmapped_Memory;          // Unmapped
+            mapperMask = 0x03;
+        }
+        else if (myConfig.msxMapper == ZEN16)
+        {
+            MSXCartPtr[0] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[1] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[2] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[3] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[4] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[5] = (u8*)ROM_Memory+0x2000;        // Segment 1 
+            MSXCartPtr[6] = (u8*)ROM_Memory+0x0000;        // Segment 0 
+            MSXCartPtr[7] = (u8*)ROM_Memory+0x2000;        // Segment 1 
             mapperMask = 0x03;
         }
         else if (mapperType == AT4K) // Mirror Page 1 to Page 0
@@ -1435,7 +1451,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
         MSXCartPtr[6] = (u8*)ROM_Memory+0xC000;        // Segment 6
         MSXCartPtr[7] = (u8*)ROM_Memory+0xE000;        // Segment 7
     }
-    else if ((romSize >= (16 * 1024)) && (romSize <= (MAX_CART_SIZE * 1024)))   // We'll take anything between these two...
+    else if ((romSize >= (16 * 1024)) && (romSize <= (MAX_CART_SIZE_KB * 1024)))   // We'll take anything between these two...
     {
         if ((mapperType == KON8) || (mapperType == SCC8) || (mapperType == ZEN8) || (mapperType == MAJUT))
         {
@@ -1634,6 +1650,10 @@ void msx_reset(void)
     }
 }
 
+// -------------------------------------------------------------------
+// For the few games that have SRAM built in. We back the SRAM onto
+// a file with the same base filename but the extension is .SRM
+// -------------------------------------------------------------------
 extern char szName[];
 void msxSaveEEPROM(void)
 {
