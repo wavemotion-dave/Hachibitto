@@ -701,7 +701,7 @@ void HandleSCCPlus(u16 address, u8 value)
 // write is much less common than reads... We handle the popular MSX
 // Konami 8K, SCC and ASCII 8K mappers directly here for max speed.
 // ------------------------------------------------------------------
-ITCM_CODE void cpu_writemem16(u8 value, u16 address)
+ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
     if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
     {

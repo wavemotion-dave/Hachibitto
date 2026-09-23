@@ -1467,6 +1467,12 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
       SetVDPIRQ(VDP_IRQ_VBLANK, 1);
   }
 
+  // Clearing the VDP VBLANK interrupt can drop the IRQ
+  if ((iReg==1) && (!(value & VDP9938_REG1_IRQ)))
+  {
+      SetVDPIRQ(VDP_IRQ_VBLANK, 0);
+  }
+
   /* There are VDP registers - map down to these and mask off irrelevant bits */
   value &= VDP_RegisterMasks[iReg];
 

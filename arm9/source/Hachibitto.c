@@ -2229,7 +2229,7 @@ u32 LoopZ80()
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (128*1024)
+#define MAX_DEBUG_BUF_SIZE   (512*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;

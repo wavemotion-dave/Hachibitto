@@ -33,7 +33,7 @@ extern u32 JoyState;;
 extern u8 kbd_key;
 
 extern Z80 CPU;
-
+extern void debug_printf(const char * str, ...);
 u32 halt_counter=0;
 extern u32 debug[];
 extern u32 DX, DY;
@@ -51,14 +51,9 @@ extern u8 *MemoryMap[8];
 // These defines and inline functions are to map maximum
 // speed/efficiency onto the memory system we have.
 // ------------------------------------------------------
-extern void cpu_writemem16 (u8 value,u16 address);
-extern byte cpu_readmem16 (u16 address);
-
-extern u8 special_memory_access;
-
 inline byte OpZ80(u32 A)    {return *(MemoryMap[A>>13] + (A&0x1FFF));}
 inline byte RdZ80(word A)   {return (special_memory_access ? cpu_readmem16(A) : *(MemoryMap[A>>13] + (A&0x1FFF)));}
-#define     WrZ80(A,V)       cpu_writemem16(V,A)
+#define     WrZ80(A,V)       cpu_writemem16(A,V)
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
 #define     InZ80(P)         cpu_readport_msx(P)
@@ -182,12 +177,10 @@ inline byte RdZ80(word A)   {return (special_memory_access ? cpu_readmem16(A) : 
 #define M_INC(Rg)       \
   Rg++;                 \
   CPU.AF.B.l=(CPU.AF.B.l&C_FLAG)|ZSTable_INC[Rg];
-    //(Rg==0x80? V_FLAG:0)|(Rg&0x0F? 0:H_FLAG)
 
 #define M_DEC(Rg)       \
   Rg--;                 \
   CPU.AF.B.l= (CPU.AF.B.l&C_FLAG)|ZSTable_DEC[Rg];
-    //(Rg==0x7F? V_FLAG:0)|((Rg&0x0F)==0x0F? H_FLAG:0)
 
 #define M_ADDW(Rg1,Rg2) \
   J.W=(CPU.Rg1.W+CPU.Rg2.W)&0xFFFF;                        \
@@ -255,75 +248,76 @@ enum Codes
 
 enum CodesCB
 {
-  RLC_B,  RLC_C,  RLC_D,  RLC_E,  RLC_H,  RLC_L,  RLC_xHL,  RLC_A,
-  RRC_B,  RRC_C,  RRC_D,  RRC_E,  RRC_H,  RRC_L,  RRC_xHL,  RRC_A,
-  RL_B,   RL_C,   RL_D,   RL_E,   RL_H,   RL_L,   RL_xHL,   RL_A,
-  RR_B,   RR_C,   RR_D,   RR_E,   RR_H,   RR_L,   RR_xHL,   RR_A,
-  SLA_B,  SLA_C,  SLA_D,  SLA_E,  SLA_H,  SLA_L,  SLA_xHL,  SLA_A,
-  SRA_B,  SRA_C,  SRA_D,  SRA_E,  SRA_H,  SRA_L,  SRA_xHL,  SRA_A,
-  SLL_B,  SLL_C,  SLL_D,  SLL_E,  SLL_H,  SLL_L,  SLL_xHL,  SLL_A,
-  SRL_B,  SRL_C,  SRL_D,  SRL_E,  SRL_H,  SRL_L,  SRL_xHL,  SRL_A,
-  BIT0_B, BIT0_C, BIT0_D, BIT0_E, BIT0_H, BIT0_L, BIT0_xHL, BIT0_A,
-  BIT1_B, BIT1_C, BIT1_D, BIT1_E, BIT1_H, BIT1_L, BIT1_xHL, BIT1_A,
-  BIT2_B, BIT2_C, BIT2_D, BIT2_E, BIT2_H, BIT2_L, BIT2_xHL, BIT2_A,
-  BIT3_B, BIT3_C, BIT3_D, BIT3_E, BIT3_H, BIT3_L, BIT3_xHL, BIT3_A,
-  BIT4_B, BIT4_C, BIT4_D, BIT4_E, BIT4_H, BIT4_L, BIT4_xHL, BIT4_A,
-  BIT5_B, BIT5_C, BIT5_D, BIT5_E, BIT5_H, BIT5_L, BIT5_xHL, BIT5_A,
-  BIT6_B, BIT6_C, BIT6_D, BIT6_E, BIT6_H, BIT6_L, BIT6_xHL, BIT6_A,
-  BIT7_B, BIT7_C, BIT7_D, BIT7_E, BIT7_H, BIT7_L, BIT7_xHL, BIT7_A,
-  RES0_B, RES0_C, RES0_D, RES0_E, RES0_H, RES0_L, RES0_xHL, RES0_A,
-  RES1_B, RES1_C, RES1_D, RES1_E, RES1_H, RES1_L, RES1_xHL, RES1_A,
-  RES2_B, RES2_C, RES2_D, RES2_E, RES2_H, RES2_L, RES2_xHL, RES2_A,
-  RES3_B, RES3_C, RES3_D, RES3_E, RES3_H, RES3_L, RES3_xHL, RES3_A,
-  RES4_B, RES4_C, RES4_D, RES4_E, RES4_H, RES4_L, RES4_xHL, RES4_A,
-  RES5_B, RES5_C, RES5_D, RES5_E, RES5_H, RES5_L, RES5_xHL, RES5_A,
-  RES6_B, RES6_C, RES6_D, RES6_E, RES6_H, RES6_L, RES6_xHL, RES6_A,
-  RES7_B, RES7_C, RES7_D, RES7_E, RES7_H, RES7_L, RES7_xHL, RES7_A,
-  SET0_B, SET0_C, SET0_D, SET0_E, SET0_H, SET0_L, SET0_xHL, SET0_A,
-  SET1_B, SET1_C, SET1_D, SET1_E, SET1_H, SET1_L, SET1_xHL, SET1_A,
-  SET2_B, SET2_C, SET2_D, SET2_E, SET2_H, SET2_L, SET2_xHL, SET2_A,
-  SET3_B, SET3_C, SET3_D, SET3_E, SET3_H, SET3_L, SET3_xHL, SET3_A,
-  SET4_B, SET4_C, SET4_D, SET4_E, SET4_H, SET4_L, SET4_xHL, SET4_A,
-  SET5_B, SET5_C, SET5_D, SET5_E, SET5_H, SET5_L, SET5_xHL, SET5_A,
-  SET6_B, SET6_C, SET6_D, SET6_E, SET6_H, SET6_L, SET6_xHL, SET6_A,
-  SET7_B, SET7_C, SET7_D, SET7_E, SET7_H, SET7_L, SET7_xHL, SET7_A
+  RLC_B,    RLC_C,      RLC_D,       RLC_E,      RLC_H,      RLC_L,      RLC_xHL,     RLC_A,      // 0x00
+  RRC_B,    RRC_C,      RRC_D,       RRC_E,      RRC_H,      RRC_L,      RRC_xHL,     RRC_A,      // 0x08    
+  RL_B,     RL_C,       RL_D,        RL_E,       RL_H,       RL_L,       RL_xHL,      RL_A,       // 0x10
+  RR_B,     RR_C,       RR_D,        RR_E,       RR_H,       RR_L,       RR_xHL,      RR_A,       // 0x18
+  SLA_B,    SLA_C,      SLA_D,       SLA_E,      SLA_H,      SLA_L,      SLA_xHL,     SLA_A,      // 0x20
+  SRA_B,    SRA_C,      SRA_D,       SRA_E,      SRA_H,      SRA_L,      SRA_xHL,     SRA_A,      // 0x28
+  SLL_B,    SLL_C,      SLL_D,       SLL_E,      SLL_H,      SLL_L,      SLL_xHL,     SLL_A,      // 0x30
+  SRL_B,    SRL_C,      SRL_D,       SRL_E,      SRL_H,      SRL_L,      SRL_xHL,     SRL_A,      // 0x38
+  BIT0_B,   BIT0_C,     BIT0_D,      BIT0_E,     BIT0_H,     BIT0_L,     BIT0_xHL,    BIT0_A,     // 0x40
+  BIT1_B,   BIT1_C,     BIT1_D,      BIT1_E,     BIT1_H,     BIT1_L,     BIT1_xHL,    BIT1_A,     // 0x48
+  BIT2_B,   BIT2_C,     BIT2_D,      BIT2_E,     BIT2_H,     BIT2_L,     BIT2_xHL,    BIT2_A,     // 0x50
+  BIT3_B,   BIT3_C,     BIT3_D,      BIT3_E,     BIT3_H,     BIT3_L,     BIT3_xHL,    BIT3_A,     // 0x58
+  BIT4_B,   BIT4_C,     BIT4_D,      BIT4_E,     BIT4_H,     BIT4_L,     BIT4_xHL,    BIT4_A,     // 0x60
+  BIT5_B,   BIT5_C,     BIT5_D,      BIT5_E,     BIT5_H,     BIT5_L,     BIT5_xHL,    BIT5_A,     // 0x68
+  BIT6_B,   BIT6_C,     BIT6_D,      BIT6_E,     BIT6_H,     BIT6_L,     BIT6_xHL,    BIT6_A,     // 0x70
+  BIT7_B,   BIT7_C,     BIT7_D,      BIT7_E,     BIT7_H,     BIT7_L,     BIT7_xHL,    BIT7_A,     // 0x78
+  RES0_B,   RES0_C,     RES0_D,      RES0_E,     RES0_H,     RES0_L,     RES0_xHL,    RES0_A,     // 0x80
+  RES1_B,   RES1_C,     RES1_D,      RES1_E,     RES1_H,     RES1_L,     RES1_xHL,    RES1_A,     // 0x88
+  RES2_B,   RES2_C,     RES2_D,      RES2_E,     RES2_H,     RES2_L,     RES2_xHL,    RES2_A,     // 0x90
+  RES3_B,   RES3_C,     RES3_D,      RES3_E,     RES3_H,     RES3_L,     RES3_xHL,    RES3_A,     // 0x98
+  RES4_B,   RES4_C,     RES4_D,      RES4_E,     RES4_H,     RES4_L,     RES4_xHL,    RES4_A,     // 0xA0
+  RES5_B,   RES5_C,     RES5_D,      RES5_E,     RES5_H,     RES5_L,     RES5_xHL,    RES5_A,     // 0xA8
+  RES6_B,   RES6_C,     RES6_D,      RES6_E,     RES6_H,     RES6_L,     RES6_xHL,    RES6_A,     // 0xB0
+  RES7_B,   RES7_C,     RES7_D,      RES7_E,     RES7_H,     RES7_L,     RES7_xHL,    RES7_A,     // 0xB8
+  SET0_B,   SET0_C,     SET0_D,      SET0_E,     SET0_H,     SET0_L,     SET0_xHL,    SET0_A,     // 0xC0
+  SET1_B,   SET1_C,     SET1_D,      SET1_E,     SET1_H,     SET1_L,     SET1_xHL,    SET1_A,     // 0xC8
+  SET2_B,   SET2_C,     SET2_D,      SET2_E,     SET2_H,     SET2_L,     SET2_xHL,    SET2_A,     // 0xD0
+  SET3_B,   SET3_C,     SET3_D,      SET3_E,     SET3_H,     SET3_L,     SET3_xHL,    SET3_A,     // 0xD8
+  SET4_B,   SET4_C,     SET4_D,      SET4_E,     SET4_H,     SET4_L,     SET4_xHL,    SET4_A,     // 0xE0
+  SET5_B,   SET5_C,     SET5_D,      SET5_E,     SET5_H,     SET5_L,     SET5_xHL,    SET5_A,     // 0xE8
+  SET6_B,   SET6_C,     SET6_D,      SET6_E,     SET6_H,     SET6_L,     SET6_xHL,    SET6_A,     // 0xF0
+  SET7_B,   SET7_C,     SET7_D,      SET7_E,     SET7_H,     SET7_L,     SET7_xHL,    SET7_A      // 0xF8
 };
 
 enum CodesED
 {
-  DB_00,    DB_01,      DB_02,      DB_03,          DB_04,      DB_05,  DB_06,  DB_07,  // 0x00
-  DB_08,    DB_09,      DB_0A,      DB_0B,          DB_0C,      DB_0D,  DB_0E,  DB_0F,
-  DB_10,    DB_11,      DB_12,      DB_13,          DB_14,      DB_15,  DB_16,  DB_17,  // 0x10
-  DB_18,    DB_19,      DB_1A,      DB_1B,          DB_1C,      DB_1D,  DB_1E,  DB_1F,
-  DB_20,    DB_21,      DB_22,      DB_23,          DB_24,      DB_25,  DB_26,  DB_27,  // 0x20
-  DB_28,    DB_29,      DB_2A,      DB_2B,          DB_2C,      DB_2D,  DB_2E,  DB_2F,
-  DB_30,    DB_31,      DB_32,      DB_33,          DB_34,      DB_35,  DB_36,  DB_37,  // 0x30
-  DB_38,    DB_39,      DB_3A,      DB_3B,          DB_3C,      DB_3D,  DB_3E,  DB_3F,
-  IN_B_xC,  OUT_xC_B,   SBC_HL_BC,  LD_xWORDe_BC,   NEG,        RETN,   IM_0,   LD_I_A, // 0x40
-  IN_C_xC,  OUT_xC_C,   ADC_HL_BC,  LD_BC_xWORDe,   DB_4C,      RETI,   DB_,    LD_R_A,
-  IN_D_xC,  OUT_xC_D,   SBC_HL_DE,  LD_xWORDe_DE,   DB_54,      DB_55,  IM_1,   LD_A_I, // 0x50
-  IN_E_xC,  OUT_xC_E,   ADC_HL_DE,  LD_DE_xWORDe,   DB_5C,      DB_5D,  IM_2,   LD_A_R,
-  IN_H_xC,  OUT_xC_H,   SBC_HL_HL,  LD_xWORDe_HL,   DB_64,      DB_65,  DB_66,  RRD,    // 0x60
-  IN_L_xC,  OUT_xC_L,   ADC_HL_HL,  LD_HL_xWORDe,   DB_6C,      DB_6D,  DB_6E,  RLD,
-  IN_F_xC,  OUT_xC_F,   SBC_HL_SP,  LD_xWORDe_SP,   DB_74,      DB_75,  DB_76,  DB_77,  // 0x70
-  IN_A_xC,  OUT_xC_A,   ADC_HL_SP,  LD_SP_xWORDe,   DB_7C,      DB_7D,  DB_7E,  DB_7F,
-  DB_80,    DB_81,      DB_82,      DB_83,          DB_84,      DB_85,  DB_86,  DB_87,  // 0x80
-  DB_88,    DB_89,      DB_8A,      DB_8B,          DB_8C,      DB_8D,  DB_8E,  DB_8F,
-  DB_90,    DB_91,      DB_92,      DB_93,          DB_94,      DB_95,  DB_96,  DB_97,  // 0x90
-  DB_98,    DB_99,      DB_9A,      DB_9B,          DB_9C,      DB_9D,  DB_9E,  DB_9F,
-  LDI,      CPI,        INI,        OUTI,           DB_A4,      DB_A5,  DB_A6,  DB_A7,  // 0xA0
-  LDD,      CPD,        IND,        OUTD,           DB_AC,      DB_AD,  DB_AE,  DB_AF,
-  LDIR,     CPIR,       INIR,       OTIR,           DB_B4,      DB_B5,  DB_B6,  DB_B7,  // 0xB0
-  LDDR,     CPDR,       INDR,       OTDR,           DB_BC,      DB_BD,  DB_BE,  DB_BF,
-  DB_C0,    DB_C1,      DB_C2,      DB_C3,          DB_C4,      DB_C5,  DB_C6,  DB_C7,  // 0xC0
-  DB_C8,    DB_C9,      DB_CA,      DB_CB,          DB_CC,      DB_CD,  DB_CE,  DB_CF,
-  DB_D0,    DB_D1,      DB_D2,      DB_D3,          DB_D4,      DB_D5,  DB_D6,  DB_D7,  // 0xD0
-  DB_D8,    DB_D9,      DB_DA,      DB_DB,          DB_DC,      DB_DD,  DB_DE,  DB_DF,
-  DB_E0,    DB_E1,      DB_E2,      DB_E3,          DB_E4,      DB_E5,  DB_E6,  DB_E7,  // 0xE0
-  DB_E8,    DB_E9,      DB_EA,      DB_EB,          DB_EC,      DB_ED,  DB_EE,  DB_EF,
-  DB_F0,    DB_F1,      DB_F2,      DB_F3,          DB_F4,      DB_F5,  DB_F6,  DB_F7,  // 0xF0
-  DB_F8,    DB_F9,      DB_FA,      DB_FB,          DB_FC,      DB_FD,  DB_FE,  DB_FF
+  DB_00,    DB_01,      DB_02,       DB_03,          DB_04,   DB_05,    DB_06,     DB_07,       // 0x00
+  DB_08,    DB_09,      DB_0A,       DB_0B,          DB_0C,   DB_0D,    DB_0E,     DB_0F,       // 0x08
+  DB_10,    DB_11,      DB_12,       DB_13,          DB_14,   DB_15,    DB_16,     DB_17,       // 0x10
+  DB_18,    DB_19,      DB_1A,       DB_1B,          DB_1C,   DB_1D,    DB_1E,     DB_1F,       // 0x18
+  DB_20,    DB_21,      DB_22,       DB_23,          DB_24,   DB_25,    DB_26,     DB_27,       // 0x20
+  DB_28,    DB_29,      DB_2A,       DB_2B,          DB_2C,   DB_2D,    DB_2E,     DB_2F,       // 0x28
+  DB_30,    DB_31,      DB_32,       DB_33,          DB_34,   DB_35,    DB_36,     DB_37,       // 0x30
+  DB_38,    DB_39,      DB_3A,       DB_3B,          DB_3C,   DB_3D,    DB_3E,     DB_3F,       // 0x38
+  IN_B_xC,  OUT_xC_B,   SBC_HL_BC,   LD_xWORDe_BC,   NEG,     RETN,     IM_0,      LD_I_A,      // 0x40
+  IN_C_xC,  OUT_xC_C,   ADC_HL_BC,   LD_BC_xWORDe,   DB_4C,   RETI,     DB_,       LD_R_A,      // 0x48
+  IN_D_xC,  OUT_xC_D,   SBC_HL_DE,   LD_xWORDe_DE,   DB_54,   DB_55,    IM_1,      LD_A_I,      // 0x50
+  IN_E_xC,  OUT_xC_E,   ADC_HL_DE,   LD_DE_xWORDe,   DB_5C,   DB_5D,    IM_2,      LD_A_R,      // 0x58
+  IN_H_xC,  OUT_xC_H,   SBC_HL_HL,   LD_xWORDe_HL,   DB_64,   DB_65,    DB_66,     RRD,         // 0x60
+  IN_L_xC,  OUT_xC_L,   ADC_HL_HL,   LD_HL_xWORDe,   DB_6C,   DB_6D,    DB_6E,     RLD,         // 0x68
+  IN_F_xC,  OUT_xC_F,   SBC_HL_SP,   LD_xWORDe_SP,   DB_74,   DB_75,    DB_76,     DB_77,       // 0x70
+  IN_A_xC,  OUT_xC_A,   ADC_HL_SP,   LD_SP_xWORDe,   DB_7C,   DB_7D,    DB_7E,     DB_7F,       // 0x78
+  DB_80,    DB_81,      DB_82,       DB_83,          DB_84,   DB_85,    DB_86,     DB_87,       // 0x80
+  DB_88,    DB_89,      DB_8A,       DB_8B,          DB_8C,   DB_8D,    DB_8E,     DB_8F,       // 0x88
+  DB_90,    DB_91,      DB_92,       DB_93,          DB_94,   DB_95,    DB_96,     DB_97,       // 0x90
+  DB_98,    DB_99,      DB_9A,       DB_9B,          DB_9C,   DB_9D,    DB_9E,     DB_9F,       // 0x98
+  LDI,      CPI,        INI,         OUTI,           DB_A4,   DB_A5,    DB_A6,     DB_A7,       // 0xA0
+  LDD,      CPD,        IND,         OUTD,           DB_AC,   DB_AD,    DB_AE,     DB_AF,       // 0xA8
+  LDIR,     CPIR,       INIR,        OTIR,           DB_B4,   DB_B5,    DB_B6,     DB_B7,       // 0xB0
+  LDDR,     CPDR,       INDR,        OTDR,           DB_BC,   DB_BD,    DB_BE,     DB_BF,       // 0xB8
+  DB_C0,    DB_C1,      DB_C2,       DB_C3,          DB_C4,   DB_C5,    DB_C6,     DB_C7,       // 0xC0
+  DB_C8,    DB_C9,      DB_CA,       DB_CB,          DB_CC,   DB_CD,    DB_CE,     DB_CF,       // 0xC8
+  DB_D0,    DB_D1,      DB_D2,       DB_D3,          DB_D4,   DB_D5,    DB_D6,     DB_D7,       // 0xD0
+  DB_D8,    DB_D9,      DB_DA,       DB_DB,          DB_DC,   DB_DD,    DB_DE,     DB_DF,       // 0xD8
+  DB_E0,    DB_E1,      DB_E2,       DB_E3,          DB_E4,   DB_E5,    DB_E6,     DB_E7,       // 0xE0
+  DB_E8,    DB_E9,      DB_EA,       DB_EB,          DB_EC,   DB_ED,    DB_EE,     DB_EF,       // 0xE8
+  DB_F0,    DB_F1,      DB_F2,       DB_F3,          DB_F4,   DB_F5,    DB_F6,     DB_F7,       // 0xF0
+  DB_F8,    DB_F9,      DB_FA,       DB_FB,          DB_FC,   DB_FD,    DB_FE,     DB_FF        // 0xF8
 };
+
 
 extern void Trap_Bad_Ops(char *, byte, word);
 
@@ -490,7 +484,7 @@ void ResetZ80(Z80 *R)
 /** negative, and current register values in R.             **/
 /*************************************************************/
 #ifdef EXECZ80
-ITCM_CODE int ExecZ80(register int RunCycles)
+ int ExecZ80(register int RunCycles)
 {
   register byte I;
   register pair J;
@@ -502,7 +496,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=OpZ80(CPU.PC.W++);
       CPU.ICount-=Cycles[I];
-
+      
       CPU.TotalInstructions++;  // Only counting base instructions... good enough for FDC timing
 
       /* Interpret opcode */

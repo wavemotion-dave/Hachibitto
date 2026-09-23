@@ -594,6 +594,7 @@ void msx_slot_map_msx1(unsigned char Value)
     }
 }
 
+u8 zzz=0;
 //--------------------------------------------------------------------------------------------------
 // MSX2 Machine Type A Configuration: Slot 3 is expanded. Slot 2 contains RAM. Slot 1 is Cartridge.
 //--------------------------------------------------------------------------------------------------
@@ -614,18 +615,21 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[0] = 0;
             MemoryMap[0] = BIOS_Memory + 0x0000;
             MemoryMap[1] = BIOS_Memory + 0x2000;
+            if (zzz) debug_printf("Page 0 mapped to Slot 0 (BIOS + 0x0000)\n");
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
             bRAMInPage[0] = 0;
             MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
             MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            if (zzz) debug_printf("Page 0 mapped to Slot 1 (CART + 0x0000)\n");
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 1;
             MemoryMap[0] = (u8 *)(MSXRamPtr[0]);
             MemoryMap[1] = (u8 *)(MSXRamPtr[1]);
+            if (zzz) debug_printf("Page 0 mapped to Slot 2 (RAM + 0x0000)\n");
             break;
         case 0x03:  // Slot 3:  This is an expanded slot... has Extended BIOS and Disk Controller ROMs
             bCartInPage[0] = 0;
@@ -634,11 +638,13 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             {
                 MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
                 MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
+                if (zzz) debug_printf("Page 0 mapped to Slot 3-0 (EXTROM + 0x0000)\n");
             }
             else // Other subslots have nothing in this page
             {
                 MemoryMap[0] = Unmapped_Memory;
                 MemoryMap[1] = Unmapped_Memory;
+                if (zzz) debug_printf("Page 0 mapped to Slot 3-%d (Unmapped Memory)\n", (msx_subslot & 0x03) >> 0);
             }
             break;
     }
@@ -650,18 +656,21 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[1] = 0;
             MemoryMap[2] = BIOS_Memory + 0x4000;
             MemoryMap[3] = BIOS_Memory + 0x6000;
+            if (zzz) debug_printf("Page 1 mapped to Slot 0 (BIOS + 0x4000)\n");
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
             bRAMInPage[1] = 0;
             MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
             MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+            if (zzz) debug_printf("Page 1 mapped to Slot 1 (CART + 0x4000)\n");
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 1;
             MemoryMap[2] = (u8 *)(MSXRamPtr[2]);
             MemoryMap[3] = (u8 *)(MSXRamPtr[3]);
+            if (zzz) debug_printf("Page 1 mapped to Slot 2 (RAM + 0x4000)\n");
             break;
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
@@ -671,16 +680,19 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             {
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
+                if (zzz) debug_printf("Page 1 mapped to Slot 3-1 (DISKROM + 0x0000)\n");
             }
             else if ((((msx_subslot & 0x0C) >> 2) == 2) && (myConfig.musicExpand == 1)) // Subslot 2 has FM PAC
             {
                 MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
+                if (zzz) debug_printf("Page 1 mapped to Slot 3-2 (FMPAC + 0x0000)\n");
             }
             else // Other subslots have nothing in this page
             {
                 MemoryMap[2] = Unmapped_Memory;
                 MemoryMap[3] = Unmapped_Memory;
+                if (zzz) debug_printf("Page 1 mapped to Slot 3-%d (Unmapped Memory)\n", (msx_subslot & 0x0C) >> 2);
             }
             break;
     }
@@ -692,24 +704,28 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[2] = 0;
             MemoryMap[4] = Unmapped_Memory;
             MemoryMap[5] = Unmapped_Memory;
+            if (zzz) debug_printf("Page 2 mapped to Slot 0 (Unmapped Memory)\n");
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
             bRAMInPage[2] = 0;
             MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
             MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            if (zzz) debug_printf("Page 2 mapped to Slot 1 (CART + 0x8000)\n");
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[2] = 0;
             bRAMInPage[2] = 1;
             MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
             MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
+            if (zzz) debug_printf("Page 2 mapped to Slot 2 (RAM + 0x8000)\n");
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
             MemoryMap[4] = Unmapped_Memory;
             MemoryMap[5] = Unmapped_Memory;
+            if (zzz) debug_printf("Page 2 mapped to Slot 3-%d (Unmapped Memory)\n", (msx_subslot & 0x30) >> 4);
             break;
     }
 
@@ -720,18 +736,21 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
             MemoryMap[7] = Unmapped_Memory;
+            if (zzz) debug_printf("Page 3 mapped to Slot 0 (Unmapped Memory)\n");
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
             bRAMInPage[3] = 0;
             MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
             MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            if (zzz) debug_printf("Page 3 mapped to Slot 1 (CART + 0xC000)\n");
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[3] = 0;
             bRAMInPage[3] = 1;
             MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
+            if (zzz) debug_printf("Page 3 mapped to Slot 2 (RAM + 0xC000)\n");
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
             special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
@@ -739,8 +758,10 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
             MemoryMap[7] = Unmapped_Memory;
+            if (zzz) debug_printf("Page 3 mapped to Slot 3-%d (Unmapped Memory)\n", (msx_subslot & 0xC0) >> 6);
             break;
     }
+    
 }
 
 //--------------------------------------------------------------------------------------------------
