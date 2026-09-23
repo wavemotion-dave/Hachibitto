@@ -103,7 +103,7 @@ struct __attribute__((__packed__)) Config_t
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
 
-extern u8 special_memory_access;
+extern u8 special_memory_access;                // 0x00 if no special access, otherwise one or more of the SPEC_MEM_xxx below
 
 #define SPEC_MEM_SUBSLOT_ACTIVE     0x01        // Allows read/write to special SubSlot register at 0xFFFF
 #define SPEC_MEM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
@@ -121,7 +121,6 @@ extern s8 temp_offset;
 extern FI_MSX gpFic[MAX_ROMS];
 extern int ucGameAct;
 extern int ucGameChoice;
-extern u8 mirror_ram_bank[4];
 
 #define MSX_MODE_CART   1
 #define MSX_MODE_DISK   2
@@ -130,6 +129,7 @@ extern u8 mapperType;
 extern u8 mapperMask;
 extern u8 msx_caps_lock;
 extern u8 msx_kana_lock;
+extern u8 mirror_ram_bank[4];
 
 #define GUESS           0
 #define MIRRORED        1
@@ -151,9 +151,9 @@ extern u8 msx_kana_lock;
 #define AT8K            17
 #define LIN64           18
 
-#define MAJUT           70
+#define MAJUT           70  // Not one of the general mappers a user can pick
 
-#define SCCPLUS_RAM     88
+#define SCCPLUS_RAM     88  // For our special SCC+ "Cart"
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
@@ -163,6 +163,7 @@ extern u8 *ROM_Memory;
 extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x10000];
+
 extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_MSX2[0x8000];
 extern const unsigned char MSXBios_MSX2EXT[0x4000];
@@ -256,5 +257,6 @@ extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
 extern void SaveConfig(bool bShow);
 extern void ShowRandomPreviewSnaps(void);
 extern void IndirectRegWrite9938(u8 Value);
+extern void EnsureSaveDirectory(void);
 
 #endif

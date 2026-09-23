@@ -64,8 +64,6 @@ void intro_logo(void) {
   while (!bOK && (vusCptVBL<3*60)) { if (keysCurrent() & 0x1FFF ) bOK=true; }
   bOK=false;
   while (!bOK) { if ( !(keysCurrent() & 0x1FFF) ) bOK=true; }
-
-  //FadeToColor(1,BLEND_FADE_BLACK | BLEND_SRC_BG0 | BLEND_DST_BG0,3,16,3);
 }
 
 // End of file

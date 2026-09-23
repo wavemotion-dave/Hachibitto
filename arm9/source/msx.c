@@ -964,7 +964,6 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     }
     else if (Port >= 0xD0 && Port <= 0xD4)  // Floppy Drive Controller
     {
-        //2 sides * 80 tracks * 9 sectors per track * 512 bytes per sector = 737280 Bytes (720kB)
         fdc_write(Port & 0x07, Value);
     }
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
@@ -1645,6 +1644,7 @@ void msx_reset(void)
 
     if (msx_mode == MSX_MODE_DISK) // .dsk based MSX
     {
+        //2 sides * 80 tracks * 9 sectors per track * 512 bytes per sector = 737280 Bytes (720kB)
         fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
         fdc_reset(true);
     }
@@ -1659,11 +1659,11 @@ void msxSaveEEPROM(void)
 {
     // Return to the original path
     chdir(initial_path);
+    
+    // Make sure the 'sav' directory exists
+    EnsureSaveDirectory();
 
     // Init filename = romname and SRM (SRAM) in place of ROM
-    DIR* dir = opendir("sav");
-    if (dir) closedir(dir);    // Directory exists... close it out and move on.
-    else mkdir("sav", 0777);   // Otherwise create the directory...
     sprintf(szName,"sav/%s", initial_file);
 
     int len = strlen(szName);
@@ -1675,7 +1675,8 @@ void msxSaveEEPROM(void)
     FILE *handle = fopen(szName, "wb+");
     if (handle != NULL)
     {
-        fwrite(SRAM_Memory, 0x2000, 1, handle);   // SRAM is either 2K or 8K
+        // SRAM is either 2K or 8K but we always just save 8K as the 2K has mirrors
+        fwrite(SRAM_Memory, 0x2000, 1, handle);
         fclose(handle);
     }
 }
@@ -1685,10 +1686,10 @@ void msxLoadEEPROM(void)
     // Return to the original path
     chdir(initial_path);
 
+    // Make sure the 'sav' directory exists
+    EnsureSaveDirectory();
+
     // Init filename = romname and SRM (SRAM) in place of ROM
-    DIR* dir = opendir("sav");
-    if (dir) closedir(dir);    // Directory exists... close it out and move on.
-    else mkdir("sav", 0777);   // Otherwise create the directory...
     sprintf(szName,"sav/%s", initial_file);
 
     int len = strlen(szName);
@@ -1701,6 +1702,14 @@ void msxLoadEEPROM(void)
     {
         memset(SRAM_Memory, 0xFF, 0x2000);
     }
+}
+
+// Ensure 'sav' directory exists. If not: create it.
+void EnsureSaveDirectory(void)
+{
+    DIR* dir = opendir("sav");
+    if (dir) closedir(dir);    // Directory exists... close it out and move on.
+    else mkdir("sav", 0777);   // Otherwise create the directory...
 }
 
 // End of file

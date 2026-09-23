@@ -86,10 +86,10 @@ void msxSaveState(void)
     // Return to the original path
     chdir(initial_path);
 
+    // Ensure 'sav' directory exists
+    EnsureSaveDirectory();
+
     // Init filename = romname and SAV in place of ROM
-    DIR* dir = opendir("sav");
-    if (dir) closedir(dir);    // Directory exists... close it out and move on.
-    else mkdir("sav", 0777);   // Otherwise create the directory...
     sprintf(szLoadFile,"sav/%s", initial_file);
 
     // Replace the original filename extension with .sav
@@ -322,10 +322,10 @@ void msxLoadState(void)
     // Return to the original path
     chdir(initial_path);
 
+    // Ensure 'sav' directory exists
+    EnsureSaveDirectory();
+
     // Init filename = romname and SAV in place of ROM
-    DIR* dir = opendir("sav");
-    if (dir) closedir(dir);    // Directory exists... close it out and move on.
-    else mkdir("sav", 0777);   // Otherwise create the directory...
     sprintf(szLoadFile,"sav/%s", initial_file);
 
     // Replace the original filename extension with .sav

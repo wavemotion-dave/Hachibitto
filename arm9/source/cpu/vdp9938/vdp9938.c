@@ -1,9 +1,13 @@
-/******************************************************************************
-* VDP 9938 (video) file
-*
-* File: vdp9938.c -- software implementation of the VDP 9938 Video Display Processor.
-*
-******************************************************************************/
+// =====================================================================================
+// Copyright (c) 2026 Dave Bernazzani (wavemotion-dave)
+//
+// Copying and distribution of this emulator, its source code and associated
+// readme files, with or without modification, are permitted in any medium without
+// royalty provided this copyright notice is used and wavemotion-dave and
+// Marat Fayzullin (fMSX core) are thanked profusely.
+//
+// The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
+// =====================================================================================
 #include <nds.h>
 #include <stdio.h>
 #include <string.h>
@@ -189,11 +193,31 @@ u8 VDP9918A_palette[16*3] = {
   0x20,0x80,0x20,   0xC0,0x40,0xA0,   0xA0,0xA0,0xA0,   0xE0,0xE0,0xE0,
 };
 
+u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x7e,0x7f,0x7f,0xff,0x3f,0xff,0x3f,0xff,
+                                                             0xfb,0xbf,0x07,0x03,0xff,0xff,0x07,0x0f,
+                                                             0x0f,0xbf,0xff,0xff,0x3f,0x3f,0x3f,0xff,
+                                                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // These are VDP9958 only
+                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
+
+u8 VDP_RegisterMasks_MSX1[] __attribute__((section(".dtcm"))) = { 0x03,0xfb,0x0f,0xff,0x07,0x7f,0x07,0xff, // To match the older TMS9918A
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+
+byte SprHeights[4] __attribute__((section(".dtcm"))) = { 8,16,16,32 };
+
 u8 VDP_Memory[0x20000] ALIGN(32) ={0};                      // VDP video memory... 128K for VDP9938 support
 
 u16 CurLine         __attribute__((section(".dtcm")));      // Current scanline
 u8 VDP[64]          __attribute__((section(".dtcm")));      // VDP Registers
-u8 VDPStatus[10]    __attribute__((section(".dtcm")));      // VDP Status
+u8 VDPStatus[10]    __attribute__((section(".dtcm")));      // VDP Status Registers
 u8 VDPDlatch        __attribute__((section(".dtcm")));      // VDP register D Latch
 u16 VAddr           __attribute__((section(".dtcm")));      // VDP Video Address (Will be a 17-bit VDP9938 addresses via VPAGE[])
 u8 *VPAGE           __attribute__((section(".dtcm")));      // VDP Video Page (to allow up to 128K support)
@@ -1336,26 +1360,6 @@ ITCM_CODE void RefreshLine8(u8 uY)
 /*********************************************************************************
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'
  ********************************************************************************/
-u8 VDP_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x7e,0x7f,0x7f,0xff,0x3f,0xff,0x3f,0xff,
-                                                             0xfb,0xbf,0x07,0x03,0xff,0xff,0x07,0x0f,
-                                                             0x0f,0xbf,0xff,0xff,0x3f,0x3f,0x3f,0xff,
-                                                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // These are VDP9958 only
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
-
-u8 VDP_RegisterMasks_MSX1[] __attribute__((section(".dtcm"))) = { 0x03,0xfb,0x0f,0xff,0x07,0x7f,0x07,0xff, // To match the older TMS9918A
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                                                  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
-
-byte SprHeights[4] __attribute__((section(".dtcm"))) = { 8,16,16,32 };
-
 
 //The VDP Video Modes (BASIC Screen 0-8) is selected by the Bits M1-M5 of VDP Register 0 and 1. The relationship between the bits and the screen is:
 //  M1 M2 M5 M4 M3  Screen format
