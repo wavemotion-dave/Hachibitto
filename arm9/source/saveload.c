@@ -247,7 +247,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(bCartInPage,            sizeof(bCartInPage),            1, handle);
         if (retVal) retVal = fwrite(bRAMInPage,             sizeof(bRAMInPage),             1, handle);
         if (retVal) retVal = fwrite(&msx_last_file_size,    sizeof(msx_last_file_size),     1, handle);
-        if (retVal) retVal = fwrite(&special_ram_access,    sizeof(special_ram_access),     1, handle);
+        if (retVal) retVal = fwrite(&special_memory_access, sizeof(special_memory_access),  1, handle);
         if (retVal) retVal = fwrite(&msx_scc_capable_game,  sizeof(msx_scc_capable_game),   1, handle);
         if (retVal) retVal = fwrite(&sccplus_mode,          sizeof(sccplus_mode),           1, handle);
         if (retVal) retVal = fwrite(sccplus_page,           sizeof(sccplus_page),           1, handle);
@@ -469,7 +469,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(bCartInPage,            sizeof(bCartInPage),            1, handle);
             if (retVal) retVal = fread(bRAMInPage,             sizeof(bRAMInPage),             1, handle);
             if (retVal) retVal = fread(&msx_last_file_size,    sizeof(msx_last_file_size),     1, handle);
-            if (retVal) retVal = fread(&special_ram_access,    sizeof(special_ram_access),     1, handle);
+            if (retVal) retVal = fread(&special_memory_access, sizeof(special_memory_access),  1, handle);
             if (retVal) retVal = fread(&msx_scc_capable_game,  sizeof(msx_scc_capable_game),   1, handle);
             if (retVal) retVal = fread(&sccplus_mode,          sizeof(sccplus_mode),           1, handle);
             if (retVal) retVal = fread(sccplus_page,           sizeof(sccplus_page),           1, handle);

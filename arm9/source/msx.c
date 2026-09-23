@@ -39,7 +39,7 @@ u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0
 u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
 u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
 u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;
-u8 special_ram_access       __attribute__((section(".dtcm"))) = 0x00;
+u8 special_memory_access       __attribute__((section(".dtcm"))) = 0x00;
 u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
 u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;
@@ -465,7 +465,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 //---------------------------------------------------------------
 void msx_slot_map_msx1(unsigned char Value)
 {
-    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE; // MSX1 has no subslots
+    special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // MSX1 has no subslots
     
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -605,7 +605,7 @@ void msx_slot_map_msx1(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
-    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE; // Until proven otherwise below...
+    special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // Until proven otherwise below...
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -734,7 +734,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
+            special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
@@ -754,7 +754,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
-    special_ram_access &= ~SPEC_RAM_SUBSLOT_ACTIVE;
+    special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -873,7 +873,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
     switch ((Value>>6) & 0x03)  // Page 3 [0xC000~0xFFFF]
     {
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (this is our expanded slot)
-            special_ram_access |= SPEC_RAM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
+            special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
             MemoryMap[6] = Unmapped_Memory;
@@ -1114,7 +1114,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // Some helper variables for the MSX
     // ----------------------------------
     msx_music_writes = 0;
-    special_ram_access = 0x00;
+    special_memory_access = 0x00;
     msx_subslot = 0x00;
 
     // ---------------------------------------------
@@ -1171,7 +1171,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
 
             sccplus_mode = 0x00;
-            HandleSCCPlusModeRegister(0x00);   // derives SPEC_RAM_SCC_ENABLED/SPEC_RAM_SCC_PLUS_ENABLED bits correctly
+            HandleSCCPlusModeRegister(0x00);   // derives SPEC_MEM_SCC_ENABLED/SPEC_MEM_SCC_PLUS_ENABLED bits correctly
             sccplus_page[0] = 0; sccplus_page[1] = 1;
             sccplus_page[2] = 2; sccplus_page[3] = 3;
             mapperMask = 0;
@@ -1510,7 +1510,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
         }
         else if (mapperType == SUPERLR)        // Just for Super Lode Runner
         {
-            special_ram_access = SPEC_RAM_SUPERLR_ACTIVE;
+            special_memory_access = SPEC_MEM_SUPERLR_ACTIVE;
             MSXCartPtr[0] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[1] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[2] = (u8*)Unmapped_Memory;          // Segment Unmapped

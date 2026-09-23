@@ -35,17 +35,17 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     // ----------------------------------------------------
     // Are we reading from the SCC chip memory mapped area?
     // ----------------------------------------------------
-    if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
+    if ((special_memory_access & SPEC_MEM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
         if (bCartInPage[2]) return SCCRead(address, &mySCC);    // If the cart is mapped in, return value from it
     }
-    else if ((special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
+    else if ((special_memory_access & SPEC_MEM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
     {
         if (bCartInPage[2]) return SCCRead(address, &mySCC);    // If the cart is mapped in, return value from it
     }
-    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    else if ((special_memory_access & SPEC_MEM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
-        return ~msx_subslot; // Compliment is returned. MSX1 map will never set SPEC_RAM_SUBSLOT_ACTIVE.
+        return (u8)~msx_subslot; // Compliment is returned. MSX1 map will never set SPEC_MEM_SUBSLOT_ACTIVE.
     }
 
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
@@ -468,12 +468,12 @@ ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
         // --------------------------------------------------------------------------------------------------
         if ((value & 0x3F) == 0x3F)
         {
-            special_ram_access |= SPEC_RAM_SCC_ENABLED;  // SCC Registers are now "in view"
+            special_memory_access |= SPEC_MEM_SCC_ENABLED;  // SCC Registers are now "in view"
             msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
         }
         else
         {
-            special_ram_access &= ~SPEC_RAM_SCC_ENABLED; // SCC Registers are no longer "in view"
+            special_memory_access &= ~SPEC_MEM_SCC_ENABLED; // SCC Registers are no longer "in view"
         }
 
         MSXCartPtr[4] = (u8*)src;  // Main ROM
@@ -631,16 +631,16 @@ void HandleSCCPlusModeRegister(u8 value)
     // Bit5 alone decides which window shows the audio registers
     if ((value & 0x20))
     {
-        special_ram_access &= ~SPEC_RAM_SCC_ENABLED;
-        special_ram_access |= SPEC_RAM_SCC_PLUS_ENABLED;
+        special_memory_access &= ~SPEC_MEM_SCC_ENABLED;
+        special_memory_access |= SPEC_MEM_SCC_PLUS_ENABLED;
     }
     else // Normal SCC
     {
-        special_ram_access &= ~SPEC_RAM_SCC_PLUS_ENABLED;
-        special_ram_access |= SPEC_RAM_SCC_ENABLED;
+        special_memory_access &= ~SPEC_MEM_SCC_PLUS_ENABLED;
+        special_memory_access |= SPEC_MEM_SCC_ENABLED;
     }
 
-    if (special_ram_access & (SPEC_RAM_SCC_ENABLED | SPEC_RAM_SCC_PLUS_ENABLED))
+    if (special_memory_access & (SPEC_MEM_SCC_ENABLED | SPEC_MEM_SCC_PLUS_ENABLED))
     {
         msx_scc_capable_game = true;
     }
@@ -660,14 +660,14 @@ void HandleSCCPlus(u16 address, u8 value)
     }
 
     // SCC+ registers shadow A000-BFFF whenever Sound Mode = SCC+
-    if (bCartInPage[2] && (special_ram_access & SPEC_RAM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
+    if (bCartInPage[2] && (special_memory_access & SPEC_MEM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
     {
         SCCWrite(value, address, &mySCC);
         return;
     }
 
     // Classic SCC registers shadow 8000-9FFF whenever Sound Mode = compat
-    if (bCartInPage[2] && (special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
+    if (bCartInPage[2] && (special_memory_access & SPEC_MEM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
     {
         SCC_LegacyWrite(value, address&0xFF);
         return;
@@ -707,7 +707,7 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
     {
         *(MemoryMap[address>>13] + (address&0x1FFF))=value;
     }
-    else if ((special_ram_access & SPEC_RAM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    else if ((special_memory_access & SPEC_MEM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
@@ -812,7 +812,7 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
             // -----------------------------------------------------------------------------------
             // Are we writing to the SCC chip memory mapped area and are the registers "in view"?
             // -----------------------------------------------------------------------------------
-            if ((special_ram_access & SPEC_RAM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
+            if ((special_memory_access & SPEC_MEM_SCC_ENABLED) && ((address & 0xF800) == 0x9800))
             {
                  SCC_LegacyWrite(value, address&0xFF);
             }
@@ -882,7 +882,7 @@ ITCM_CODE void cpu_writemem16(u8 value, u16 address)
         {
             HandleXBlam(src, block, address);
         }
-        else if ((special_ram_access & SPEC_RAM_SUPERLR_ACTIVE) && (address == 0x0000))
+        else if ((special_memory_access & SPEC_MEM_SUPERLR_ACTIVE) && (address == 0x0000))
         {
             // ------------------------------------------------------------------------------
             // In theory, the write to 0x0000 can come with any slot mapped in anywhere

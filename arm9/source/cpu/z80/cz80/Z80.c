@@ -54,10 +54,10 @@ extern u8 *MemoryMap[8];
 extern void cpu_writemem16 (u8 value,u16 address);
 extern byte cpu_readmem16 (u16 address);
 
-extern u8 special_ram_access;
+extern u8 special_memory_access;
 
 inline byte OpZ80(u32 A)    {return *(MemoryMap[A>>13] + (A&0x1FFF));}
-inline byte RdZ80(word A)   {return (special_ram_access ? cpu_readmem16(A) : *(MemoryMap[A>>13] + (A&0x1FFF)));}
+inline byte RdZ80(word A)   {return (special_memory_access ? cpu_readmem16(A) : *(MemoryMap[A>>13] + (A&0x1FFF)));}
 #define     WrZ80(A,V)       cpu_writemem16(V,A)
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)

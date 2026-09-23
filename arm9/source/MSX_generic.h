@@ -103,12 +103,12 @@ struct __attribute__((__packed__)) Config_t
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
 
-extern u8 special_ram_access;
+extern u8 special_memory_access;
 
-#define SPEC_RAM_SUBSLOT_ACTIVE     0x01        // Allows read/write to special SubSlot register at 0xFFFF
-#define SPEC_RAM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
-#define SPEC_RAM_SCC_PLUS_ENABLED   0x04        // SCC+ is enabled and requires memory traps
-#define SPEC_RAM_SUPERLR_ACTIVE     0x08        // Super Lode Runner traps on writes to 0x0000 even if the cart isn't mapped in!
+#define SPEC_MEM_SUBSLOT_ACTIVE     0x01        // Allows read/write to special SubSlot register at 0xFFFF
+#define SPEC_MEM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
+#define SPEC_MEM_SCC_PLUS_ENABLED   0x04        // SCC+ is enabled and requires memory traps
+#define SPEC_MEM_SUPERLR_ACTIVE     0x08        // Super Lode Runner traps on writes to 0x0000 even if the cart isn't mapped in!
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
