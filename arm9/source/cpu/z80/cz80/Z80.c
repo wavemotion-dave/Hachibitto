@@ -484,7 +484,7 @@ void ResetZ80(Z80 *R)
 /** negative, and current register values in R.             **/
 /*************************************************************/
 #ifdef EXECZ80
- int ExecZ80(register int RunCycles)
+ITCM_CODE int ExecZ80(register int RunCycles)
 {
   register byte I;
   register pair J;

@@ -160,7 +160,7 @@ extern u8 mirror_ram_bank[4];
 extern u32 MAX_CART_SIZE_KB;
 
 extern u8 *ROM_Memory;
-extern u8 RAM_Memory[0x20000];
+extern u8 RAM_Memory[0x40000];
 extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x10000];
 

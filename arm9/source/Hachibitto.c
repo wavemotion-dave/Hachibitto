@@ -70,7 +70,7 @@ u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 u32 MAX_CART_SIZE_KB = 1256;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
                                 
 u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
-u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
+u8 RAM_Memory[0x40000]          ALIGN(32) = {0};        // RAM is 256K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]          ALIGN(32) = {0};        // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
 u8 SRAM_Memory[0x10000]         ALIGN(32) = {0};        // 'Special RAM' - SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
 
@@ -2229,7 +2229,7 @@ u32 LoopZ80()
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (512*1024)
+#define MAX_DEBUG_BUF_SIZE   (128*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;
