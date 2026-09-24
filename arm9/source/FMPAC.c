@@ -25,7 +25,7 @@
 							// that. Retune this constant if it still isn't right - up
 							// for a lusher/longer tail, down if notes start blurring
 							// together too much.
-#define FMPAC_PERCUSSION_RELEASE_STEP	19920		// PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
+#define FMPAC_PERCUSSION_RELEASE_STEP	7500		// PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
 							// Real drums (hi-hat especially) decay in tens of ms, not
 							// hundreds - using the melodic rate here made consecutive
 							// hits (fired every 100-150ms in a normal rhythm pattern)
@@ -212,6 +212,16 @@ void FMPACReset(FMPAC *chip)
 	}
 }
 
+static void FMPAC_RhythmRetrigger(FMPAC_Oscillator *osc, int resetPhase)
+{
+	/* YM2413 rhythm bits are trigger/key-on controls, not sustained
+	   oscillator gates.  A 0->1 write starts a new percussion envelope. */
+	osc->gain = 255;
+	osc->releaseAccum = 0;
+	if (resetPhase)
+		osc->phase = 0;
+}
+
 void FMPACWrite(u8 value, u8 address, FMPAC *chip)
 {
 	if (address <= 0x07)
@@ -252,13 +262,68 @@ void FMPACWrite(u8 value, u8 address, FMPAC *chip)
 	}
 	else if (address == 0x0E)
 	{
+		u8 old = chip->rhythmReg;
 		chip->rhythmReg = value;
+
+		/*
+		 * The rhythm bits are write-controlled percussion key-ons.  Aleste
+		 * explicitly does the expected trigger sequence:
+		 *
+		 *     0E=20   ; all rhythm voices off
+		 *     0E=28   ; SD + TOM on
+		 *
+		 * The mixer cannot reliably observe the intervening state because the
+		 * two CPU writes can occur between audio samples.  Therefore the
+		 * 0->1 transition must be handled here, at write time.
+		 *
+		 * Once triggered, a percussion voice decays on its own.  A rhythm bit
+		 * remaining at 1 must NOT hold the simplified oscillator/noise source
+		 * at full gain, otherwise the repeated 0E=20/28 sequences in real
+		 * music lose their attack/decay behavior.
+		 */
 		if (value & FMPAC_RHYTHM_ENABLE_BIT)
 		{
-			chip->channels[FMPAC_CHANNEL_BD].keyOn    = (value & FMPAC_RHYTHM_BD_BIT)  ? 1 : 0;
-			// HH/SD/TOM/TOP-CY key-on state is read directly from rhythmReg at mix time
-			// (see FMPACMixer) rather than mirrored into a channel field here.
+			if (!(old & FMPAC_RHYTHM_ENABLE_BIT))
+			{
+				/* Entering rhythm mode: any selected percussion voice is a new hit. */
+				if (value & FMPAC_RHYTHM_BD_BIT)
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_BD].osc, 1);
+				if (value & FMPAC_RHYTHM_SD_BIT)
+					FMPAC_RhythmRetrigger(&chip->rhythmSD, 1);
+				if (value & FMPAC_RHYTHM_TOM_BIT)
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_TOMTCY].osc, 1);
+				if (value & FMPAC_RHYTHM_TCY_BIT)
+					FMPAC_RhythmRetrigger(&chip->rhythmTCY, 0);
+				if (value & FMPAC_RHYTHM_HH_BIT)
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_HHSD].osc, 0);
+			}
+			else
+			{
+				/* Normal drum trigger: only newly asserted bits re-attack. */
+				if ((value & FMPAC_RHYTHM_BD_BIT) && !(old & FMPAC_RHYTHM_BD_BIT))
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_BD].osc, 1);
+				if ((value & FMPAC_RHYTHM_SD_BIT) && !(old & FMPAC_RHYTHM_SD_BIT))
+					FMPAC_RhythmRetrigger(&chip->rhythmSD, 1);
+				if ((value & FMPAC_RHYTHM_TOM_BIT) && !(old & FMPAC_RHYTHM_TOM_BIT))
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_TOMTCY].osc, 1);
+				if ((value & FMPAC_RHYTHM_TCY_BIT) && !(old & FMPAC_RHYTHM_TCY_BIT))
+					FMPAC_RhythmRetrigger(&chip->rhythmTCY, 0);
+				if ((value & FMPAC_RHYTHM_HH_BIT) && !(old & FMPAC_RHYTHM_HH_BIT))
+					FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_HHSD].osc, 0);
+			}
 		}
+		else
+		{
+			/* Leaving rhythm mode mutes the dedicated rhythm voices. */
+			chip->channels[FMPAC_CHANNEL_BD].osc.gain = 0;
+			chip->channels[FMPAC_CHANNEL_TOMTCY].osc.gain = 0;
+			chip->channels[FMPAC_CHANNEL_HHSD].osc.gain = 0;
+			chip->rhythmSD.gain = 0;
+			chip->rhythmTCY.gain = 0;
+		}
+
+		/* The melodic key-on field is not used for rhythm voices. */
+		chip->channels[FMPAC_CHANNEL_BD].keyOn = 0;
 	}
 	else if (address == 0x0F)
 	{
@@ -326,57 +391,144 @@ void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 			FMPAC_Channel *hs = &chip->channels[FMPAC_CHANNEL_HHSD];
 			FMPAC_Channel *tt = &chip->channels[FMPAC_CHANNEL_TOMTCY];
 
-			u8 hhOn  = (chip->rhythmReg & FMPAC_RHYTHM_HH_BIT)  ? 1 : 0;
-			u8 sdOn  = (chip->rhythmReg & FMPAC_RHYTHM_SD_BIT)  ? 1 : 0;
-			u8 tomOn = (chip->rhythmReg & FMPAC_RHYTHM_TOM_BIT) ? 1 : 0;
-			u8 tcyOn = (chip->rhythmReg & FMPAC_RHYTHM_TCY_BIT) ? 1 : 0;
-
-			if (bd->keyOn || bd->osc.gain != 0)
-				sample += FMPAC_RenderChannel(&bd->osc, bd->keyOn, chip->rhythmVolBD, 0);
-
-			if (tomOn || tt->osc.gain != 0)
-				sample += FMPAC_RenderChannel(&tt->osc, tomOn, chip->rhythmVolTOM, 0);
-
-			// HH/SD/TOP-CY: high-pass filtered noise. A plain LFSR alone sounded like flat
-			// "static" (too much low-frequency rumble mixed into the hiss, which reads as
-			// "swish"/"wash" rather than a crisp tick). A bit-exact replica of real
-			// hardware's phase-selection trick (tried in an earlier round) turned out too
-			// fragile to get right without being able to listen and verify every bit
-			// position. This is simpler and more robust: one subtraction between
-			// consecutive noise samples mathematically boosts high frequencies and cuts
-			// low ones - the opposite of the earlier "hold" attempt, which was a low-pass
-			// and made things duller. Real hi-hats/cymbals ARE fundamentally high-pass
-			// noise in most non-OPLL-specific chip and even acoustic contexts, so this
-			// should read as "bright/crisp" by construction, not by hoping several fragile
-			// constants all landed correctly.
-			if (hhOn || sdOn || tcyOn || hs->osc.gain != 0 || chip->rhythmSD.gain != 0 || chip->rhythmTCY.gain != 0)
+			/*
+			 * Rhythm voices are one-shot envelopes.  FMPAC_RhythmRetrigger()
+			 * starts them at full gain when the corresponding 0E bit rises;
+			 * after that they decay regardless of whether the bit remains 1.
+			 *
+			 * This is important for Aleste: its trace repeatedly writes 0E=28
+			 * between frame updates, but only occasionally writes 0E=20 followed
+			 * immediately by 0E=28 to create the actual re-trigger.
+			 */
+			if (bd->osc.gain != 0)
 			{
-				u32 lfsr = chip->noiseLFSR;
-				u32 bit = ((lfsr >> 0) ^ (lfsr >> 3)) & 1;
-				lfsr = (lfsr >> 1) | (bit << 16);
-				chip->noiseLFSR = lfsr;
-				s32 rawNoise = (s32)(lfsr & 0xFF) - 128;	// -128..127
-				s32 hp = rawNoise - chip->rhythmPrevNoise;	// high-pass: boosts highs, cuts lows
-				chip->rhythmPrevNoise = rawNoise;
+				FMPAC_UpdateGain(&bd->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+				if (bd->osc.gain != 0)
+				{
+					bd->osc.phase += bd->osc.phaseIncrement;
+					s32 s = FMPAC_SinTable[(bd->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF];
+					sample += (s * (15 - chip->rhythmVolBD) * bd->osc.gain) >> FMPAC_OUT_SHIFT;
+				}
+			}
 
-				if (hhOn || hs->osc.gain != 0)
+			if (tt->osc.gain != 0)
+			{
+				FMPAC_UpdateGain(&tt->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+				if (tt->osc.gain != 0)
 				{
-					FMPAC_UpdateGain(&hs->osc, hhOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					tt->osc.phase += tt->osc.phaseIncrement;
+					s32 s = FMPAC_SinTable[(tt->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF];
+					sample += (s * (15 - chip->rhythmVolTOM) * tt->osc.gain) >> FMPAC_OUT_SHIFT;
+				}
+			}
+
+			/*
+			 * YM2413 rhythm mode is NOT a generic white-noise generator.
+			 *
+			 * The OPLL combines the noise bit with selected phase bits from the
+			 * HH and top-cymbal phase generators. SD, HH and TCY then select one
+			 * of several fixed phase positions from their waveform. This is the
+			 * important missing ingredient in the previous versions: feeding the
+			 * LFSR amplitude directly to the DAC produces a sharp broadband tick,
+			 * whereas the real chip produces a much denser, phase-shaped drum
+			 * waveform.
+			 *
+			 * This follows the compact rhythm equations used by emu2413:
+			 *   SD:  phase bit 8 + noise bit
+			 *   CYM: short-noise bit
+			 *   HH:  short-noise bit + noise bit
+			 * The existing fast 256-entry waveform table is used for the selected
+			 * phase positions, so this adds no large table or expensive FM path.
+			 */
+			if (hs->osc.gain != 0 || chip->rhythmSD.gain != 0 || chip->rhythmTCY.gain != 0)
+			{
+				/*
+				 * Keep the YM2413-style 23-bit noise generator running continuously.
+				 * emu2413 clocks it by:
+				 *
+				 *     if (noise & 1) noise ^= 0x800200;
+				 *     noise >>= 1;
+				 *
+				 * This is deliberately different from the old 17-bit LFSR.
+				 */
+				if (chip->noiseLFSR & 1)
+					chip->noiseLFSR ^= 0x800200;
+				chip->noiseLFSR >>= 1;
+				chip->noiseLFSR &= 0x7FFFFF;
+				u32 noiseBit = chip->noiseLFSR & 1;
+
+				/* 10-bit phase outputs corresponding to the OPLL PG. */
+				u32 hhPhase = (chip->channels[FMPAC_CHANNEL_HHSD].osc.phase >> 22) & 0x3FF;
+				u32 cymPhase = (chip->channels[FMPAC_CHANNEL_TOMTCY].osc.phase >> 22) & 0x3FF;
+
+				/*
+				 * Short-noise equation from the OPLL rhythm section:
+				 * (HH bit2 xor bit7) | (HH bit3 xor CYM bit5) |
+				 * (CYM bit3 xor CYM bit5)
+				 */
+				u32 shortNoise =
+					(((hhPhase >> 2) & 1) ^ ((hhPhase >> 7) & 1)) |
+					(((hhPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1)) |
+					(((cymPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1));
+
+				/* Convert a 10-bit phase position to our 256-entry waveform. */
+#define FMPAC_RHYTHM_WAVE(p) FMPAC_SinTable[((p) >> 2) & 0xFF]
+
+				if (hs->osc.gain != 0)
+				{
+					FMPAC_UpdateGain(&hs->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
 					if (hs->osc.gain != 0)
-						sample += (hp * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
+					{
+						/*
+						 * YM2413 HH:
+						 * short_noise ? {2D0,234} : {034,0D0},
+						 * selected by the noise bit.
+						 */
+						u32 phase;
+						if (shortNoise)
+							phase = noiseBit ? 0x2D0 : 0x234;
+						else
+							phase = noiseBit ? 0x034 : 0x0D0;
+
+						s32 s = FMPAC_RHYTHM_WAVE(phase);
+						sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
+					}
 				}
-				if (sdOn || chip->rhythmSD.gain != 0)
+
+				if (chip->rhythmSD.gain != 0)
 				{
-					FMPAC_UpdateGain(&chip->rhythmSD, sdOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					FMPAC_UpdateGain(&chip->rhythmSD, 0, FMPAC_PERCUSSION_RELEASE_STEP);
 					if (chip->rhythmSD.gain != 0)
-						sample += (hp * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
+					{
+						/*
+						 * YM2413 SD:
+						 * if carrier phase bit 8 is set, select 300/200;
+						 * otherwise select 000/100; noise chooses within the pair.
+						 */
+						u32 phase;
+						if (hhPhase & 0x100)
+							phase = noiseBit ? 0x300 : 0x200;
+						else
+							phase = noiseBit ? 0x000 : 0x100;
+
+						s32 s = FMPAC_RHYTHM_WAVE(phase);
+						sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
+					}
 				}
-				if (tcyOn || chip->rhythmTCY.gain != 0)
+
+				if (chip->rhythmTCY.gain != 0)
 				{
-					FMPAC_UpdateGain(&chip->rhythmTCY, tcyOn, FMPAC_PERCUSSION_RELEASE_STEP);
+					FMPAC_UpdateGain(&chip->rhythmTCY, 0, FMPAC_PERCUSSION_RELEASE_STEP);
 					if (chip->rhythmTCY.gain != 0)
-						sample += (hp * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
+					{
+						/* YM2413 top cymbal: short-noise selects 300 or 100. */
+						u32 phase = shortNoise ? 0x300 : 0x100;
+						s32 s = FMPAC_RHYTHM_WAVE(phase);
+						sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
+					}
 				}
+
+#undef FMPAC_RHYTHM_WAVE
 			}
 		}
 
