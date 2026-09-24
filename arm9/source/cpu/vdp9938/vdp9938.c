@@ -1330,7 +1330,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
 /*************************************************************/
-ITCM_CODE void RefreshLine8(u8 uY)
+void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
     

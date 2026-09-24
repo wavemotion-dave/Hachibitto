@@ -436,7 +436,7 @@ void HandleAscii16_SRAM8(u32* src, u8 block, u16 address, u8 value)
     }
 }
 
-ITCM_CODE void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
+void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 {
     // --------------------------------------------------------
     // Konami 8K mapper with SCC
