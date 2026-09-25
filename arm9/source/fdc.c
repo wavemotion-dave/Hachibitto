@@ -342,6 +342,7 @@ u8 fdc_read(u8 addr)
             if (FDC.status & ST_INDEX_DRQ)   // Are we waiting for the CPU to read a byte?
             {
                 FDC.status &= ~ST_INDEX_DRQ; // Clear Data Request flag
+                FDC.int_req &= ~0x40;        // Clear Data Request flag
                 FDC.wait_for_read = 0;       // Clock in next byte (or end sequence if we have read all there is)
             }
             return FDC.data;                 // Return data to caller

@@ -89,14 +89,16 @@ typedef struct
 //@----------------------------------------------------------------------------
 typedef struct
 {
-    u32 phase;              // fixed-point phase accumulator
-    u32 phaseIncrement;     // cached per-sample phase step - recomputed only when freq/block/mul/instrument change
-    u32 releaseAccum;       // 16.16 fixed-point fractional accumulator - release needs a much
-                            // slower rate than gain's whole-unit resolution can express directly
-                            // (see FMPAC.c: this is what lets notes ring out instead of cutting
-                            // off instantly on key-off, which was making FM music sound thin)
-    u8  gain;               // 0 (silent) - 255 (full) - ramps UP fast toward 255 on key-on,
-                            // ramps DOWN slowly toward 0 on key-off (see releaseAccum above)
+    u32 phase;
+    u32 phaseIncrement;
+    u32 releaseAccum;
+    u32 envelopeLevel;
+    u32 envelopeAccum;
+    u8  envelopeState;
+    u8  previousKeyOn;
+    u8  sustainCounter;
+    u8  sustainGain;
+    u8  gain;
 } FMPAC_Oscillator;
 
 //@----------------------------------------------------------------------------

@@ -404,7 +404,7 @@ ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
 /** This function is called from RefreshLine#() to refresh  **/
 /** and draw sprites to a given pixel line.                 **/
 /*************************************************************/
-ITCM_CODE void RefreshSprites(register byte Y)
+void RefreshSprites(register byte Y)
 {
   register byte *PT,*AT;
   register byte *P,*T,C;

@@ -168,7 +168,7 @@ static void FMPAC_UpdateCustomUsers(FMPAC *chip)
 //@ the earlier ADSR version, just for one rate instead of a per-instrument
 //@ table.
 //@----------------------------------------------------------------------------
-static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep, u8 slCar)
+static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep)
 {
     if (keyOn)
     {
@@ -179,7 +179,7 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep, u
             osc->gain = (g >= 255) ? 255 : (u8)g;
             osc->sustainCounter = 0;
         }
-        else if (osc->gain > FMPAC_SustainGain[slCar & 0x0F])
+        else if (osc->gain > osc->sustainGain)
         {
             if (++osc->sustainCounter >= FMPAC_SUSTAIN_TICK_SAMPLES)
             {
@@ -215,13 +215,12 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep, u
 //@ isMelodic selects which release rate applies - see FMPAC_RELEASE_STEP
 //@ vs FMPAC_PERCUSSION_RELEASE_STEP.
 //@----------------------------------------------------------------------------
-static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume, int isMelodic, u8 slCar)
+static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume, int isMelodic)
 {
     /* Most active notes spend the vast majority of their time at the
        sustain target.  Once there, skip the bookkeeping entirely. */
-    if (!(keyOn && osc->gain == FMPAC_SustainGain[slCar & 0x0F]))
-        FMPAC_UpdateGain(osc, keyOn, isMelodic ? FMPAC_RELEASE_STEP : FMPAC_PERCUSSION_RELEASE_STEP,
-                         isMelodic ? slCar : 15);
+    if (!(keyOn && osc->gain == osc->sustainGain))
+        FMPAC_UpdateGain(osc, keyOn, isMelodic ? FMPAC_RELEASE_STEP : FMPAC_PERCUSSION_RELEASE_STEP);
 
     if (osc->gain == 0) return 0;    // still idle/silent - skip the phase/table work
 
@@ -241,6 +240,7 @@ void FMPACReset(FMPAC *chip)
     for (ch = 0; ch < FMPAC_NUM_CHANNELS; ch++)
     {
         chip->channels[ch].instPtr = &chip->customInstrument;
+        chip->channels[ch].osc.sustainGain = 255;
         FMPAC_UpdateChannelFreq(chip, ch);
     }
 }
@@ -387,6 +387,10 @@ void FMPACWrite(u8 value, u8 address, FMPAC *chip)
         chip->channels[ch].instrument = value >> FMPAC_REG_INST_SHIFT;
         chip->channels[ch].volume = value & FMPAC_REG_VOL_MASK;
         chip->channels[ch].instPtr = FMPAC_GetInstrument(chip, chip->channels[ch].instrument);
+        chip->channels[ch].osc.sustainGain =
+            ((chip->channels[ch].instPtr->slCar & 0x0F) == 15)
+            ? 255
+            : FMPAC_SustainGain[chip->channels[ch].instPtr->slCar & 0x0F];
         if (ch == FMPAC_CHANNEL_BD)  chip->rhythmVolBD = value & FMPAC_REG_VOL_MASK;
         if (ch == FMPAC_CHANNEL_HHSD)  { chip->rhythmVolHH = value >> FMPAC_REG_INST_SHIFT; chip->rhythmVolSD = value & FMPAC_REG_VOL_MASK; }
         if (ch == FMPAC_CHANNEL_TOMTCY) { chip->rhythmVolTOM = value >> FMPAC_REG_INST_SHIFT; chip->rhythmVolTCY = value & FMPAC_REG_VOL_MASK; }
@@ -416,7 +420,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
         {
             FMPAC_Channel *cc = &chip->channels[ch];
             if (!cc->keyOn && cc->osc.gain == 0) continue;    // fully idle - skip entirely
-            sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1, cc->instPtr->slCar);
+            sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1);
 
             /*
              * Acoustic Bass (ROM instrument 14): keep the proven baseline
@@ -454,7 +458,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
              */
             if (bd->osc.gain != 0)
             {
-                FMPAC_UpdateGain(&bd->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP, 15);
+                FMPAC_UpdateGain(&bd->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
                 if (bd->osc.gain != 0)
                 {
                     bd->osc.phase += bd->osc.phaseIncrement;
@@ -465,7 +469,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 
             if (tt->osc.gain != 0)
             {
-                FMPAC_UpdateGain(&tt->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP, 15);
+                FMPAC_UpdateGain(&tt->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
                 if (tt->osc.gain != 0)
                 {
                     tt->osc.phase += tt->osc.phaseIncrement;
@@ -528,7 +532,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 
                 if (hs->osc.gain != 0)
                 {
-                    FMPAC_UpdateGain(&hs->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP, 15);
+                    FMPAC_UpdateGain(&hs->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
                     if (hs->osc.gain != 0)
                     {
                         /*
@@ -549,7 +553,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 
                 if (chip->rhythmSD.gain != 0)
                 {
-                    FMPAC_UpdateGain(&chip->rhythmSD, 0, FMPAC_PERCUSSION_RELEASE_STEP, 15);
+                    FMPAC_UpdateGain(&chip->rhythmSD, 0, FMPAC_PERCUSSION_RELEASE_STEP);
                     if (chip->rhythmSD.gain != 0)
                     {
                         /*
@@ -570,7 +574,7 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 
                 if (chip->rhythmTCY.gain != 0)
                 {
-                    FMPAC_UpdateGain(&chip->rhythmTCY, 0, FMPAC_PERCUSSION_RELEASE_STEP, 15);
+                    FMPAC_UpdateGain(&chip->rhythmTCY, 0, FMPAC_PERCUSSION_RELEASE_STEP);
                     if (chip->rhythmTCY.gain != 0)
                     {
                         /* YM2413 top cymbal: short-noise selects 300 or 100. */
