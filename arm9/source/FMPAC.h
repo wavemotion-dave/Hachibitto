@@ -1,39 +1,55 @@
 //
-//  FMPAC.h
-//  Konami FM-PAC (Yamaha YM2413 / OPLL) sound chip emulator.
+//  ACCURACY LEVEL - deliberately simplified OPLL emulation.
 //
-//  Interface shape deliberately mirrors SCC.s/SCC.i: FMPACReset,
-//  FMPACWrite, FMPACRead, FMPACMixer, FMPACGetStateSize, FMPACSaveState,
-//  FMPACLoadState.
+//  This is NOT a cycle-accurate or full YM2413/OPLL implementation.
+//  The mixer is designed around the CPU budget of the target hardware,
+//  trading synthesis accuracy for a substantial reduction in per-sample
+//  computation.
 //
-//  ACCURACY LEVEL - this is a DRASTIC simplification, not FM synthesis:
-//    Measured mixer cost with real 2-operator FM + full ADSR was ~5x over
-//    budget on this hardware (22fps vs. a 90fps target) even at -O2, and
-//    DTCM placement of the lookup tables barely moved it (~2%) -
-//    confirming the cost is raw per-sample computation, not memory
-//    latency or missing compiler optimization. Per explicit direction,
-//    this version trades authenticity for speed:
-//      - NO FM modulation. Each channel is a single sine-wave oscillator,
-//        tuned from its own frequency registers. The modulator operator,
-//        self-feedback, and phase modulation are gone entirely.
-//      - NO ADSR envelope. A channel's gain just ramps linearly toward
-//        full volume on key-on and toward zero on key-off, at a fixed
-//        rate - no attack/decay/sustain/release shaping, no per-instrument
-//        rate tables. Once a held note reaches its target gain, the
-//        per-sample "envelope" cost is a single comparison that does
-//        nothing.
-//      - Instrument selection ($30-$38 high nibble) and the custom/ROM
-//        instrument registers ($00-$07) are still fully decoded and
-//        stored (so nothing is lost if this needs to be dialed back up
-//        later), but the mixer only reads mulCar from them (for a
-//        free per-instrument pitch multiplier) - TL, feedback, KSL, AM,
-//        VIB, and all ADSR rates are stored but unused.
-//      - Rhythm mode's non-tonal drums (HH/SD/TOP-CY) still use noise,
-//        but with the same simple gain ramp as melodic channels rather
-//        than their own ADSR rates.
-//    Every channel now sounds like a plain tone or a burst of noise -
-//    no FM timbre, no per-instrument envelope character. This is
-//    deliberate: getting the frame rate back is the only goal right now.
+//  A full 2-operator FM implementation with a more complete ADSR model was
+//  measured to be far too expensive on this hardware.  In particular,
+//  moving lookup tables to faster memory produced only a small improvement,
+//  indicating that the dominant cost was the per-sample synthesis work.
+//
+//  Current melodic synthesis:
+//    - Each channel uses a single oscillator rather than the OPLL's
+//      modulator + carrier FM pair.  There is no carrier phase modulation,
+//      operator feedback, or full FM timbre synthesis.
+//    - The oscillator waveform is intentionally inexpensive.
+//    - Instrument selection and the custom/ROM instrument registers are
+//      still decoded and retained.  The carrier MUL value contributes to
+//      the oscillator frequency.
+//    - Carrier SL (sustain level) is approximated by making a held note's
+//      gain settle toward an instrument-dependent sustain level.  SL=15 is
+//      treated as full level; this is important for software that changes
+//      channel volume while leaving a key held.
+//    - Carrier RR (release rate) is approximated by making the key-off
+//      release rate instrument-dependent.  The RR mapping is normalized to
+//      this simplified gain model rather than attempting to reproduce the
+//      OPLL envelope generator exactly.
+//    - Attack/decay behavior remains deliberately simple.  This avoids the
+//      cost and complexity of a full OPLL envelope generator while retaining
+//      some of the per-instrument character that is audible in real music.
+//
+//  Current rhythm synthesis:
+//    - Bass Drum and Tom-Tom use tonal oscillators.
+//    - Hi-Hat, Snare Drum, and Top Cymbal use inexpensive noise-based
+//      approximations.
+//    - Rhythm voices use simplified gain/release behavior rather than the
+//      complete OPLL rhythm envelope.
+//
+//  The result intentionally omits several pieces of the YM2413 synthesis
+//  model, including full 2-operator FM, operator feedback, KSL, AM, VIB,
+//  KSR, and the complete per-operator ADSR behavior.
+//
+//  These omissions are deliberate.  The goal is to obtain convincing
+//  musical behavior at a frame rate suitable for the target hardware,
+//  rather than to reproduce every detail of the original chip.
+//
+//  Performance history is intentionally kept out of this header; measured
+//  FPS and experiment results change as the emulator evolves.  The source
+//  implementation and comments should describe the current model, while
+//  benchmark results belong in development notes.
 //
 //  Register map (verified against the Yamaha OPLL Application Manual,
 //  not reconstructed from memory - see chat for the source):
@@ -47,10 +63,12 @@
 //    $10-$18   F-Number low byte, one per channel (ch = reg-0x10)
 //    $20-$28   D5=SUS D4=KEY D3-1=BLOCK D0=F-Number bit8
 //    $30-$38   D7-4=INST(0-15) D3-0=VOL
+//
 //  Rhythm mode (D5 of $0E set) repurposes channels 6/7/8 (zero-indexed):
 //    ch6 = Bass Drum (tonal oscillator, key-on = D4/$0E)
 //    ch7 = Hi-Hat (noise, key-on = D0/$0E) + Snare Drum (noise, D3/$0E)
 //    ch8 = Tom-Tom (tonal oscillator, key-on = D2/$0E) + Top Cymbal (noise, D1/$0E)
+//
 //  Setup values ($16-$18/$26-$28) and rhythm volumes ($36-$38) are still
 //  decoded the same as before - only the synthesis method changed.
 //
@@ -200,7 +218,6 @@ extern const FMPAC_Instrument FMPAC_InstrumentROM[16];
 //@----------------------------------------------------------------------------
 void FMPACReset(FMPAC *chip);
 void FMPACWrite(u8 value, u8 address, FMPAC *chip);   // address = resolved register 0x00-0x38, not a Z80 address
-u8   FMPACRead(u8 address, FMPAC *chip);
 void FMPACMixer(int len, s16 *dest, FMPAC *chip);    // accumulates into dest - see FMPAC.c
 
 #endif // FMPAC_H

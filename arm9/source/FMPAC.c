@@ -11,24 +11,24 @@
 //@----------------------------------------------------------------------------
 //@ Tunables.
 //@----------------------------------------------------------------------------
-#define FMPAC_SAMPLE_RATE             27965        // confirmed value, matches the AY driver's rate
-#define FMPAC_MASTER_CLOCK            3579545        // MSX standard clock, same as SCC's
+#define FMPAC_SAMPLE_RATE             27965     // confirmed value, matches the AY driver's rate
+#define FMPAC_MASTER_CLOCK            3579545   // MSX standard clock, same as SCC's
 #define FMPAC_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
 #define FMPAC_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
-                            // full on key-on - ~16 samples (~0.6ms), fast/click-free
-#define FMPAC_RELEASE_STEP            3984        // MELODIC release rate: 16.16 fixed-point step targeting a
-                            // ~150ms fade to silence on key-off, not an instant cutoff.
-                            // This is the fix for FM music sounding "thin"/"cut" - real FM
-                            // pieces lean on overlapping decay tails for their fullness
-                            // (unlike AY music, which doesn't use per-note envelopes at
-                            // all), and cutting every note off in <1ms removed exactly
-                            // that. Retune this constant if it still isn't right - up
-                            // for a lusher/longer tail, down if notes start blurring
-                            // together too much.
-#define FMPAC_PERCUSSION_RELEASE_STEP 7500        // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
-                            // Real drums (hi-hat especially) decay in tens of ms, not
-                            // hundreds - using the melodic rate here made consecutive
-                            // hits overlap instead of sounding like distinct hits.
+                                                // full on key-on - ~16 samples (~0.6ms), fast/click-free
+#define FMPAC_RELEASE_STEP            3984      // MELODIC release rate: 16.16 fixed-point step targeting a
+                                                // ~150ms fade to silence on key-off, not an instant cutoff.
+                                                // This is the fix for FM music sounding "thin"/"cut" - real FM
+                                                // pieces lean on overlapping decay tails for their fullness
+                                                // (unlike AY music, which doesn't use per-note envelopes at
+                                                // all), and cutting every note off in <1ms removed exactly
+                                                // that. Retune this constant if it still isn't right - up
+                                                // for a lusher/longer tail, down if notes start blurring
+                                                // together too much.
+#define FMPAC_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
+                                                // Real drums (hi-hat especially) decay in tens of ms, not
+                                                // hundreds - using the melodic rate here made consecutive
+                                                // hits overlap instead of sounding like distinct hits.
 
 /* Carrier sustain level test: map OPLL SL to the same approximate gain
    levels used by the earlier envelope experiment, but move toward the target
@@ -101,22 +101,22 @@ static const u8 FMPAC_MulTableX2[16] __attribute__((section(".dtcm"))) =
 //@----------------------------------------------------------------------------
 const FMPAC_Instrument FMPAC_InstrumentROM[16] __attribute__((section(".dtcm"))) =
 {
-    /*  0 unused/custom */ { 9,12, 0,0, 1,1, 0,0, 0,0, 1,0, 12, 0,1, 2, 0,0,0,0, 0,0,0,0 },
-    /*  1 Violin        */ { 1,1, 0,0, 1,1, 1,1, 0,0, 0,0, 30, 0,1, 7, 15,0,0,0, 7,8,1,7 },
-    /*  2 Guitar        */ { 3,1, 0,0, 0,1, 0,0, 1,0, 0,0, 30, 1,0, 5, 13,7,1,3, 15,7,1,3 },
-    /*  3 Piano         */ { 3,1, 0,0, 0,0, 0,0, 1,0, 2,0, 25, 0,0, 4, 15,2,1,1, 15,4,2,3 },
-    /*  4 Flute         */ { 1,1, 0,0, 0,1, 1,1, 0,0, 0,0, 27, 0,0, 7, 10,15,4,0, 6,4,2,7 },
-    /*  5 Clarinet      */ { 2,1, 0,0, 0,0, 1,1, 0,0, 0,0, 30, 0,0, 6, 15,0,0,8, 7,5,1,8 },
-    /*  6 Oboe          */ { 1,2, 0,0, 0,0, 1,1, 1,0, 0,0, 22, 0,0, 5, 9,0,0,0, 7,1,1,3 },
-    /*  7 Trumpet       */ { 1,1, 0,0, 0,1, 1,1, 0,0, 0,0, 29, 0,0, 7, 8,2,1,0, 8,0,1,7 },
-    /*  8 Organ         */ { 3,1, 0,0, 0,0, 1,1, 0,0, 0,0, 45, 0,1, 6, 12,0,0,7, 7,0,0,7 },
-    /*  9 Horn          */ { 1,1, 0,0, 1,1, 1,1, 0,0, 0,0, 27, 0,0, 6, 6,4,1,0, 6,5,1,7 },
-    /* 10 Synthesizer   */ { 1,1, 0,0, 1,1, 1,1, 0,0, 0,0, 12, 1,1, 0, 8,5,7,0, 15,0,0,7 },
-    /* 11 Harpsichord   */ { 3,1, 0,0, 0,0, 1,0, 0,0, 0,0, 7, 0,1, 1, 15,0,0,0, 10,4,2,2 },
-    /* 12 Vibraphone    */ { 7,1, 1,1, 0,1, 0,0, 1,0, 0,0, 36, 0,0, 7, 15,15,2,2, 15,8,1,2 },
-    /* 13 Synth Bass    */ { 1,0, 0,0, 1,0, 1,0, 0,1, 0,0, 12, 0,0, 5, 15,2,4,0, 15,4,4,4 },
-    /* 14 Acoustic Bass */ { 1,1, 0,0, 0,0, 0,0, 0,0, 1,0, 21, 0,0, 3, 15,3,15,3, 9,2,15,3 },
-    /* 15 Elec Guitar   */ { 1,1, 0,0, 1,1, 1,0, 0,0, 2,0, 9, 0,0, 3, 15,1,15,0, 15,4,1,3 },
+    /*  0 unused/custom */ { 9,12, 0,0, 1,1, 0,0, 0,0, 1,0, 12, 0,1, 2, 0,0,0,0,   0,0,0,0  },
+    /*  1 Violin        */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 30, 0,1, 7, 15,0,0,0,  7,8,1,7  },
+    /*  2 Guitar        */ { 3,1,  0,0, 0,1, 0,0, 1,0, 0,0, 30, 1,0, 5, 13,7,1,3,  15,7,1,3 },
+    /*  3 Piano         */ { 3,1,  0,0, 0,0, 0,0, 1,0, 2,0, 25, 0,0, 4, 15,2,1,1,  15,4,2,3 },
+    /*  4 Flute         */ { 1,1,  0,0, 0,1, 1,1, 0,0, 0,0, 27, 0,0, 7, 10,15,4,0, 6,4,2,7  },
+    /*  5 Clarinet      */ { 2,1,  0,0, 0,0, 1,1, 0,0, 0,0, 30, 0,0, 6, 15,0,0,8,  7,5,1,8  },
+    /*  6 Oboe          */ { 1,2,  0,0, 0,0, 1,1, 1,0, 0,0, 22, 0,0, 5, 9,0,0,0,   7,1,1,3  },
+    /*  7 Trumpet       */ { 1,1,  0,0, 0,1, 1,1, 0,0, 0,0, 29, 0,0, 7, 8,2,1,0,   8,0,1,7  },
+    /*  8 Organ         */ { 3,1,  0,0, 0,0, 1,1, 0,0, 0,0, 45, 0,1, 6, 12,0,0,7,  7,0,0,7  },
+    /*  9 Horn          */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 27, 0,0, 6, 6,4,1,0,   6,5,1,7  },
+    /* 10 Synthesizer   */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 12, 1,1, 0, 8,5,7,0,   15,0,0,7 },
+    /* 11 Harpsichord   */ { 3,1,  0,0, 0,0, 1,0, 0,0, 0,0, 7,  0,1, 1, 15,0,0,0,  10,4,2,2 },
+    /* 12 Vibraphone    */ { 7,1,  1,1, 0,1, 0,0, 1,0, 0,0, 36, 0,0, 7, 15,15,2,2, 15,8,1,2 },
+    /* 13 Synth Bass    */ { 1,0,  0,0, 1,0, 1,0, 0,1, 0,0, 12, 0,0, 5, 15,2,4,0,  15,4,4,4 },
+    /* 14 Acoustic Bass */ { 1,1,  0,0, 0,0, 0,0, 0,0, 1,0, 21, 0,0, 3, 15,3,15,3, 9,2,15,3 },
+    /* 15 Elec Guitar   */ { 1,1, 0,0,  1,1, 1,0, 0,0, 2,0, 9,  0,0, 3, 15,1,15,0, 15,4,1,3 },
 };
 
 //@----------------------------------------------------------------------------
@@ -212,15 +212,43 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep)
 //@ function serves both ordinary melodic channels and the tonal rhythm
 //@ voices (BD, TOM), which need their key-on state computed fresh from
 //@ the rhythm register each sample rather than stored on the channel.
-//@ isMelodic selects which release rate applies - see FMPAC_RELEASE_STEP
-//@ vs FMPAC_PERCUSSION_RELEASE_STEP.
+//@ isMelodic selects the release rate: melodic voices use the instrument's
+//@ actual carrier RR value; percussion keeps the fixed fast release.
 //@----------------------------------------------------------------------------
-static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume, int isMelodic)
+/* RR-dependent release, normalized so RR=15 is about the old
+   150 ms V0 release, while lower RR values release faster. */
+/*
+ * Simplified carrier envelope model
+ *
+ * The original V0 renderer used a simple gain ramp: notes reached full
+ * volume while held and then decayed at a fixed rate after key-off.
+ *
+ * Two cheap OPLL-inspired additions are retained here:
+ *
+ *   - SL (sustain level) sets the level a held note settles toward.
+ *     SL=15 is treated as full level.  This is important for sounds that
+ *     change channel volume while a key remains held (for example Gaiden
+ *     footsteps); treating SL=15 as silence breaks those sounds.
+ *
+ *   - RR (release rate) controls how quickly the gain falls after key-off.
+ *     The table below is deliberately normalized to the V0 gain model
+ *     rather than attempting to reproduce the OPLL envelope generator
+ *     literally.  RR=15 uses the original V0 release rate, while lower RR
+ *     values release progressively more slowly.
+ *
+ * These approximations give noticeably better note blending and fuller
+ * melodic lines at a much lower CPU cost than a full OPLL envelope model.
+ */
+static const u16 FMPAC_RRReleaseStepTest[16] =
+    {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
+
+static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume,
+                                      int isMelodic, u32 releaseStep)
 {
     /* Most active notes spend the vast majority of their time at the
        sustain target.  Once there, skip the bookkeeping entirely. */
     if (!(keyOn && osc->gain == osc->sustainGain))
-        FMPAC_UpdateGain(osc, keyOn, isMelodic ? FMPAC_RELEASE_STEP : FMPAC_PERCUSSION_RELEASE_STEP);
+        FMPAC_UpdateGain(osc, keyOn, releaseStep);
 
     if (osc->gain == 0) return 0;    // still idle/silent - skip the phase/table work
 
@@ -420,7 +448,8 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
         {
             FMPAC_Channel *cc = &chip->channels[ch];
             if (!cc->keyOn && cc->osc.gain == 0) continue;    // fully idle - skip entirely
-            sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1);
+            sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1,
+                                   (u32)FMPAC_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2);
 
             /*
              * Acoustic Bass (ROM instrument 14): keep the proven baseline
