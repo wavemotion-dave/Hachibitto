@@ -83,7 +83,7 @@ struct __attribute__((__packed__)) Config_t
     u8  yOffset;
     u8  cpuBoost;
     u8  splitRefresh;
-    u8  reserved4;
+    u8  blendScr7;
     u8  scaleScreen;
     u8  maskBorders;
     u8  reserved5;
@@ -109,7 +109,7 @@ extern u8 special_memory_access;                // 0x00 if no special access, ot
 #define SPEC_MEM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
 #define SPEC_MEM_SCC_PLUS_ENABLED   0x04        // SCC+ is enabled and requires memory traps
 #define SPEC_MEM_SUPERLR_ACTIVE     0x08        // Super Lode Runner traps on writes to 0x0000 even if the cart isn't mapped in!
-#define SPEC_MEM_NEW_DISK           0x10        // Standard Memory-Mapped Disk Controller active in Page 1
+#define SPEC_MEM_DISK_CONTROLLER    0x10        // Standard Memory-Mapped Disk Controller active in Page 1
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;
@@ -179,6 +179,7 @@ extern u8 *MemoryMap[8];
 extern u8  sccplus_page[4];
 extern u8  sccplus_mode;
 extern AY38910 myAY;
+extern AY38910 myAY2;
 extern SCC     mySCC;
 extern FMPAC   myYM;
 extern u8 msx_scc_enable;
@@ -208,8 +209,6 @@ extern u8 CurrentEpochSaved;
 extern u8 msx_irq_pending;
 extern u8 palette_latch;
 extern uint8_t OccBuf[320];
-extern u16 nibbleLUT16[256];
-extern u8 screen7LUT[256];
 extern u16 beeperFreq;
 
 // --------------------------------------------------

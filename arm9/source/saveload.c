@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0005  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0006  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -227,6 +227,7 @@ void msxSaveState(void)
 
         // Write sound chip data
         if (retVal) retVal = fwrite(&myAY,                  sizeof(myAY),                   1, handle);
+        if (retVal) retVal = fwrite(&myAY2,                 sizeof(myAY2),                  1, handle);
         if (retVal) retVal = fwrite(&mySCC,                 sizeof(mySCC),                  1, handle);
         if (retVal) retVal = fwrite(&myYM,                  sizeof(myYM),                   1, handle);
 
@@ -258,8 +259,6 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
         if (retVal) retVal = fwrite(&palette_latch,         sizeof(palette_latch),          1, handle);
         if (retVal) retVal = fwrite(OccBuf,                 sizeof(OccBuf),                 1, handle);
-        if (retVal) retVal = fwrite(nibbleLUT16,            sizeof(nibbleLUT16),            1, handle);
-        if (retVal) retVal = fwrite(screen7LUT,             sizeof(screen7LUT),             1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
         if (retVal) retVal = fwrite(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
@@ -449,6 +448,7 @@ void msxLoadState(void)
 
             // Write sound chip data
             if (retVal) retVal = fread(&myAY,                  sizeof(myAY),                   1, handle);
+            if (retVal) retVal = fread(&myAY2,                 sizeof(myAY2),                  1, handle);
             if (retVal) retVal = fread(&mySCC,                 sizeof(mySCC),                  1, handle);
             if (retVal) retVal = fread(&myYM,                  sizeof(myYM),                   1, handle);
 
@@ -480,8 +480,6 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
             if (retVal) retVal = fread(&palette_latch,         sizeof(palette_latch),          1, handle);
             if (retVal) retVal = fread(OccBuf,                 sizeof(OccBuf),                 1, handle);
-            if (retVal) retVal = fread(nibbleLUT16,            sizeof(nibbleLUT16),            1, handle);
-            if (retVal) retVal = fread(screen7LUT,             sizeof(screen7LUT),             1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
             if (retVal) retVal = fread(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
