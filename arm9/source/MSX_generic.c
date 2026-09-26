@@ -930,7 +930,7 @@ void SetDefaultGameConfig(void)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
-    myConfig.reserved4    = 0;                           
+    myConfig.blendScr7    = 0;                           // No blending by default - some visual novel games work best with this
     myConfig.reserved5    = 0;
     myConfig.reserved6    = 0;
     myConfig.reserved7    = 0;
@@ -1038,10 +1038,11 @@ const struct options_t Option_Table[1][20] =
         {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
-        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS"},                                                                                                                   &myConfig.musicExpand,    3},
+        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
+        {"SCR7 BLEND",     {"OFF", "ENABLED"},                                                                                                                                  &myConfig.blendScr7,      2},        
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
         {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},

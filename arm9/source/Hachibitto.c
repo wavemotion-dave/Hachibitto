@@ -420,14 +420,27 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         else  // Pretty simple... just AY (and maybe beeper)
         {
             ay38910Mixer(len * 2, dest, &myAY);
-
+            
+            if (myConfig.musicExpand == 3) // 2x PSG enabled? If so... mix it in.
+            {
+                ay38910Mixer(len * 2, mixbuf1, &myAY2);
+                s16 *p = (s16*)dest;
+                for (int i=0; i < len*2; i++)
+                {
+                    s32 combined = p[i] + mixbuf1[i] + 32768;
+                    if (combined > 32767)  combined = 32767;
+                    else if (combined < -32768) combined = -32768;
+                    p[i] = combined;
+                }
+            }
+            else
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
             if (beeperFreq)
             {
                 ProcessBeeper(len, dest);
             }
             else
-            if (isDSiMode()) // DSi gets slight audio filter to remove clicks
+            if (isDSiMode()) // DSi gets slight audio filter to remove clicks if AY only
             {
                 s16 *p = (s16*)dest;
                 int count = len * 2;
@@ -445,6 +458,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 }
                 ay_smoothed = smoothed;
             }
+            
             last_sample = ((s16*)dest)[len*2 - 1];
         }
     }
@@ -514,6 +528,11 @@ void sound_chip_reset()
     ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
     ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
+
+    ay38910Reset(&myAY2);             // Reset the 2xPSG "AY" sound chip
+    ay38910IndexW(0x07, &myAY2);      // Register 7 is ENABLE
+    ay38910DataW(0x3F, &myAY2);       // All OFF (negative logic)
+    ay38910Mixer(8, mixbuf2, &myAY2); // Do an initial mix conversion to clear the output
 
     // -----------------------------------------------------------------
     // The SCC sound chip is just for a few select Konami MSX1 games
@@ -727,6 +746,14 @@ void DisplayStatusLine(bool bForce)
             // MSX MUSIC has a little cool graphic to go with it!
             DSPrint(20, 0, 2, "$%&");
             DSPrint(20, 1, 2, "DEF");
+        }
+        else if (myConfig.musicExpand == 3)
+        {
+            // 2X PSG
+            DSPrint(20, 0, 0, " ");
+            DSPrint(20, 1, 0, " ");
+            DSPrint(21, 0, 2, "\"#");
+            DSPrint(21, 1, 2, "BC");
         }
         else // Clear the display area...
         {
@@ -2240,7 +2267,7 @@ u32 LoopZ80()
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (400*1024)
+#define MAX_DEBUG_BUF_SIZE   (128*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;

@@ -46,6 +46,7 @@ u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
+AY38910 myAY2               __attribute__((section(".dtcm")));          // Declare new AY structure for 2x PSG
 FMPAC   myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
 // ---------------------------------------------------------------------
@@ -429,6 +430,10 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
       }
       return ay38910DataR(&myAY);
   }
+  else if (Port == 0x12)  // 2xPSG Read...
+  {
+      return ay38910DataR(&myAY2);
+  }  
   else if (Port == 0xA8)
   {
       return Port_PPI_A;
@@ -440,10 +445,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
   else if (Port == 0xAA)
   {
       return Port_PPI_C;
-  }
-  else if (Port >= 0xD0 && Port <= 0xD7)  // Floppy Drive Controller
-  {
-      return fdc_read(Port & 0x07);
   }
   else if (Port >= 0xFC && Port <= 0xFF)  // Mirror of RAM select. Not all MSX2 machine return this but we do.
   {
@@ -466,7 +467,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 void msx_slot_map_msx1(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // MSX1 has no subslots
-    special_memory_access &= ~SPEC_MEM_NEW_DISK;
+    special_memory_access &= ~SPEC_MEM_DISK_CONTROLLER;
     
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -509,9 +510,7 @@ void msx_slot_map_msx1(unsigned char Value)
             {
                 bCartInPage[1] = 1;
                 bRAMInPage[1] = 0;
-#ifdef NEW_DISK
-                special_memory_access |= SPEC_MEM_NEW_DISK;
-#endif
+                special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
                 break;
@@ -608,7 +607,7 @@ void msx_slot_map_msx1(unsigned char Value)
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // Until proven otherwise below...
-    special_memory_access &= ~SPEC_MEM_NEW_DISK;
+    special_memory_access &= ~SPEC_MEM_DISK_CONTROLLER;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -672,9 +671,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
-#ifdef NEW_DISK
-                special_memory_access |= SPEC_MEM_NEW_DISK;
-#endif
+                special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             }
@@ -761,7 +758,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE;
-    special_memory_access &= ~SPEC_MEM_NEW_DISK;
+    special_memory_access &= ~SPEC_MEM_DISK_CONTROLLER;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -838,9 +835,7 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
         case 0x02:  // Slot 2:  Maps to Disk Controller
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-#ifdef NEW_DISK
-            special_memory_access |= SPEC_MEM_NEW_DISK;
-#endif
+            special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
             MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
             MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             break;
@@ -926,6 +921,8 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     else if (Port == 0x9B) {IndirectRegWrite9938(Value);}       // Indirect Register Area
     else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
     else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}        // PSG Area
+    else if (Port == 0x10) {ay38910IndexW(Value&0xF, &myAY2);}  // PSG Area - 2nd PSG
+    else if (Port == 0x11) {ay38910DataW(Value, &myAY2);}       // PSG Area - 2nd PSG
     else if (Port == 0xB4) {write_port_RTC_index(Value);}       // RTC Area (index register)
     else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
     else if (Port == 0xA8) // Slot system for MSX
@@ -971,10 +968,6 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
         else Port_PPI_C &= ~(1 << bit);
 
         msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
-    }
-    else if (Port >= 0xD0 && Port <= 0xD4)  // Floppy Drive Controller
-    {
-        fdc_write(Port & 0x07, Value);
     }
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
     {

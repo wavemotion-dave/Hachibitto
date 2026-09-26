@@ -56,11 +56,7 @@ struct FDC_GEOMETRY_t   Geom;
 #define FDC_CPU_CLOCK               3579545                                  // Z80 clock, NTSC
 #define FDC_DATA_RATE_BPS           250000                                   // MSX double-density (MFM)
 #define FDC_CYCLES_PER_BYTE         (FDC_CPU_CLOCK / (FDC_DATA_RATE_BPS/8))  // ~114 T-states/byte
-#ifdef NEW_DISK
-#define FDC_INSTRUCTIONS_PER_BYTE   0
-#else
-#define FDC_INSTRUCTIONS_PER_BYTE   (FDC_CYCLES_PER_BYTE/8)                  // Rough to keep math simple (~8 cycles per instruction)
-#endif
+#define FDC_INSTRUCTIONS_PER_BYTE   0                                        // For the Japanese disk interface - no interbyte timing
 #define FDC_INSTRUCTIONS_PER_SEEK   (100*(FDC_INSTRUCTIONS_PER_BYTE+1));     // Arbitrarily 100x longer than reading a byte
 
 void fdc_debug(u8 bWrite, u8 addr, u8 data)

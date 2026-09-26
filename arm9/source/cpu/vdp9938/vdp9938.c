@@ -45,7 +45,8 @@ u8 frame_skip_mask      __attribute__((section(".dtcm"))) = 0;
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
 uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
-u8 screen7LUT[256]       __attribute__((section(".dtcm")));
+u8 screen7LUT0[256]      __attribute__((section(".dtcm")));
+u8 screen7LUT1[256]      __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
 {
@@ -114,7 +115,8 @@ void BuildScreen7LUT(void)
 {
     for (int i = 0; i < 256; i++)
     {
-        screen7LUT[i] = (i >> 4);   // Decimate 512->256: keep the first (left) pixel of each packed pair
+        screen7LUT0[i] = i >> 4;   // Keep left pixel: A
+        screen7LUT1[i] = i & 0x0F; // Keep right pixel: B
     }
 }
 
@@ -1301,21 +1303,25 @@ ITCM_CODE void RefreshLine7(u8 uY)
         const u8 *src = ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=src-0x10000) src-=0x10000;
 
+        const u8 *lut = screen7LUT0;
+        
+        if (myConfig.blendScr7 && (frame_number & 1)) lut = screen7LUT1;
+
         const u32* restrict s32 = (const u32*)src;
         for (int i = 0; i < 32; i++)
         {
             u32 chunk0 = *s32++;
             u32 chunk1 = *s32++;
 
-            u32 b0 = screen7LUT[chunk0 & 0xFF];
-            u32 b1 = screen7LUT[(chunk0 >> 8) & 0xFF];
-            u32 b2 = screen7LUT[(chunk0 >> 16) & 0xFF];
-            u32 b3 = screen7LUT[(chunk0 >> 24) & 0xFF];
+            u32 b0 = lut[chunk0 & 0xFF];
+            u32 b1 = lut[(chunk0 >> 8) & 0xFF];
+            u32 b2 = lut[(chunk0 >> 16) & 0xFF];
+            u32 b3 = lut[(chunk0 >> 24) & 0xFF];
 
-            u32 b4 = screen7LUT[chunk1 & 0xFF];
-            u32 b5 = screen7LUT[(chunk1 >> 8) & 0xFF];
-            u32 b6 = screen7LUT[(chunk1 >> 16) & 0xFF];
-            u32 b7 = screen7LUT[(chunk1 >> 24) & 0xFF];
+            u32 b4 = lut[chunk1 & 0xFF];
+            u32 b5 = lut[(chunk1 >> 8) & 0xFF];
+            u32 b6 = lut[(chunk1 >> 16) & 0xFF];
+            u32 b7 = lut[(chunk1 >> 24) & 0xFF];
 
             *dst32++ = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
             *dst32++ = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
