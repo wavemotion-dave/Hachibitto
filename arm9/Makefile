@@ -30,7 +30,7 @@ ARCH	:=
 
 CFLAGS	:= -Wall -Wno-strict-aliasing -O2 -march=armv5te -mtune=arm946e-s -fomit-frame-pointer -ffast-math $(ARCH) -falign-functions=4 -frename-registers -finline-functions
 
-CFLAGS	+=	$(INCLUDE) -DARM9
+CFLAGS	+=	$(INCLUDE) -DARM9 -DNEW_DISK
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	$(ARCH) -march=armv5te -mtune=arm946e-s -DSCCMULT=64 -DAY_UPSHIFT=2 -DNDS

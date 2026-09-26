@@ -109,6 +109,7 @@ extern u8 special_memory_access;                // 0x00 if no special access, ot
 #define SPEC_MEM_SCC_ENABLED        0x02        // SCC is enabled and requires memory traps
 #define SPEC_MEM_SCC_PLUS_ENABLED   0x04        // SCC+ is enabled and requires memory traps
 #define SPEC_MEM_SUPERLR_ACTIVE     0x08        // Super Lode Runner traps on writes to 0x0000 even if the cart isn't mapped in!
+#define SPEC_MEM_NEW_DISK           0x10        // Standard Memory-Mapped Disk Controller active in Page 1
 
 extern u8 last_special_key;
 extern u8 last_special_key_dampen;

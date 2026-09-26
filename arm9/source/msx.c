@@ -466,6 +466,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
 void msx_slot_map_msx1(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // MSX1 has no subslots
+    special_memory_access &= ~SPEC_MEM_NEW_DISK;
     
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -508,10 +509,11 @@ void msx_slot_map_msx1(unsigned char Value)
             {
                 bCartInPage[1] = 1;
                 bRAMInPage[1] = 0;
-
+#ifdef NEW_DISK
+                special_memory_access |= SPEC_MEM_NEW_DISK;
+#endif
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
-
                 break;
             }
             else
@@ -606,6 +608,7 @@ void msx_slot_map_msx1(unsigned char Value)
 void msx_slot_map_msx2_typeA(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE; // Until proven otherwise below...
+    special_memory_access &= ~SPEC_MEM_NEW_DISK;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -669,6 +672,9 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
+#ifdef NEW_DISK
+                special_memory_access |= SPEC_MEM_NEW_DISK;
+#endif
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             }
@@ -740,8 +746,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             MemoryMap[6] = Unmapped_Memory;
             MemoryMap[7] = Unmapped_Memory;
             break;
-    }
-    
+    }    
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -756,6 +761,7 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
 void msx_slot_map_msx2_typeB(unsigned char Value)
 {
     special_memory_access &= ~SPEC_MEM_SUBSLOT_ACTIVE;
+    special_memory_access &= ~SPEC_MEM_NEW_DISK;
 
     switch ((Value>>0) & 0x03)  // Page 0 [0x0000~0x3FFF]
     {
@@ -832,6 +838,9 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
         case 0x02:  // Slot 2:  Maps to Disk Controller
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
+#ifdef NEW_DISK
+            special_memory_access |= SPEC_MEM_NEW_DISK;
+#endif
             MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
             MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             break;

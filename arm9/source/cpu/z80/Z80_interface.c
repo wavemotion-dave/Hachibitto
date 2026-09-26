@@ -20,6 +20,7 @@
 #include "Z80_interface.h"
 #include "../../Hachibitto.h"
 #include "../../MSX_generic.h"
+#include "../../fdc.h"
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
@@ -44,6 +45,13 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
             else if (off < 0x90) return SCCRead(off + 0x20, &mySCC);
         }
     }
+#ifdef NEW_DISK
+    else if ((special_memory_access & SPEC_MEM_NEW_DISK) && (address >= 0x7FF8) && (address <= 0x7FFF))
+    {
+        if (address == 0x7FFF) return fdc_read(4);
+        else return fdc_read(address & 7);
+    }
+#endif    
     else if ((special_memory_access & SPEC_MEM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))
     {
         if (bCartInPage[2]) return SCCRead(address, &mySCC);    // If the cart is mapped in, return value from it
@@ -717,6 +725,14 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
+#ifdef NEW_DISK    
+    else if ((special_memory_access & SPEC_MEM_NEW_DISK) && (address >= 0x7FF8) && (address <= 0x7FFF))
+    {
+        if (address <= 0x7FFB) fdc_write(address & 3, value);
+        if (address == 0x7FFC) fdc_setSide((value & 1) ? 1:0);  // Side: [xxxxxxxS]
+        if (address == 0x7FFD) fdc_setDrive((value & 1) ? 1:0); // Drive: [xxxxxxxD]
+    }
+#endif    
     else if (mapperMask) // Check if the cart has some special mapper properties (ASC8, ASC16, KON8, etc)
     {
         // -------------------------------------------------------------

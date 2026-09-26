@@ -56,8 +56,12 @@ struct FDC_GEOMETRY_t   Geom;
 #define FDC_CPU_CLOCK               3579545                                  // Z80 clock, NTSC
 #define FDC_DATA_RATE_BPS           250000                                   // MSX double-density (MFM)
 #define FDC_CYCLES_PER_BYTE         (FDC_CPU_CLOCK / (FDC_DATA_RATE_BPS/8))  // ~114 T-states/byte
+#ifdef NEW_DISK
+#define FDC_INSTRUCTIONS_PER_BYTE   0
+#else
 #define FDC_INSTRUCTIONS_PER_BYTE   (FDC_CYCLES_PER_BYTE/8)                  // Rough to keep math simple (~8 cycles per instruction)
-#define FDC_INSTRUCTIONS_PER_SEEK   (100*FDC_INSTRUCTIONS_PER_BYTE);         // Arbitrarily 100x longer than reading a byte
+#endif
+#define FDC_INSTRUCTIONS_PER_SEEK   (100*(FDC_INSTRUCTIONS_PER_BYTE+1));     // Arbitrarily 100x longer than reading a byte
 
 void fdc_debug(u8 bWrite, u8 addr, u8 data)
 {
@@ -65,9 +69,9 @@ void fdc_debug(u8 bWrite, u8 addr, u8 data)
     static u8 idx=0;
 
     if (bWrite)
-        debug_printf("W%04d %d=%02X  %02X %02X %02X %d %02X %d\n", idx++, addr, data, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
+        debug_printf("W %04X=%02X [STA=%02X] [IRQ=%02X] D%d S%d T%02d K%d\n", addr, data, FDC.status, FDC.int_req, FDC.drive, FDC.side, FDC.track, FDC.sector);
     else
-        debug_printf("R%04d %d     %02X %02X %02X %d %02X %d\n", idx++, addr, FDC.status, FDC.track, FDC.sector, FDC.side, FDC.data, FDC.drive);
+        debug_printf("R %04X [STA=%02X] [IRQ=%02X] D%d S%d T%02d K%d\n", addr, FDC.status, FDC.int_req, FDC.drive, FDC.side, FDC.track, FDC.sector);
 #endif
 }
 
@@ -180,17 +184,18 @@ void fdc_state_machine(void)
     switch(FDC.command & 0xF0)
     {
         case 0x00: // Restore - same as Seek Track except track=0
-                FDC.track = FDC.seekDestination;            // Settle on requested track
-                FDC.wait_for_read = 2;                      // No data to transfer
-                FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
-                FDC.int_req = 0x80;
+            FDC.track = FDC.seekDestination;            // Settle on requested track
+            FDC.wait_for_read = 2;                      // No data to transfer
+            FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
+            FDC.int_req = 0x80;
             break;
 
         case 0x10: // Seek Track
-                FDC.track = FDC.seekDestination;            // Settle on requested track
-                FDC.wait_for_read = 2;                      // No data to transfer
-                FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
-                FDC.int_req = 0x80;
+            FDC.track = FDC.seekDestination;            // Settle on requested track
+            FDC.wait_for_read = 2;                      // No data to transfer
+            FDC.status = (FDC.command & 0x08) ? ST_HEAD_ENGAGED : 0;
+            if (FDC.track == 0) FDC.status |= ST_TRACK0;
+            FDC.int_req = 0x80;
             break;
 
         case 0x20: // Step
@@ -202,7 +207,6 @@ void fdc_state_machine(void)
             else // Inwards
             {
                 if (FDC.track < (Geom.tracks-1)) FDC.track++;
-                fdc_buffer_track();
             }
             FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
             FDC.int_req = 0x80;
@@ -212,7 +216,6 @@ void fdc_state_machine(void)
         case 0x50: // Step in (no track update)
             FDC.stepDirection = 0; // Step inwards
             if (FDC.track < (Geom.tracks-1)) FDC.track++;
-            fdc_buffer_track();
             FDC.status = ST_HEAD_ENGAGED | (FDC.track ? 0x00 : ST_TRACK0);
             FDC.int_req = 0x80;
             break;
@@ -323,7 +326,7 @@ u8 fdc_read(u8 addr)
     fdc_state_machine();    // Clock the floppy drive controller state machine
 
     fdc_debug(0, addr, 0);  // Debug the read routine
-
+    
     switch (addr)
     {
         case 0:                             // Read Status
@@ -346,15 +349,9 @@ u8 fdc_read(u8 addr)
             }
             return FDC.data;                 // Return data to caller
         }
-        case 4: // Ready Register. IDxxRITW where I=~INTRQ (this is the important one!), D=DATA_REQ, R=~READY, I=~INDEX, W=~WRITEPROTECT
+        case 4: // Ready Register... only bits 7 and 6 used.
         {
-            u8 ret = 0x37;
-            ret |= (FDC.int_req & 0x80);                    // Or in the Interrupt Request bit (bit 7) - this is the gating one
-            if (FDC.status & ST_TRACK0)    ret &= ~0x02;    // Track 0 bit
-            if (FDC.status & ST_INDEX_DRQ) ret &= ~0x04;    // Index bit
-            if (FDC.status & ST_NOT_READY) ret |= 0x08;     // Not Ready bit
-            if (FDC.status & ST_INDEX_DRQ) ret |= 0x40;     // Data Request
-            return ret;
+            return FDC.int_req;
         }
     }
 
@@ -377,7 +374,7 @@ u8 fdc_read(u8 addr)
 void fdc_write(u8 addr, u8 data)
 {
     fdc_state_machine(); // Clock the state machine before we check for a new command
-
+    
     // -------------------------------------------------------
     // Handle the write - most of the time it's a command...
     // -------------------------------------------------------
@@ -499,6 +496,23 @@ void fdc_write(u8 addr, u8 data)
             }
         }
     }
+}
+
+// ---------------------------------------------------------------
+// External interface call to set the current drive.
+// ---------------------------------------------------------------
+void fdc_setDrive(u8 drive)
+{
+    FDC.drive = drive;                      // Record the drive in use
+}
+
+// ---------------------------------------------------------------
+// External interface call to set the current side.
+// ---------------------------------------------------------------
+void fdc_setSide(u8 side)
+{
+    debug_printf("Set Side %d\n", side);
+    FDC.side = side;                        // Record the side in use
 }
 
 // ---------------------------------------------------------------
