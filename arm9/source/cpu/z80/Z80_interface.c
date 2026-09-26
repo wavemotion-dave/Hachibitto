@@ -40,10 +40,8 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
         if (bCartInPage[2]) 
         {
             u16 off = address & 0xFF;
-            if (off < 0x80)
-                return SCCRead(off, &mySCC);
-            else if (off < 0x90)
-                return SCCRead(off + 0x20, &mySCC);
+            if (off < 0x80) return SCCRead(off, &mySCC);
+            else if (off < 0x90) return SCCRead(off + 0x20, &mySCC);
         }
     }
     else if ((special_memory_access & SPEC_MEM_SCC_PLUS_ENABLED) && (address >= 0xB800) && (address <= 0xBFFD))

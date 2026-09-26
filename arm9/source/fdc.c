@@ -342,18 +342,18 @@ u8 fdc_read(u8 addr)
             if (FDC.status & ST_INDEX_DRQ)   // Are we waiting for the CPU to read a byte?
             {
                 FDC.status &= ~ST_INDEX_DRQ; // Clear Data Request flag
-                FDC.int_req &= ~0x40;        // Clear Data Request flag
                 FDC.wait_for_read = 0;       // Clock in next byte (or end sequence if we have read all there is)
             }
             return FDC.data;                 // Return data to caller
         }
-        case 4: // IDxxRITW where I=~INTRQ (this is the important one!), D=DATA_REQ, R=~READY, I=~INDEX, W=~WRITEPROTECT
+        case 4: // Ready Register. IDxxRITW where I=~INTRQ (this is the important one!), D=DATA_REQ, R=~READY, I=~INDEX, W=~WRITEPROTECT
         {
             u8 ret = 0x37;
-            ret |= FDC.int_req;                             // Or in the Interrupt Request bit (bit 7) - this is the gating one
+            ret |= (FDC.int_req & 0x80);                    // Or in the Interrupt Request bit (bit 7) - this is the gating one
             if (FDC.status & ST_TRACK0)    ret &= ~0x02;    // Track 0 bit
             if (FDC.status & ST_INDEX_DRQ) ret &= ~0x04;    // Index bit
             if (FDC.status & ST_NOT_READY) ret |= 0x08;     // Not Ready bit
+            if (FDC.status & ST_INDEX_DRQ) ret |= 0x40;     // Data Request
             return ret;
         }
     }

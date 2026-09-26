@@ -1516,8 +1516,15 @@ void Hachibitto_main(void)
           if (slide_n_glide_key_left)  slide_n_glide_key_left--;
           if (slide_n_glide_key_right) slide_n_glide_key_right--;
           last_mapped_key = 0;
+      }
 
-          if (save_config)
+      // -----------------------------------------------------------------------------
+      // If the user has changed the screen position using the LEFT shoulder key,
+      // we need to save that out. But we do so only if they still aren't doing that.
+      // -----------------------------------------------------------------------------
+      if (save_config)
+      {
+          if ((nds_key & KEY_L) == 0)
           {
               if (--save_config == 0)
               {
@@ -1531,6 +1538,10 @@ void Hachibitto_main(void)
           if (--screen_position_dampen == 0)
           {
               save_config = 60; // Save config in 1 second
+          }
+          else
+          {
+              save_config = 0;
           }
       }
 

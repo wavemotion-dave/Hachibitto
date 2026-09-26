@@ -426,13 +426,6 @@ void FMPACWrite(u8 value, u8 address, FMPAC *chip)
     }
 }
 
-u8 FMPACRead(u8 address, FMPAC *chip)
-{
-    (void)address;
-    (void)chip;
-    return 0xFF;
-}
-
 ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 {
     int i;

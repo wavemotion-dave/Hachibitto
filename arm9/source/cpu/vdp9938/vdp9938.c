@@ -1454,25 +1454,6 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     value &= VDP_RegisterMasks[iReg];
   }
 
-  // Clearing the VDP Line interrupt can drop the IRQ
-  if ((iReg == 0) && ((VDPStatus[1]&0x01)&&!(value&0x10)))
-  {
-      VDPStatus[1]&=0xFE;
-      SetVDPIRQ(VDP_IRQ_LINE, 0);
-  }
-
-  /* Enabling IRQs may cause an IRQ here */
-  if ((iReg==1) && ((VDP[1]^value)&value&VDP9938_REG1_IRQ) && (VDPStatus[0]&VDP9938_STAT_VBLANK))
-  {
-      SetVDPIRQ(VDP_IRQ_VBLANK, 1);
-  }
-
-  // Clearing the VDP VBLANK interrupt can drop the IRQ
-  if ((iReg==1) && (!(value & VDP9938_REG1_IRQ)))
-  {
-      SetVDPIRQ(VDP_IRQ_VBLANK, 0);
-  }
-
   /* There are VDP registers - map down to these and mask off irrelevant bits */
   value &= VDP_RegisterMasks[iReg];
 
@@ -1482,6 +1463,16 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
    /* Depending on the register, do... */
   switch (iReg)
   {
+    case 0:
+        if((VDPStatus[1]&0x01)&&!(value&0x10)) // Clearing the VDP Line interrupt can drop the IRQ
+        {
+            VDPStatus[1]&=0xFE;
+            SetVDPIRQ(VDP_IRQ_LINE, 0);
+        }
+        break;    
+    case 1: 
+        if(VDPStatus[0]&0x80) SetVDPIRQ(VDP_IRQ_VBLANK, value&0x20? 1:0); 
+        break;
     case  7:
       FGColor=value>>4;
       BGColor=value&0x0F;
