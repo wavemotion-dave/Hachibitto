@@ -392,65 +392,81 @@ ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
 }
 
 
-/** RefreshSprites() *****************************************/
-/** This function is called from RefreshLine#() to refresh  **/
-/** and draw sprites to a given pixel line.                 **/
-/*************************************************************/
-void RefreshSprites(register byte Y)
+/** RefreshSprites() ***************************************/
+/** VScroll changes the logical sprite scanline, but the  **/
+/** result is still drawn into physical XBuf row Y.       **/
+/***********************************************************/
+ITCM_CODE void RefreshSprites(register byte Y)
 {
   register byte *PT,*AT;
   register byte *P,*T,C;
   register int L,K,N;
   unsigned int M;
 
-  /* Find sprites to show, update 5th sprite status */
-  N = ScanSprites(Y,&M);
+  /*
+   * R23/VScroll moves the logical scanline through the
+   * sprite coordinate system.
+   *
+   * Keep Y as the physical XBuf destination row.
+   */
+  register byte spriteY = Y;
+  if (ScrMode == 2)  spriteY += VScroll;
+
+  /* Find sprites to show using the scrolled scanline */
+  N = ScanSprites(spriteY,&M);
   if((N<0) || !M) return;
 
-  T  = XBuf+256*Y;
+  /* Still draw into the actual physical output row */
+  T = XBuf + 256*Y;
   AT = SprTab+(N<<2);
 
   /* For each possibly shown sprite... */
   for( ; N>=0 ; --N, AT-=4)
   {
-    /* If showing this sprite... */
     if(M&(1<<N))
     {
-      C=AT[3];                  /* C = sprite attributes */
-      L=C&0x80? AT[1]-32:AT[1]; /* Sprite may be shifted left by 32 */
-      C&=0x0F;                  /* C = sprite color */
-      C = XPal[C];              /* Map to correct color */
+      C=AT[3];
+      L=C&0x80? AT[1]-32:AT[1];
+      C&=0x0F;
+      C=XPal[C];
 
       if((L<256) && (L>-OH) && C)
       {
-        K=AT[0];                /* K = sprite Y coordinate */
-        if(K>256-IH) K-=256;    /* Y coordinate may be negative */
+        K=AT[0];
+        if(K>256-IH) K-=256;
 
-        P  = T+L;
-        K  = Y-K-1;
-        PT = SprGen
-           + ((int)(IH>8? (AT[2]&0xFC):AT[2])<<3)
-           + (OH>IH? (K>>1):K);
+        P=T+L;
+
+        /*
+         * Calculate the sprite pattern row using the
+         * scrolled/logical scanline, not physical Y.
+         */
+        K=spriteY-K-1;
+
+        PT=SprGen
+           +((int)(IH>8? (AT[2]&0xFC):AT[2])<<3)
+           +(OH>IH?(K>>1):K);
 
         /* Mask 1: clip left sprite boundary */
-        K=L>=0? 0xFFFF:(0x10000>>(OH>IH? (-L>>1):-L))-1;
+        K=L>=0?0xFFFF:
+          (0x10000>>(OH>IH?(-L>>1):-L))-1;
 
         /* Mask 2: clip right sprite boundary */
         L+=(int)OH-257;
         if(L>=0)
         {
-          L=(IH>8? 0x0002:0x0200)<<(OH>IH? (L>>1):L);
+          L=(IH>8?0x0002:0x0200)
+            <<(OH>IH?(L>>1):L);
           K&=~(L-1);
         }
 
-        /* Get and clip the sprite data */
-        K&=((int)PT[0]<<8)|(IH>8? PT[16]:0x00);
+        /* Get and clip sprite data */
+        K&=((int)PT[0]<<8)|(IH>8?PT[16]:0x00);
 
         if(OH>IH)
         {
           /* Big (zoomed) sprite */
 
-          /* Draw left 16 pixels of the sprite */
           if(K&0xFF00)
           {
             if(K&0x8000) P[1]=P[0]=C;
@@ -463,7 +479,6 @@ void RefreshSprites(register byte Y)
             if(K&0x0100) P[15]=P[14]=C;
           }
 
-          /* Draw right 16 pixels of the sprite */
           if(K&0x00FF)
           {
             if(K&0x0080) P[17]=P[16]=C;
@@ -480,7 +495,6 @@ void RefreshSprites(register byte Y)
         {
           /* Normal (unzoomed) sprite */
 
-          /* Draw left 8 pixels of the sprite */
           if(K&0xFF00)
           {
             if(K&0x8000) P[0]=C;
@@ -493,7 +507,6 @@ void RefreshSprites(register byte Y)
             if(K&0x0100) P[7]=C;
           }
 
-          /* Draw right 8 pixels of the sprite */
           if(K&0x00FF)
           {
             if(K&0x0080) P[8]=C;
@@ -890,7 +903,11 @@ void RefreshLine1(u8 uY)
 /** Refresh line Y (0..191) of SCREEN2, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-ITCM_CODE void RefreshLine2(u8 uY)
+/** RefreshLine2() *******************************************/
+/** Refresh line Y (0..191) of SCREEN2, including sprites   **/
+/** in this line.                                           **/
+/*************************************************************/
+void RefreshLine2(u8 uY)
 {
   u32 *P;
   register byte FC,BC;
@@ -899,18 +916,39 @@ ITCM_CODE void RefreshLine2(u8 uY)
 
   DEBUG_REFRESH(2);
 
-  P=(u32*)(XBuf+(uY<<8));
+  /*
+   * R18 vertical display adjustment.
+   * VAdjust is already defined as:
+   *
+   *   -((signed char)(VDP[18]) >> 4)
+   *
+   * Use it only for the physical destination row.
+   */
+  int dstY = (int)uY + VAdjust;
+
+  if ((dstY < 0) || (dstY >= 192))
+    return;
+
+  P=(u32*)(XBuf+(dstY<<8));
 
   if (!ScreenON)
   {
-    memset(XBuf + (uY<<8), XPal[BGColor], 256);
+    memset(XBuf + (dstY<<8), XPal[BGColor], 256);
   }
   else
   {
-    u32 ptLow = 0; u32 ptHigh = 0;
+    u32 ptLow = 0;
+    u32 ptHigh = 0;
 
-    J   = ((u16)((u16)uY&0xC0)<<5)+(uY&0x07);
-    T   = ChrTab+((u16)((u16)uY&0xF8)<<2);
+    /*
+     * R23 / VScroll selects the source line of the
+     * 256-line virtual Screen 2 display.
+     */
+    u8 srcY = uY + VScroll;
+
+    J = ((u16)((u16)srcY&0xC0)<<5) + (srcY&0x07);
+    T = ChrTab + ((u16)((u16)srcY&0xF8)<<2);
+
     u8 lastT = ~(*T);
 
     for(int X=0;X<32;X++)
@@ -923,10 +961,13 @@ ITCM_CODE void RefreshLine2(u8 uY)
           FC   = (K>>4);
           BC   = K & 0x0F;
           K    = ChrGen[(J+I)&ChrGenM];
+
           u32* ptLut = (u32*)(lutTablehh[FC][BC]);
-          ptLow = *(ptLut + ((K>>4)));
+
+          ptLow  = *(ptLut + ((K>>4)));
           ptHigh = *(ptLut + ((K & 0xF)));
       }
+
       *P++ = ptLow;
       *P++ = ptHigh;
       T++;
