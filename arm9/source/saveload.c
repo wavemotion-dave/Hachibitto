@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0006  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0007  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -255,6 +255,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&XPalReal0,             sizeof(XPalReal0),              1, handle);
         if (retVal) retVal = fwrite(&ALatch,                sizeof(ALatch),                 1, handle);
         if (retVal) retVal = fwrite(&frame_number,          sizeof(frame_number),           1, handle);
+        if (retVal) retVal = fwrite(&drawn_frame_number,    sizeof(drawn_frame_number),     1, handle);        
         if (retVal) retVal = fwrite(&CurrentEpochSaved,     sizeof(CurrentEpochSaved),      1, handle);
         if (retVal) retVal = fwrite(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
         if (retVal) retVal = fwrite(&palette_latch,         sizeof(palette_latch),          1, handle);
@@ -476,6 +477,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&XPalReal0,             sizeof(XPalReal0),              1, handle);
             if (retVal) retVal = fread(&ALatch,                sizeof(ALatch),                 1, handle);
             if (retVal) retVal = fread(&frame_number,          sizeof(frame_number),           1, handle);
+            if (retVal) retVal = fread(&drawn_frame_number,    sizeof(drawn_frame_number),     1, handle);
             if (retVal) retVal = fread(&CurrentEpochSaved,     sizeof(CurrentEpochSaved),      1, handle);
             if (retVal) retVal = fread(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
             if (retVal) retVal = fread(&palette_latch,         sizeof(palette_latch),          1, handle);

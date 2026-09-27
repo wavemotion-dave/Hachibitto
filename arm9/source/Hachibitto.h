@@ -17,7 +17,8 @@
 extern u32 debug[0x10];
 extern u32 DX, DY;
 
-#define DS_LCD_VRAM   ((u16*)0x06000000) // This is where we draw on the DS screen into LCD VRAM
+#define DS_LCD_VRAM_1 ((u16*)0x06000000) // This is where we draw on the DS screen into LCD VRAM - BG2
+#define DS_LCD_VRAM_2 ((u16*)0x06020000) // This is where we draw on the DS screen into LCD VRAM - BG3
 
 // These are the various special icons/menu operations
 #define MENU_CHOICE_NONE         0x00

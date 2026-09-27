@@ -268,17 +268,6 @@ void HachibittoModeNormal(void)
     REG_BG3Y = 0;
 }
 
-//*****************************************************************************
-// Put the top screen in refocused bitmap mode
-//*****************************************************************************
-void HachibittoInitScreenUp(void)
-{
-  videoSetMode(MODE_5_2D | DISPLAY_BG3_ACTIVE);
-  vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
-  vramSetBankB(VRAM_B_MAIN_SPRITE);
-  HachibittoModeNormal();
-}
-
 // ----------------------------------------------------------------------------
 // This stuff handles the 'random' screen snapshot at the top screen...
 // ----------------------------------------------------------------------------
@@ -930,11 +919,13 @@ void SetDefaultGameConfig(void)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
-    myConfig.blendScr7    = 0;                           // No blending by default - some visual novel games work best with this
+    myConfig.reserved0    = 0;
+    myConfig.reserved1    = 0;
+    myConfig.reserved2    = 0;
+    myConfig.reserved3    = 0;
+    myConfig.reserved4    = 0;
     myConfig.reserved5    = 0;
-    myConfig.reserved6    = 0;
-    myConfig.reserved7    = 0;
-    myConfig.reserved8    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
+    myConfig.reserved6    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
 
     // ----------------------------------------------------------------------------------
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
@@ -1042,7 +1033,6 @@ const struct options_t Option_Table[1][20] =
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
-        {"SCR7 BLEND",     {"OFF", "ENABLED"},                                                                                                                                  &myConfig.blendScr7,      2},        
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
         {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},

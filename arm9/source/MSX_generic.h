@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x000C
+#define CONFIG_VER                  0x000E
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -83,13 +83,15 @@ struct __attribute__((__packed__)) Config_t
     u8  yOffset;
     u8  cpuBoost;
     u8  splitRefresh;
-    u8  blendScr7;
     u8  scaleScreen;
     u8  maskBorders;
+    u8  reserved0;
+    u8  reserved1;
+    u8  reserved2;
+    u8  reserved3;
+    u8  reserved4;
     u8  reserved5;
     u8  reserved6;
-    u8  reserved7;
-    u8  reserved8;
 };
 
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression
@@ -161,7 +163,7 @@ extern u8 mirror_ram_bank[4];
 extern u32 MAX_CART_SIZE_KB;
 
 extern u8 *ROM_Memory;
-extern u8 RAM_Memory[0x40000];
+extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x10000];
 
@@ -238,7 +240,6 @@ extern void msxRun(void);
 extern void allocateCompressedMem(void);
 extern void restoreCompressedMem(void);
 extern void LoadConfig(void);
-extern void HachibittoInitScreenUp(void);
 extern void HachibittoFindFiles(void);
 extern void HachibittoChangeOptions(void);
 extern void DSPrint(int iX,int iY,int iScr,char *szMessage);

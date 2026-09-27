@@ -70,7 +70,7 @@ u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 u32 MAX_CART_SIZE_KB = 1256;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
                                 
 u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
-u8 RAM_Memory[0x40000]          ALIGN(32) = {0};        // RAM is 256K for the MSX2 (this is fairly standard for MSX2 machines)
+u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]          ALIGN(32) = {0};        // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
 u8 SRAM_Memory[0x10000]         ALIGN(32) = {0};        // 'Special RAM' - SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
 
@@ -1604,7 +1604,7 @@ void Hachibitto_main(void)
 // ----------------------------------------------------------------------------------------
 void useVRAM(void)
 {
-    vramSetBankD(VRAM_D_LCD );        // Not using this for video but 128K of faster RAM always useful!  Mapped at 0x06860000 -   Not currently used...
+    vramSetBankD(VRAM_D_LCD );        // Not using this for video but 128K of faster RAM always useful!  Mapped at 0x06860000 -   Used as temp swap area when saving/loading state (256K total)
     vramSetBankE(VRAM_E_LCD );        // Not using this for video but 64K of faster RAM always useful!   Mapped at 0x06880000 -   ..
     vramSetBankF(VRAM_F_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06890000 -   ..
     vramSetBankG(VRAM_G_LCD );        // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06894000 -   ..
@@ -2054,10 +2054,17 @@ u8 msxInit(char *szGame)
     // but we can use it for fast memory swaps and look-up-tables.
     // -----------------------------------------------------------------
     videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
-    vramSetBankA(VRAM_A_MAIN_BG_0x06000000);      // This is our top emulation screen (where the game is played)
-    vramSetBankB(VRAM_B_LCD);                     // 128K of Video Memory mapped at 0x6820000 which can be used in-game
-    REG_BG3CNT = BG_BMP8_256x256;
-    REG_BG2CNT = BG_BMP8_256x256;
+    vramSetBankA(VRAM_A_MAIN_BG_0x06000000);       // Bank A starts at 0x06000000
+    vramSetBankB(VRAM_B_MAIN_BG_0x06020000);       // Bank B starts at 0x06020000
+
+    REG_BG2CNT = BG_BMP8_256x256 | BG_BMP_BASE(0);  // Uses Bank A
+    REG_BG3CNT = BG_BMP8_256x256 | BG_BMP_BASE(8);  // Uses Bank B
+
+    // Alpha blending configuration
+    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
+
+    // EVA = 8, EVB = 8 (50/50 blend)
+    REG_BLDALPHA = (8) | (8 << 8);
 
     REG_BG2PA = (1<<8);
     REG_BG2PB = 0;
@@ -2077,7 +2084,8 @@ u8 msxInit(char *szGame)
     for (uBcl=0;uBcl<255;uBcl++)
     {
         uVide=0;
-        dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM+uBcl*128,256);
+        dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM_1+uBcl*128,256);
+        dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM_2+uBcl*128,256);
     }
 
     // LoadGameRom() will figure out how big and where to load it...
@@ -2123,7 +2131,10 @@ void msxUpdateScreen(void)
 
     if (!skip_render)
     {
-        dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM, 256*212);
+        if (frame_number & 1)
+            dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
+        else 
+            dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);
     }
     skip_render=0;
 }

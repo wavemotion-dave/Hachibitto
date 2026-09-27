@@ -35,6 +35,7 @@ u8 ALatch               __attribute__((section(".dtcm"))) = 0;
 u8 OH                   __attribute__((section(".dtcm"))) = 0;
 u8 IH                   __attribute__((section(".dtcm"))) = 0;
 u32 frame_number        __attribute__((section(".dtcm"))) = 0;
+u32 drawn_frame_number  __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpochSaved    __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
@@ -45,8 +46,6 @@ u8 frame_skip_mask      __attribute__((section(".dtcm"))) = 0;
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
 uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
-u8 screen7LUT0[256]      __attribute__((section(".dtcm")));
-u8 screen7LUT1[256]      __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
 {
@@ -108,15 +107,6 @@ void write_port_palette(uint8_t data)
         // Auto-increment Palette Register index R#16
         VDP[16] = (VDP[16] + 1) & 0x0F;
         palette_latch = false;
-    }
-}
-
-void BuildScreen7LUT(void)
-{
-    for (int i = 0; i < 256; i++)
-    {
-        screen7LUT0[i] = i >> 4;   // Keep left pixel: A
-        screen7LUT1[i] = i & 0x0F; // Keep right pixel: B
     }
 }
 
@@ -1242,41 +1232,52 @@ ITCM_CODE void RefreshLine5(u8 uY)
     }
 }
 
-/** RefreshLine6() ********************************************/
+/** RefreshLine6() ******************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
-/*************************************************************/
+/************************************************************/
 ITCM_CODE void RefreshLine6(u8 uY)
 {
-    uint8_t *P = RefreshBorder(uY);
-
     DEBUG_REFRESH(6);
 
     if (!ScreenON)
     {
-      memset(XBuf + (uY<<8), XPal[BGColor], 256);
+        memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
-        u32 *destPtr32 = (u32*) P;
+        uint8_t *P = RefreshBorder(uY);
+        
+        u32 * restrict dst32 = (u32*)P;
         u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
-        u8 *srcPtr = &ChrTab[addr & 0x7FFF];
+        const u8 * restrict src = &ChrTab[addr & 0x7FFF];
 
-        // Loops 64 times. Processes exactly 128 source bytes.
-        // Each iteration reads 2 source bytes and generates 4 destination pixels (1 word).
-        for (int i = 0; i < 128; i += 2)
+        if (drawn_frame_number & 1) // Render the B pixels
         {
-            u32 b0 = srcPtr[i];
-            u32 b1 = srcPtr[i+1];
+            for (int i = 0; i < 128; i += 2)
+            {
+                u32 b0 = src[i];
+                u32 b1 = src[i+1];
 
-            // This extracts two distinct 2-bit pixels per source byte.
-            // It produces 4 continuous horizontal pixels, mapping perfectly
-            // to a 256-pixel wide screen without skipping half the line or overrunning.
-             u32 word = ((b0 >> 6) & 0x03) |
-                        (((b0 >> 2) & 0x03) << 8) |
-                        (((b1 >> 6) & 0x03) << 16) |
-                        (((b1 >> 2) & 0x03) << 24);
+                *dst32++ =
+                    ((b0 >> 4) & 3) |
+                    (((b0     ) & 3) << 8) |
+                    (((b1 >> 4) & 3) << 16) |
+                    (((b1     ) & 3) << 24);
+            }
+        }
+        else // Render the A pixels
+        {
+            for (int i = 0; i < 128; i += 2)
+            {
+                u32 b0 = src[i];
+                u32 b1 = src[i+1];
 
-            *destPtr32++ = word;
+                *dst32++ =
+                    ((b0 >> 6) & 3) |
+                    (((b0 >> 2) & 3) << 8) |
+                    (((b1 >> 6) & 3) << 16) |
+                    (((b1 >> 2) & 3) << 24);
+            }
         }
 
         ColorSprites(uY, P-32);
@@ -1305,48 +1306,19 @@ ITCM_CODE void RefreshLine7(u8 uY)
 
         const u32* restrict s32 = (const u32*)src;
         
-        if (myConfig.blendScr7)
+        for (int i = 0; i < 32; i++)
         {
-            const u8 *lut = (frame_number & 1) ? screen7LUT1 : screen7LUT0;
-
-            for (int i = 0; i < 32; i++)
+            u32 chunk0 = *s32++;
+            u32 chunk1 = *s32++;
+            if (drawn_frame_number & 1) // Render the B pixels
             {
-                u32 chunk0 = *s32++;
-                u32 chunk1 = *s32++;
-
-                u32 b0 = lut[chunk0 & 0xFF];
-                u32 b1 = lut[(chunk0 >> 8) & 0xFF];
-                u32 b2 = lut[(chunk0 >> 16) & 0xFF];
-                u32 b3 = lut[(chunk0 >> 24) & 0xFF];
-
-                u32 b4 = lut[chunk1 & 0xFF];
-                u32 b5 = lut[(chunk1 >> 8) & 0xFF];
-                u32 b6 = lut[(chunk1 >> 16) & 0xFF];
-                u32 b7 = lut[(chunk1 >> 24) & 0xFF];
-
-                *dst32++ = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-                *dst32++ = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
+                *dst32++ = (chunk0 & 0x0F0F0F0F);
+                *dst32++ = (chunk1 & 0x0F0F0F0F);
             }
-        }
-        else
-        {
-            for (int i = 0; i < 32; i++)
+            else // Render the A pixels
             {
-                u32 chunk0 = *s32++;
-                u32 chunk1 = *s32++;
-
-                u32 b0 = screen7LUT0[chunk0 & 0xFF];
-                u32 b1 = screen7LUT0[(chunk0 >> 8) & 0xFF];
-                u32 b2 = screen7LUT0[(chunk0 >> 16) & 0xFF];
-                u32 b3 = screen7LUT0[(chunk0 >> 24) & 0xFF];
-
-                u32 b4 = screen7LUT0[chunk1 & 0xFF];
-                u32 b5 = screen7LUT0[(chunk1 >> 8) & 0xFF];
-                u32 b6 = screen7LUT0[(chunk1 >> 16) & 0xFF];
-                u32 b7 = screen7LUT0[(chunk1 >> 24) & 0xFF];
-
-                *dst32++ = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-                *dst32++ = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
+                *dst32++ = (chunk0 & 0xF0F0F0F0) >> 4;
+                *dst32++ = (chunk1 & 0xF0F0F0F0) >> 4;
             }
         }
 
@@ -1783,7 +1755,11 @@ ITCM_CODE void Loop9938(void)
       // -------------------------------------
       // !!!Into the Vertical Blank!!!
       // -------------------------------------
-      frame_number++;
+      if (!(timingFrames & frame_skip_mask))
+      {
+          drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
+      }
+      frame_number++; // This one tracks all frames... drawn or skipped
 
       /* Generate IRQ when enabled and when VBlank flag goes up */
       if (VDP9938_VBlankON && !(VDPStatus[0]&VDP9938_STAT_VBLANK))
@@ -1836,7 +1812,6 @@ void Reset9938(void)
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
 
     BuildNibbleLUT();
-    BuildScreen7LUT();
 
     // ---------------------------------------------------------------------------------------------
     // For the DS-Lite/Phat we need some level of frameskip... the MSX2 has just too much happening!
@@ -1893,6 +1868,7 @@ void Reset9938(void)
     SprTab=SprGen=VDP_Memory;               // Sprite Table/Generator pointing to start of Video Memory
     VPAGE=VDP_Memory;                       // VPAGE starts off pointing to start of Video Memory
     frame_number = 0;                       // Zero frame counter
+    drawn_frame_number = 0;                 // Zero frame counter
     msx_irq_pending = 0;                    // No IRQs pending
 
     ChrTabM = 0x3FFF;                       // Default Mask

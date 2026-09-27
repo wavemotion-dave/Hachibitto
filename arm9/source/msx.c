@@ -972,7 +972,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
     {
         u8 page = Port-0xFC;
-        u8 bank = Value & 0xF; // 256K
+        u8 bank = Value & 0x7; // 128K is 16K in 8 banks
 
         mirror_ram_bank[page] = bank; // For read-back
 
