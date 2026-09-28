@@ -1054,22 +1054,13 @@ u8 MSX_GuessROMType(u32 size)
 
 
 /*********************************************************************************
- * Wipe main RAM with random patterns... or fill with 0x00 for some emulations.
+ * We wipe main RAM with 0x00 values (helps with compression of save states even
+ * if not truly accurate to real hardware) and SRAM is wiped to 0xFF values.
  ********************************************************************************/
 void msxWipeRAM(void)
 {
-    // Clear main RAM with either 0x00 or a random byte depending on config...
-    for (int i=0; i<sizeof(RAM_Memory); i++)
-    {
-        u8 randbyte = rand() & 0xFF;
-        RAM_Memory[i] = (myConfig.memWipe ? 0x00 : randbyte);
-    }
-
-    // SRAM memory gets 0xFF
-    for (int i=0; i<sizeof(SRAM_Memory); i++)
-    {
-        SRAM_Memory[i] = 0xFF;
-    }
+    memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
+    memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
 }
 
 // -------------------------------------------------------------------

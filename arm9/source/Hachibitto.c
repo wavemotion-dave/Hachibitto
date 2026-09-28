@@ -1617,8 +1617,10 @@ void ShowInstructions(void)
     dmaCopy((void*) instructionsPal,(void*) BG_PALETTE_SUB,256*2);
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
+    
+    WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
 
-    while ((keysCurrent() & KEY_START) == 0)
+    while ((keysCurrent() & (KEY_START | KEY_A | KEY_B)) == 0)
     {
         ShowRandomPreviewSnaps();
         swiWaitForVBlank();
@@ -2252,14 +2254,14 @@ u32 LoopZ80()
       CPU.NumInts++;   // Track Interrupt Requests
       if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
       {
-          mid_frame_interrupt=3; // Let CPU run 3 lines then redraw the previous 2...
+          mid_frame_interrupt=3; // Let CPU run for 2 lines then redraw the previous 2...
       }
   }
 
   // Drop out unless end of screen is reached
   if (CurLine == VDP9938_END_LINE)
   {
-      CPU.CycleDeficit = 0; // Start fresh at the VBlank boundary
+      CPU.CycleDeficit = 0; // Start fresh at the VBlank boundary. Keeps frame timing consistent.
       return 0;
   }
   return 1;
@@ -2271,7 +2273,7 @@ u32 LoopZ80()
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (128*1024)
+#define MAX_DEBUG_BUF_SIZE   (64*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;

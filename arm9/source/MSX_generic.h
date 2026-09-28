@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x000E
+#define CONFIG_VER                  0x000F
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -78,7 +78,6 @@ struct __attribute__((__packed__)) Config_t
     u8  keyboard;
     u8  maxSprites;
     u8  dpad;
-    u8  memWipe;
     u8  musicExpand;
     u8  yOffset;
     u8  cpuBoost;
@@ -92,6 +91,7 @@ struct __attribute__((__packed__)) Config_t
     u8  reserved4;
     u8  reserved5;
     u8  reserved6;
+    u8  reserved7;
 };
 
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression

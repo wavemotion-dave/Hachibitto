@@ -1,8 +1,19 @@
+// =====================================================================================
+// Copyright (c) 2026 Dave Bernazzani (wavemotion-dave)
+//
+// Copying and distribution of this emulator, its source code and associated
+// readme files, with or without modification, are permitted in any medium without
+// royalty provided this copyright notice is used and wavemotion-dave and
+// Marat Fayzullin (fMSX core) are thanked profusely.
+//
+// The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
+// =====================================================================================
+
 //
 //  msx_music.c
-//  Konami FM-PAC (Yamaha YM2413 / OPLL) sound chip emulator - music only.
+//  MSX-MUSIC (Yamaha YM2413 / OPLL) sound chip emulator - music only.
 //  See YM.h for the accuracy-level disclaimer: this is a drastically
-//  simplified, no-FM, no-ADSR design chosen purely for speed.
+//  simplified, minimal-FM, no-ADSR design chosen purely for speed.
 //
 
 #include "msx_music.h"
@@ -15,20 +26,20 @@
 #define YM_MASTER_CLOCK            3579545   // MSX standard clock, same as SCC's
 #define YM_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
 #define YM_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
-                                                // full on key-on - ~16 samples (~0.6ms), fast/click-free
+                                             // full on key-on - ~16 samples (~0.6ms), fast/click-free
 #define YM_RELEASE_STEP            3984      // MELODIC release rate: 16.16 fixed-point step targeting a
-                                                // ~150ms fade to silence on key-off, not an instant cutoff.
-                                                // This is the fix for FM music sounding "thin"/"cut" - real FM
-                                                // pieces lean on overlapping decay tails for their fullness
-                                                // (unlike AY music, which doesn't use per-note envelopes at
-                                                // all), and cutting every note off in <1ms removed exactly
-                                                // that. Retune this constant if it still isn't right - up
-                                                // for a lusher/longer tail, down if notes start blurring
-                                                // together too much.
+                                             // ~150ms fade to silence on key-off, not an instant cutoff.
+                                             // This is the fix for FM music sounding "thin"/"cut" - real FM
+                                             // pieces lean on overlapping decay tails for their fullness
+                                             // (unlike AY music, which doesn't use per-note envelopes at
+                                             // all), and cutting every note off in <1ms removed exactly
+                                             // that. Retune this constant if it still isn't right - up
+                                             // for a lusher/longer tail, down if notes start blurring
+                                             // together too much.
 #define YM_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
-                                                // Real drums (hi-hat especially) decay in tens of ms, not
-                                                // hundreds - using the melodic rate here made consecutive
-                                                // hits overlap instead of sounding like distinct hits.
+                                             // Real drums (hi-hat especially) decay in tens of ms, not
+                                             // hundreds - using the melodic rate here made consecutive
+                                             // hits overlap instead of sounding like distinct hits.
 
 /* Carrier sustain level test: map OPLL SL to the same approximate gain
    levels used by the earlier envelope experiment, but move toward the target
@@ -39,13 +50,14 @@ static const u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
      16,  11,   8,  5,  4,  2,  1,  0
 };
 #define YM_SUSTAIN_TICK_SAMPLES 64
-        // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
+                            // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
                             // Real drums (hi-hat especially) decay in tens of ms, not
                             // hundreds - using the melodic rate here made consecutive
                             // hits (fired every 100-150ms in a normal rhythm pattern)
                             // overlap and blend continuously instead of sounding like
                             // distinct hits. Applies to BD/TOM and HH/SD/TOP-CY alike.
-#define YM_OUT_SHIFT               8        // output headroom for everything - melodic channels AND
+
+#define YM_OUT_SHIFT  8     // Output headroom for everything - melodic channels AND
                             // percussion now both go through YM_SinTable via real
                             // phase-selection logic (see YMMixer), not a separate
                             // noise path, so one shared shift is enough. The earlier

@@ -912,7 +912,6 @@ void SetDefaultGameConfig(void)
     myConfig.keyboard     = OVL_FULLKBD;                 // Default to normal full MSX keyboard
     myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
-    myConfig.memWipe      = 1;                           // Default to CLEAR memory (helps with save states)
     myConfig.yOffset      = 0;                           // Default is no Y offset
     myConfig.musicExpand  = 0;                           // Default is no expansion. 1=MSX-MUSIC, 2=SCC+
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
@@ -925,7 +924,8 @@ void SetDefaultGameConfig(void)
     myConfig.reserved3    = 0;
     myConfig.reserved4    = 0;
     myConfig.reserved5    = 0;
-    myConfig.reserved6    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
+    myConfig.reserved6    = 0;
+    myConfig.reserved7    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
 
     // ----------------------------------------------------------------------------------
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
@@ -1026,7 +1026,6 @@ const struct options_t Option_Table[1][20] =
         {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
-        {"RAM WIPE",       {"RANDOM", "CLEAR"},                                                                                                                                 &myConfig.memWipe,        2},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
         {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},

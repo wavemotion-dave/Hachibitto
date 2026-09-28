@@ -1025,7 +1025,7 @@ void RefreshLine3(u8 uY)
 #define LS_BASE 64   // generous margin both sides for HAdjust (~±8) + sprite draw overshoot (±32)
 static u8 LineScratch[400] ALIGN(32) __attribute__((section(".dtcm")));
 
-uint8_t *RefreshBorder(uint8_t Y)
+ITCM_CODE uint8_t *RefreshBorder(uint8_t Y)
 {
     int shift = HAdjust & ~1;   // even-only clamp - we only scroll in 2 pixel jumps which is not perfect but allows for faster rendering.
 
