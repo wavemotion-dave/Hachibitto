@@ -14,11 +14,12 @@ These hobby emulators have been a labor of love. An embarassing amount of develo
 
 Features :
 -----------------------
-* Loads .ROM cartridge files up to 1.25MB (DS-Lite/Phat) or 4MB (DSi)
+* Loads .ROM cartridge files up to 1.25MB (DS-Lite/Phat) or 4MB (DSi).
 * Loads .DSK disk files that are single side (360K) or double sided (720K) with in-game disk swap.
-* Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard
-* Save and Restore states so you can pick up where you left off on a per-game basis
-* Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!)
+* Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard.
+* Save and Restore states so you can pick up where you left off on a per-game basis.
+* Standard PSG, 2x PSG, SCC, SCC+ and MSX-MUSIC available.
+* Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!).
 * High Score saving for 10 scores with initials, date/time.
 * Favorites list so you can mark games as 'like' or 'love' - a yellow or red heart icon will mark your favorite games.
 * Solid Z80 core that passes the ZEXDOC test suite (covering everything except undocumented flags which are partially supported for the few games that need them).
