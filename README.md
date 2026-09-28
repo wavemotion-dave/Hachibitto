@@ -1,10 +1,13 @@
 # Hachibitto - MSX2 Emulator
 
-![Hachibitto Logo](images/Hachibito-HB8-Console.jpeg)
+Welcome to Hachibitto (pronounced Ha-Chi-Bee-Toe)
 
-![Hachibitto Logo](images/Hachibito-HB8-Backplate.jpeg)
+![Loading Screen](arm9/gfx_data/pdev_bg0.png)
 
-![Hachibitto Logo](images/MemoryMap.png)
+![Hachibitto Console](images/Hachibito-HB8-Console.jpeg)
 
+![Hachibitto Backplate](images/Hachibito-HB8-Backplate.jpeg)
+
+![Hachibitto Memory Map](images/MemoryMap.png)
 
 <img width="582" height="606" alt="image" src="https://github.com/user-attachments/assets/c82c24e7-9706-43c8-bb50-04ae3cf569a5" />
