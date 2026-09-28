@@ -4,8 +4,6 @@ Welcome to Hachibitto (pronounced Ha-Chi-Bee-Toe). A Fantasy MSX/MSX2 Console fo
 
 ![Loading Screen](arm9/gfx_data/pdev_bg0.png)
 
-TBD
-
 # Donations Welcome (but never required!)
 
 These hobby emulators have been a labor of love. An embarassing amount of development time has gone into it as I've strived to provide an enjoyable retro experience on the DS handheld. It's free to use and always will be, however if you feel inclined to buy me a virtual coffee for the effort, that would be beyond amazing!
