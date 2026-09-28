@@ -2252,7 +2252,6 @@ u32 LoopZ80()
       CPU.NumInts++;   // Track Interrupt Requests
       if (((CurLine-1) >= VDP9938_START_LINE) && ((CurLine-1) < VDP9938_END_LINE)) // Is this a mid-frame line interrupt?
       {
-          CPU.CycleDeficit = 0;
           mid_frame_interrupt=3; // Let CPU run 3 lines then redraw the previous 2...
       }
   }
@@ -2260,6 +2259,7 @@ u32 LoopZ80()
   // Drop out unless end of screen is reached
   if (CurLine == VDP9938_END_LINE)
   {
+      CPU.CycleDeficit = 0; // Start fresh at the VBlank boundary
       return 0;
   }
   return 1;
