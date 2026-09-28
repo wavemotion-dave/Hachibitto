@@ -15,6 +15,11 @@
 //  See YM.h for the accuracy-level disclaimer: this is a drastically
 //  simplified, minimal-FM, no-ADSR design chosen purely for speed.
 //
+//  Please note: this file was largely generated with Claude.AI and ChatGPT with a lot
+//  of patience (and frustration) by the author. Sound drivers are not my specialty...
+//  in fact, we are not really on speaking terms. So if you happen to understand basic
+//  sound sampling principles and can figure out FM Synthesis and want to help improve
+//  this - please be my guest!
 
 #include "msx_music.h"
 #include <string.h>    // memcpy, memset

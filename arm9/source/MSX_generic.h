@@ -1,5 +1,5 @@
 // =====================================================================================
-// Copyright (c) 2021-2024 Dave Bernazzani (wavemotion-dave)
+// Copyright (c) 2026 Dave Bernazzani (wavemotion-dave)
 //
 // Copying and distribution of this emulator, its source code and associated
 // readme files, with or without modification, are permitted in any medium without
@@ -236,7 +236,6 @@ extern void restoreCompressedMem(void);
 extern void HandleSCCPlusModeRegister(u8 value);
 extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void BuildScreen8ColorMap(void);
-extern void msxRun(void);
 extern void allocateCompressedMem(void);
 extern void restoreCompressedMem(void);
 extern void LoadConfig(void);
@@ -259,5 +258,5 @@ extern void SaveConfig(bool bShow);
 extern void ShowRandomPreviewSnaps(void);
 extern void IndirectRegWrite9938(u8 Value);
 extern void EnsureSaveDirectory(void);
-
+extern void intro_logo(void);
 #endif

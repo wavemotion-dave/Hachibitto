@@ -55,7 +55,8 @@ bool screenshotbmp(const char* filename) {
 
     // ----------------------------------------------------------------------------------------------
     // Use the back-end of the large cart buffer. In theory this might be used by some massive
-    // game - and screenshot of such a game would break.
+    // game - and screenshot of such a game would break. In the future we should probably just
+    // move out the 128K to VRAM and then move it back. Good enough for now...
     // ----------------------------------------------------------------------------------------------
     u8 *temp = (u8*)ROM_Memory+(MAX_CART_SIZE_KB*1024) - (128*1024);
 

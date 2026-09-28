@@ -24,19 +24,19 @@
 #include "CRC32.h"
 #include "printf.h"
 
-int countMSX     = 0;
-int ucGameAct    = 0;
+int countMSX     =  0;
+int ucGameAct    =  0;
 int ucGameChoice = -1;
-u32 file_size    = 0;
+u32 file_size    =  0;
 
 FI_MSX gpFic[MAX_ROMS];
 char szName[256];
 char szFile[256];
 char strBuf[40];
 
-struct Config_t AllConfigs[MAX_CONFIGS];
-struct Config_t myConfig __attribute((aligned(4))) __attribute__((section(".dtcm")));
-struct GlobalConfig_t myGlobalConfig;
+struct Config_t         AllConfigs[MAX_CONFIGS];
+struct Config_t         myConfig __attribute((aligned(4))) __attribute__((section(".dtcm")));
+struct GlobalConfig_t   myGlobalConfig;
 
 typedef struct
 {
@@ -1127,10 +1127,6 @@ void HachibittoGameOptions(bool bIsGlobal)
             }
             if (keysCurrent() & KEY_START)  // Save Options
             {
-                if (myConfig.cpuBoost && (myConfig.splitRefresh == 2))
-                {
-                    //TODO: myConfig.splitRefresh = 1; // Cap at 1 for boosted CPU
-                }
                 SaveConfig(TRUE);
             }
             if ((keysCurrent() & KEY_B) || (keysCurrent() & KEY_A))  // Exit options
@@ -1618,6 +1614,7 @@ void DSPrint(int iX,int iY,int iScr,char *szMessage)
   }
 }
 
+// Just a bit faster than the generic DSPrint() when dealing with numbers only
 void DSPrint_fps(u16 fps)
 {
     u16 *pusScreen,*pusMap;

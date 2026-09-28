@@ -24,9 +24,9 @@
 #include "fdc.h"
 #include "printf.h"
 
-// ---------------------------------------
-// Some MSX Mapper / Slot Handling stuff
-// ---------------------------------------
+// -------------------------------------------------------------
+// Some MSX Mapper / Slot Handling and sound generation stuff...
+// -------------------------------------------------------------
 u8 mapperType               __attribute__((section(".dtcm"))) = 0;
 u8 mapperMask               __attribute__((section(".dtcm"))) = 0;
 u8 bCartInPage[4]           __attribute__((section(".dtcm"))) = {0,0,0,0};
@@ -35,18 +35,18 @@ u8 bRAMInPage[4]            __attribute__((section(".dtcm"))) = {0,0,0,0};
 u8 *MSXCartPtr[8]           __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 u8 *MSXRamPtr[8]            __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
-u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;
-u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;
-u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;
-u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;
-u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;
+u16 beeperFreq              __attribute__((section(".dtcm"))) = 0;      // Crude square wave beeper handling. Not much uses this.
+u8 msx_scc_capable_game     __attribute__((section(".dtcm"))) = 0;      // True if game is making use of SCC / SCC+
+u8 msx_music_capable_game   __attribute__((section(".dtcm"))) = 0;      // True if game is making use of MSX-MUSIC (YM Sound)
+u8 special_memory_access    __attribute__((section(".dtcm"))) = 0x00;   // This lets us know we've got something special mapped into memory 
+u32 msx_music_writes        __attribute__((section(".dtcm"))) = 0;      // If we cross a threshold, we decare we are MSX-MUSIC capable (and mix in the proper sound)
 u16 msx_block_size          __attribute__((section(".dtcm"))) = 0x2000; // Either 8K or 16K based on Mapper Type
-u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;
+u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;   // Only one slot is expanded so we only need to track one register here
 
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 AY38910 myAY2               __attribute__((section(".dtcm")));          // Declare new AY structure for 2x PSG
-YM   myYM                   __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
+YM      myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -371,7 +371,7 @@ u8 readport_keyboard(void)
 }
 // --------------------------------------------------------------------
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
-// including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
+// including Joystick, PSG, SCC, RTC, keyboard, etc.
 // --------------------------------------------------------------------
 ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 {
@@ -430,21 +430,25 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   {
       return ay38910DataR(&myAY2);
   }  
-  else if (Port == 0xA8)
+  else if (Port == 0xA8)  // Feedback on Slot mapping
   {
       return Port_PPI_A;
   }
-  else if (Port == 0xA9)
+  else if (Port == 0xA9)  // Keyboard read
   {
       return readport_keyboard();
   }
-  else if (Port == 0xAA)
+  else if (Port == 0xAA)  // Port C feedback
   {
       return Port_PPI_C;
   }
   else if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machine return this but we do.
   {
       return mirror_ram_bank[Port - 0xFC];
+  }
+  else // Unknown port read
+  {
+      //debug[DX++ & 0xF] = Port;
   }
 
   // No such port
@@ -1052,6 +1056,34 @@ u8 MSX_GuessROMType(u32 size)
     return type;
 }
 
+// A few games get special config options by default...
+void LoadGameTweaks(void)
+{
+    if (strstr(initial_file_upper, "SNATCHER"))
+    {
+        myConfig.musicExpand = 2;   // Enable SCC+
+    }   
+
+    if (strstr(initial_file_upper, "XAK"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }   
+
+    if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }   
+
+    if (strstr(initial_file_upper, "FAMICLE"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }   
+
+    if (strstr(initial_file_upper, "FRAY"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }   
+}
 
 /*********************************************************************************
  * We wipe main RAM with 0x00 values (helps with compression of save states even
@@ -1103,12 +1135,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
     special_memory_access = 0x00;
     msx_subslot = 0x00;
 
-    // ---------------------------------------------
-    // Start with reset memory - fill in MSX slots.
-    // RAM wipe happens in msxWipeRAM().
-    // ---------------------------------------------
-    memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
-
     // -----------------------------------------
     // Setup RAM/ROM pointers back to defaults
     // -----------------------------------------
@@ -1139,6 +1165,9 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // Restore the MSX BIOS and point to it
     // ---------------------------------------------
     msx_restore_bios();
+    
+    // Load game tweaks for some games based on filenames loaded... e.g. Snatcher gets SCC+
+    LoadGameTweaks();
 
     // -----------------------------------------------------------------
     // If we are a .dsk we can point to nothing for the cart and return
@@ -1206,7 +1235,7 @@ void MSX_InitialMemoryLayout(u32 romSize)
             mapperType = myConfig.msxMapper;
         }
     }
-
+    
     // ------------------------------------------------------------
     // Setup the Z80 memory based on the MSX game ROM size loaded
     // ------------------------------------------------------------

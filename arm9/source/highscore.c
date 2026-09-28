@@ -17,8 +17,6 @@
 #include "MSX_generic.h"
 #include "printf.h"
 
-extern u8 *ROM_Memory;
-
 // ------------------------------------------------------------------------------------
 // We need to put a practical limit on the size of the high scores... 1475 games it is!
 // ------------------------------------------------------------------------------------
@@ -104,35 +102,6 @@ void highscore_init(void)
     {
         fread(&highscore_header, sizeof(highscore_header), 1, fp);
         
-        // -----------------------------------------------------------
-        // For version 8, we will auto-update to the current version.
-        // We have expanded the database to have more highscore slots
-        // and we are now only reading one record at a time to save 
-        // as it was a bit outrageous to read in all highscore slots
-        // when only one is used (saves almost 125K of RAM).
-        // -----------------------------------------------------------
-        if (highscore_header.version == 0x0008)
-        {
-            // Old file entries started at offset 6 just past the header
-            fseek(fp, 6, SEEK_SET);
-            fread(ROM_Memory, sizeof(highscore), 744, fp);
-            fclose(fp);
-
-            highscore_header.version = HS_VERSION;
-            highscore_header.dirty_flag = 0;
-            
-            FILE *fp = fopen(HS_FILE, "wb");
-            fwrite(&highscore_header, sizeof(highscore_header), 1, fp);
-            for (int i=0; i<MAX_HS_GAMES; i++)
-            {
-                if (i < 744)
-                {
-                    memcpy(&highscore, ROM_Memory + (i * sizeof(highscore)), sizeof(highscore));
-                }
-                fwrite(&highscore, sizeof(highscore), 1, fp);
-            }            
-        }
-
         // -------------------------------------------------------
         // If the high score version is wrong, reset to defaults.
         // -------------------------------------------------------

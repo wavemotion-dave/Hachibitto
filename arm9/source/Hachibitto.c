@@ -25,7 +25,6 @@
 #include "highscore.h"
 #include "MSX_generic.h"
 #include "cpu/vdp9938/vdp9938.h"
-#include "intro.h"
 #include "msx_kbd.h"
 #include "alpha_kbd.h"
 #include "debug_ovl.h"
@@ -45,6 +44,12 @@
 #include "cpu/scc/SCC.h"
 #include "printf.h"
 
+// ------------------------------------------------------------------
+// These 16 debug registers plus indexes DX/DY are the lifeline for
+// development of this emulator. We can use these to track all sorts
+// of things going on and help to isolate and fix problems. The 
+// debugger can be turned on in options to see these values.
+// ------------------------------------------------------------------
 u32 debug[0x10]={0};
 u32 DX = 0;
 u32 DY = 0;
@@ -479,7 +484,7 @@ void setupStream(void)
     //----------------------------------------------------------------
     //  open stream
     //----------------------------------------------------------------
-    myStream.sampling_rate  = sample_rate;            // sample_rate for the CV to match the SN/AY drivers
+    myStream.sampling_rate  = sample_rate;            // sample_rate for the emulated MSX to match the AY/SCC drivers
     myStream.buffer_length  = buffer_size;            // buffer length = (512+16)
     myStream.callback       = OurSoundMixer;          // set callback function
     myStream.format         = MM_STREAM_16BIT_STEREO; // format = stereo 16-bit
@@ -617,6 +622,8 @@ int getMemFree() { // returns the amount of free memory in bytes
 void ShowDebugZ80(void)
 {
     u8 idx=1;
+    
+    debug[6] = mySCC.chControl;
 
     sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
     DSPrint(0,idx++,7, tmp);
@@ -1097,7 +1104,9 @@ void Hachibitto_main(void)
   // Get the MSX Machine Emulator ready
   msxInit(gpFic[ucGameAct].szName);
 
-  msxRun();
+  Z80_Interface_Reset();                // Reset the Z80 Interface module
+  ResetZ80(&CPU);                       // Reset the CZ80 core CPU
+  BottomScreenKeypad();                 // Show the game-related screen with keypad / keyboard
 
   // Frame-to-frame timing...
   TIMER1_CR = 0;
@@ -2098,17 +2107,6 @@ u8 msxInit(char *szGame)
     // Return with result
     return (RetFct);
 }
-
-/*********************************************************************************
- * Run the emul
- ********************************************************************************/
-void msxRun(void)
-{
-    Z80_Interface_Reset();                // Reset the Z80 Interface module
-    ResetZ80(&CPU);                       // Reset the CZ80 core CPU
-    BottomScreenKeypad();                 // Show the game-related screen with keypad / keyboard
-}
-
 
 /*********************************************************************************
  * Update the screen for the current cycle. On the DSi this will generally

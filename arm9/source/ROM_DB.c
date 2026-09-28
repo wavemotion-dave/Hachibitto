@@ -1,3 +1,14 @@
+// =====================================================================================
+// Copyright (c) 2026 Dave Bernazzani (wavemotion-dave)
+//
+// Copying and distribution of this emulator, its source code and associated
+// readme files, with or without modification, are permitted in any medium without
+// royalty provided this copyright notice is used and wavemotion-dave and
+// Marat Fayzullin (fMSX core) are thanked profusely.
+//
+// The Hachibitto emulator is offered as-is, without any warranty. Please see readme.md
+// =====================================================================================
+
 // ROM Database courtesy of https://romdb.vampier.net/
 
 #include <nds.h>
@@ -9659,3 +9670,5 @@ u8 RomDB_Lookup(u32 size)
     
     return 0xFF; // Not found
 }
+
+// End of File

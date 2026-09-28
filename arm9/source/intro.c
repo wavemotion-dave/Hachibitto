@@ -19,14 +19,16 @@
 #include "pdev_bg0.h"
 #include "printf.h"
 
-void vblankIntro() {
-  vusCptVBL++;
+void vblankIntro() 
+{
+  vusCptVBL++; // Simple timing for the intro screen to show
 }
 
 // --------------------------------------------------------------
 // Intro with portabledev logo and new PHEONIX-EDITION version
 // --------------------------------------------------------------
-void intro_logo(void) {
+void intro_logo(void)
+{
   bool bOK;
 
   // Init graphics

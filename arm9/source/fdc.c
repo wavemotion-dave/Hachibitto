@@ -23,11 +23,11 @@
 #include "MSX_generic.h"
 #include "printf.h"
 
-// -----------------------------------------------------------------------------------------
-// WD2793-only Floppy Drive Controller for the CDX2-FDD interface (MSX2-compatible).
+// -------------------------------------------------------------------------------------------
+// WD2793-only Floppy Drive Controller for the stanadar Japanese Memory-mapped FDD interface.
 // Handles basic seeks, sector reads, sector writes, and force interrupt -- enough
 // for the vast majority of MSX2 .dsk-based disk games to play properly.
-// -----------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
 struct FDC_t            FDC;
 struct FDC_GEOMETRY_t   Geom;
 
@@ -62,12 +62,11 @@ struct FDC_GEOMETRY_t   Geom;
 void fdc_debug(u8 bWrite, u8 addr, u8 data)
 {
 #if 0 // Set to 1 to enable debug
-    static u8 idx=0;
-
     if (bWrite)
         debug_printf("W %04X=%02X [STA=%02X] [IRQ=%02X] D%d S%d T%02d K%d\n", addr, data, FDC.status, FDC.int_req, FDC.drive, FDC.side, FDC.track, FDC.sector);
     else
         debug_printf("R %04X [STA=%02X] [IRQ=%02X] D%d S%d T%02d K%d\n", addr, FDC.status, FDC.int_req, FDC.drive, FDC.side, FDC.track, FDC.sector);
+    }
 #endif
 }
 
@@ -259,6 +258,7 @@ void fdc_state_machine(void)
             if (FDC.wait_for_write == 3)
             {
                 FDC.status |= (ST_BUSY | ST_INDEX_DRQ);   // We're good to accept data now
+                FDC.int_req = 0x40;                       // ready to accept data
                 FDC.wait_for_write = 1;                   // And start looking for data
                 FDC.cycle_deadline = CPU.TotalInstructions + FDC_INSTRUCTIONS_PER_BYTE;  // Pace first byte
             }
@@ -269,6 +269,7 @@ void fdc_state_machine(void)
                 if (FDC.track_buffer_idx >= FDC.track_buffer_end)
                 {
                     FDC.status &= ~ST_BUSY;               // Done. No longer busy.
+                    FDC.status &= ~ST_INDEX_DRQ;          // Ensure we don't ask for more data.
                     FDC.wait_for_write = 2;               // Don't write more FDC data
                     FDC.sector_byte_counter = 0;          // And reset our counter
                     fdc_flush_track();                    // Write the buffer back out
@@ -276,8 +277,8 @@ void fdc_state_machine(void)
                 }
                 else
                 {
-                    FDC.int_req = 0x40;
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);  // Data Ready and no errors... still busy
+                    FDC.int_req = 0x40;                      // Data request but not interrupt request
                     FDC.wait_for_write = 1;                  // Wait for the CPU to give us more data
                     FDC.cycle_deadline = CPU.TotalInstructions + FDC_INSTRUCTIONS_PER_BYTE;  // Pace next byte
                     if (++FDC.sector_byte_counter >= Geom.sectorSize)   // Did we cross a sector boundary?
@@ -507,7 +508,6 @@ void fdc_setDrive(u8 drive)
 // ---------------------------------------------------------------
 void fdc_setSide(u8 side)
 {
-    debug_printf("Set Side %d\n", side);
     FDC.side = side;                        // Record the side in use
 }
 
