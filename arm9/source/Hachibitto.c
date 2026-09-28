@@ -1092,7 +1092,7 @@ void Hachibitto_main(void)
 
   // Clear top screen
   BG_PALETTE[0] = RGB15(0,0,0);
-  memset((u8*)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
+  memset((u8*)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)
 
   // Get the MSX Machine Emulator ready
   msxInit(gpFic[ucGameAct].szName);
@@ -1250,7 +1250,7 @@ void Hachibitto_main(void)
                           // Ask for verification
                           if (showMessage("DO YOU REALLY WANT TO", "RESET THE CURRENT GAME ?") == ID_SHM_YES)
                           {
-                              memset((u8*)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
+                              memset((u8*)0x06000000, 0x00, 0x40000); // Ensure screen is clear...
                               DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
                               ResetMSX();
                           }
@@ -1263,7 +1263,7 @@ void Hachibitto_main(void)
                             //  Ask for verification
                             if  (showMessage("DO YOU REALLY WANT TO","QUIT THE CURRENT GAME ?") == ID_SHM_YES)
                             {
-                                memset((u8*)0x06000000, 0x00, 0x20000);    // Reset VRAM to 0x00 to clear any potential display garbage on way out
+                                memset((u8*)0x06000000, 0x00, 0x40000);    // Reset VRAM to 0x00 to clear any potential display garbage on way out
                                 return;
                             }
                             BottomScreenKeypad();
