@@ -73,12 +73,12 @@
 //  decoded the same as before - only the synthesis method changed.
 //
 
-#ifndef FMPAC_H
-#define FMPAC_H
+#ifndef YM_H
+#define YM_H
 
 #include <nds.h>
 
-#define FMPAC_NUM_CHANNELS      9
+#define YM_NUM_CHANNELS      9
 
 //@----------------------------------------------------------------------------
 //@ Register-level instrument parameters. Fully decoded and stored (both the
@@ -100,7 +100,7 @@ typedef struct
     u8 fb;                          // $03     D2-0  - unused (no feedback without a modulator)
     u8 arMod, drMod, slMod, rrMod;  // $04/$06 - unused (no ADSR right now)
     u8 arCar, drCar, slCar, rrCar;  // $05/$07 - unused (no ADSR right now)
-} FMPAC_Instrument;
+} YM_Instrument;
 
 //@----------------------------------------------------------------------------
 //@ Runtime (audio-rate) state for one channel's oscillator.
@@ -117,7 +117,7 @@ typedef struct
     u8  sustainCounter;
     u8  sustainGain;
     u8  gain;
-} FMPAC_Oscillator;
+} YM_Oscillator;
 
 //@----------------------------------------------------------------------------
 //@ Register-level (saved) state for one channel, plus its oscillator's
@@ -126,28 +126,28 @@ typedef struct
 //@----------------------------------------------------------------------------
 typedef struct
 {
-    u8  instrument;         // $3x D7-4 - 0 = custom (FMPAC.customInstrument), 1-15 = ROM preset
+    u8  instrument;         // $3x D7-4 - 0 = custom (YM.customInstrument), 1-15 = ROM preset
     u8  volume;             // $3x D3-0 - attenuation, 0 (loudest) - 15 (quietest)
     u16 fNumber;            // $1x + $2x D0 - 9-bit F-Number
     u8  block;              // $2x D3-1 - octave, 0-7
     u8  keyOn;              // $2x D4 (melodic) or the matching $0E bit (rhythm ch6-8)
     u8  sustain;            // $2x D5 - stored, currently unused by the mixer
 
-    const FMPAC_Instrument *instPtr;  // cached &customInstrument or &InstrumentROM[instrument] -
+    const YM_Instrument *instPtr;  // cached &customInstrument or &InstrumentROM[instrument] -
                                       // re-pointed only on a $3x write, not re-derived every sample
 
-    FMPAC_Oscillator osc;
-} FMPAC_Channel;
+    YM_Oscillator osc;
+} YM_Channel;
 
 //@----------------------------------------------------------------------------
 //@ Whole-chip state. This is the struct pointer passed around exactly like
-//@ SCC's SCCptr, and the whole thing is what FMPACSaveState/FMPACLoadState
+//@ SCC's SCCptr, and the whole thing is what YMSaveState/YMLoadState
 //@ round-trip.
 //@----------------------------------------------------------------------------
 typedef struct
 {
-    FMPAC_Channel channels[FMPAC_NUM_CHANNELS];
-    FMPAC_Instrument customInstrument;  // regs $00-$07, used by any channel with instrument==0
+    YM_Channel channels[YM_NUM_CHANNELS];
+    YM_Instrument customInstrument;  // regs $00-$07, used by any channel with instrument==0
     u8 rhythmReg;                       // $0E raw byte
     u8 rhythmVolBD;                     // $36 D3-0
     u8 rhythmVolHH, rhythmVolSD;        // $37 D7-4, D3-0
@@ -158,66 +158,66 @@ typedef struct
                                         // must never be seeded 0
     s32 rhythmPrevNoise;                // previous raw noise sample - the one-sample delay used
                                         // for the high-pass filter (output = current - previous)
-    FMPAC_Oscillator rhythmSD;          // rhythm mode only: channel 7's SECOND voice's envelope (HH uses
+    YM_Oscillator rhythmSD;          // rhythm mode only: channel 7's SECOND voice's envelope (HH uses
                                         // channels[7].osc's envelope; both derive their actual waveform
-                                        // from channels 7 & 8's phase, not their own - see FMPACMixer)
-    FMPAC_Oscillator rhythmTCY;         // rhythm mode only: channel 8's SECOND voice's envelope (TOM uses
+                                        // from channels 7 & 8's phase, not their own - see YMMixer)
+    YM_Oscillator rhythmTCY;         // rhythm mode only: channel 8's SECOND voice's envelope (TOM uses
                                         // channels[8].osc directly, both for envelope and waveform)
     s32 outputFilterState;              // one-sample treble-damping state; included in save states
-} FMPAC;
+} YM;
 
 //@----------------------------------------------------------------------------
 //@ Register bit masks/shifts.
 //@----------------------------------------------------------------------------
-#define FMPAC_REG_AM_BIT        0x80
-#define FMPAC_REG_VIB_BIT       0x40
-#define FMPAC_REG_EGTYPE_BIT    0x20
-#define FMPAC_REG_KSR_BIT       0x10
-#define FMPAC_REG_MUL_MASK      0x0F
+#define YM_REG_AM_BIT        0x80
+#define YM_REG_VIB_BIT       0x40
+#define YM_REG_EGTYPE_BIT    0x20
+#define YM_REG_KSR_BIT       0x10
+#define YM_REG_MUL_MASK      0x0F
 
-#define FMPAC_REG_KSL_SHIFT     6       // $02/$03 D7-6
-#define FMPAC_REG_TL_MASK       0x3F    // $02 D5-0
-#define FMPAC_REG_DC_BIT        0x10    // $03 D4
-#define FMPAC_REG_DM_BIT        0x08    // $03 D3
-#define FMPAC_REG_FB_MASK       0x07    // $03 D2-0
+#define YM_REG_KSL_SHIFT     6       // $02/$03 D7-6
+#define YM_REG_TL_MASK       0x3F    // $02 D5-0
+#define YM_REG_DC_BIT        0x10    // $03 D4
+#define YM_REG_DM_BIT        0x08    // $03 D3
+#define YM_REG_FB_MASK       0x07    // $03 D2-0
 
-#define FMPAC_REG_AR_SHIFT      4       // $04/$05 D7-4
-#define FMPAC_REG_DR_MASK       0x0F    // $04/$05 D3-0
-#define FMPAC_REG_SL_SHIFT      4       // $06/$07 D7-4
-#define FMPAC_REG_RR_MASK       0x0F    // $06/$07 D3-0
+#define YM_REG_AR_SHIFT      4       // $04/$05 D7-4
+#define YM_REG_DR_MASK       0x0F    // $04/$05 D3-0
+#define YM_REG_SL_SHIFT      4       // $06/$07 D7-4
+#define YM_REG_RR_MASK       0x0F    // $06/$07 D3-0
 
-#define FMPAC_REG_SUS_BIT       0x20    // $20-$28 D5
-#define FMPAC_REG_KEY_BIT       0x10    // $20-$28 D4
-#define FMPAC_REG_BLOCK_SHIFT   1       // $20-$28 D3-1
-#define FMPAC_REG_BLOCK_MASK    0x07
-#define FMPAC_REG_FNUM_MSB_BIT  0x01    // $20-$28 D0
+#define YM_REG_SUS_BIT       0x20    // $20-$28 D5
+#define YM_REG_KEY_BIT       0x10    // $20-$28 D4
+#define YM_REG_BLOCK_SHIFT   1       // $20-$28 D3-1
+#define YM_REG_BLOCK_MASK    0x07
+#define YM_REG_FNUM_MSB_BIT  0x01    // $20-$28 D0
 
-#define FMPAC_REG_INST_SHIFT    4       // $30-$38 D7-4
-#define FMPAC_REG_VOL_MASK      0x0F    // $30-$38 D3-0
+#define YM_REG_INST_SHIFT    4       // $30-$38 D7-4
+#define YM_REG_VOL_MASK      0x0F    // $30-$38 D3-0
 
-#define FMPAC_RHYTHM_ENABLE_BIT 0x20    // $0E D5
-#define FMPAC_RHYTHM_BD_BIT     0x10    // $0E D4
-#define FMPAC_RHYTHM_SD_BIT     0x08    // $0E D3
-#define FMPAC_RHYTHM_TOM_BIT    0x04    // $0E D2
-#define FMPAC_RHYTHM_TCY_BIT    0x02    // $0E D1
-#define FMPAC_RHYTHM_HH_BIT     0x01    // $0E D0
+#define YM_RHYTHM_ENABLE_BIT 0x20    // $0E D5
+#define YM_RHYTHM_BD_BIT     0x10    // $0E D4
+#define YM_RHYTHM_SD_BIT     0x08    // $0E D3
+#define YM_RHYTHM_TOM_BIT    0x04    // $0E D2
+#define YM_RHYTHM_TCY_BIT    0x02    // $0E D1
+#define YM_RHYTHM_HH_BIT     0x01    // $0E D0
 
-#define FMPAC_CHANNEL_BD        6       // zero-indexed - real-world "channel 7"
-#define FMPAC_CHANNEL_HHSD      7       // real-world "channel 8"
-#define FMPAC_CHANNEL_TOMTCY    8       // real-world "channel 9"
+#define YM_CHANNEL_BD        6       // zero-indexed - real-world "channel 7"
+#define YM_CHANNEL_HHSD      7       // real-world "channel 8"
+#define YM_CHANNEL_TOMTCY    8       // real-world "channel 9"
 
 //@----------------------------------------------------------------------------
 //@ Instrument table - real Yamaha ROM data (decoded from a verified
 //@ reference core), though the mixer currently only reads mulCar/mulMod
-//@ from each entry. Defined in FMPAC.c.
+//@ from each entry. Defined in YM.c.
 //@----------------------------------------------------------------------------
-extern const FMPAC_Instrument FMPAC_InstrumentROM[16];
+extern const YM_Instrument YM_InstrumentROM[16];
 
 //@----------------------------------------------------------------------------
 //@ Public interface - same shape as the SCC driver.
 //@----------------------------------------------------------------------------
-void FMPACReset(FMPAC *chip);
-void FMPACWrite(u8 value, u8 address, FMPAC *chip);   // address = resolved register 0x00-0x38, not a Z80 address
-void FMPACMixer(int len, s16 *dest, FMPAC *chip);    // accumulates into dest - see FMPAC.c
+void YMReset(YM *chip);
+void YMWrite(u8 value, u8 address, YM *chip);   // address = resolved register 0x00-0x38, not a Z80 address
+void YMMixer(int len, s16 *dest, YM *chip);    // accumulates into dest - see YM.c
 
-#endif // FMPAC_H
+#endif // YM_H

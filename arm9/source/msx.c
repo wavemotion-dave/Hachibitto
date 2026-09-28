@@ -19,7 +19,6 @@
 
 #include "Hachibitto.h"
 #include "CRC32.h"
-#include "FMPAC.h"
 #include "cpu/z80/Z80_interface.h"
 #include "MSX_generic.h"
 #include "fdc.h"
@@ -47,7 +46,7 @@ u8 msx_subslot              __attribute__((section(".dtcm"))) = 0x00;
 SCC     mySCC               __attribute__((section(".dtcm")));          // Declare new SCC module for Konami MSX games that use it
 AY38910 myAY                __attribute__((section(".dtcm")));          // Declare new AY structure for basic MSX sounds
 AY38910 myAY2               __attribute__((section(".dtcm")));          // Declare new AY structure for 2x PSG
-FMPAC   myYM                __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
+YM   myYM                   __attribute__((section(".dtcm")));          // Declare new YM module (MSX-MUSIC) for MSX games that use it
 
 // ---------------------------------------------------------------------
 // Konami SCC+ 64K RAM Cartridge (flash-cart style: 8x8K RAM pages)
@@ -374,11 +373,8 @@ u8 readport_keyboard(void)
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, Disk I/O (via the CDX2 ROM), keyboard, etc.
 // --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
+ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 {
-  // MSX ports are 8-bit
-  Port &= 0x00FF;
-
   //98h~9Bh   Access to the VDP I/O ports.
   if      (Port == 0x98) return RdData9938();               // VDP Data
   else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
@@ -446,7 +442,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register unsigned short Port)
   {
       return Port_PPI_C;
   }
-  else if (Port >= 0xFC && Port <= 0xFF)  // Mirror of RAM select. Not all MSX2 machine return this but we do.
+  else if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machine return this but we do.
   {
       return mirror_ram_bank[Port - 0xFC];
   }
@@ -675,10 +671,10 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
                 MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
             }
-            else if ((((msx_subslot & 0x0C) >> 2) == 2) && (myConfig.musicExpand == 1)) // Subslot 2 has FM PAC
+            else if ((((msx_subslot & 0x0C) >> 2) == 2) && (myConfig.musicExpand == 1)) // Subslot 2 has MSX MUSIC
             {
-                MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000;
+                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000;
             }
             else // Other subslots have nothing in this page
             {
@@ -815,10 +811,10 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
                 MemoryMap[2] = BIOS_Memory + 0x4000;
                 MemoryMap[3] = BIOS_Memory + 0x6000;
             }
-            else if ((((msx_subslot & 0x0C) >> 2) == 1) && (myConfig.musicExpand == 1)) // Subslot 0-1 has FM PAC
+            else if ((((msx_subslot & 0x0C) >> 2) == 1) && (myConfig.musicExpand == 1)) // Subslot 0-1 has MSX-MUSIC
             {
-                MemoryMap[2] = (u8 *)MSXBios_FMPAC + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_FMPAC + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000;
+                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000;
             }
             else // Other subslots map nothing
             {
@@ -908,13 +904,10 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
 // -----------------------------------------------------------------------------------------------
-ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned char Value)
+ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
     
-    // MSX ports are 8-bit
-    Port &= 0x00FF;
-
     if      (Port == 0x98) {WrData9938(Value);}                 // VDP Data
     else if (Port == 0x99) {WrCtrl9938(Value);}                 // VDP Control
     else if (Port == 0x9A) {write_port_palette(Value);}         // VDP Palette
@@ -992,7 +985,7 @@ ITCM_CODE void cpu_writeport_msx(register unsigned short Port,register unsigned 
             if (myConfig.musicExpand == 1) msx_music_capable_game = 1;
         }
 
-        FMPACWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
+        YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
     }
     else // Unhandled port write...
     {

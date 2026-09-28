@@ -409,8 +409,7 @@ ITCM_CODE void RefreshSprites(register byte Y)
    *
    * Keep Y as the physical XBuf destination row.
    */
-  register byte spriteY = Y;
-  if (ScrMode == 2)  spriteY += VScroll;
+  register byte spriteY = Y + VScroll;
 
   /* Find sprites to show using the scrolled scanline */
   N = ScanSprites(spriteY,&M);
@@ -903,11 +902,7 @@ void RefreshLine1(u8 uY)
 /** Refresh line Y (0..191) of SCREEN2, including sprites   **/
 /** in this line.                                           **/
 /*************************************************************/
-/** RefreshLine2() *******************************************/
-/** Refresh line Y (0..191) of SCREEN2, including sprites   **/
-/** in this line.                                           **/
-/*************************************************************/
-void RefreshLine2(u8 uY)
+ITCM_CODE void RefreshLine2(u8 uY)
 {
   u32 *P;
   register byte FC,BC;
@@ -1495,9 +1490,6 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     iReg &= 0x3f;
     value &= VDP_RegisterMasks[iReg];
   }
-
-  /* There are VDP registers - map down to these and mask off irrelevant bits */
-  value &= VDP_RegisterMasks[iReg];
 
   /* Store value into the register */
   VDP[iReg]=value;

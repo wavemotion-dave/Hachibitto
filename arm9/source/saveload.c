@@ -40,15 +40,15 @@ struct RomOffset
 
 struct RomOffset Offsets[8];
 
-#define TYPE_ROM   0
-#define TYPE_RAM   1
-#define TYPE_SCC   2
-#define TYPE_FDC   3
-#define TYPE_BIOS  4
-#define TYPE_EBIOS 5
-#define TYPE_FMPAC 6
-#define TYPE_SRAM  7
-#define TYPE_OTHER 9
+#define TYPE_ROM        0
+#define TYPE_RAM        1
+#define TYPE_SCC        2
+#define TYPE_FDC        3
+#define TYPE_BIOS       4
+#define TYPE_EBIOS      5
+#define TYPE_MSXMUSIC   6
+#define TYPE_SRAM       7
+#define TYPE_OTHER      9
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
 
@@ -142,10 +142,10 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_EBIOS;
                 Offsets[i].offset = MemoryMap[i] - MSXBios_MSX2EXT;
             }
-            else if ((MemoryMap[i] >= MSXBios_FMPAC) && (MemoryMap[i] < MSXBios_FMPAC+(sizeof(MSXBios_FMPAC))))
+            else if ((MemoryMap[i] >= MSXBios_MSXMUSIC) && (MemoryMap[i] < MSXBios_MSXMUSIC+(sizeof(MSXBios_MSXMUSIC))))
             {
-                Offsets[i].type = TYPE_FMPAC;
-                Offsets[i].offset = MemoryMap[i] - MSXBios_FMPAC;
+                Offsets[i].type = TYPE_MSXMUSIC;
+                Offsets[i].offset = MemoryMap[i] - MSXBios_MSXMUSIC;
             }
             else
             {
@@ -374,9 +374,9 @@ void msxLoadState(void)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset);
                 }
-                else if (Offsets[i].type == TYPE_FMPAC)
+                else if (Offsets[i].type == TYPE_MSXMUSIC)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_FMPAC + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (MSXBios_MSXMUSIC + Offsets[i].offset);
                 }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {

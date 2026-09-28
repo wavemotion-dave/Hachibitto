@@ -1,22 +1,22 @@
 //
-//  FMPAC.c
+//  msx_music.c
 //  Konami FM-PAC (Yamaha YM2413 / OPLL) sound chip emulator - music only.
-//  See FMPAC.h for the accuracy-level disclaimer: this is a drastically
+//  See YM.h for the accuracy-level disclaimer: this is a drastically
 //  simplified, no-FM, no-ADSR design chosen purely for speed.
 //
 
-#include "FMPAC.h"
+#include "msx_music.h"
 #include <string.h>    // memcpy, memset
 
 //@----------------------------------------------------------------------------
 //@ Tunables.
 //@----------------------------------------------------------------------------
-#define FMPAC_SAMPLE_RATE             27965     // confirmed value, matches the AY driver's rate
-#define FMPAC_MASTER_CLOCK            3579545   // MSX standard clock, same as SCC's
-#define FMPAC_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
-#define FMPAC_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
+#define YM_SAMPLE_RATE             27965     // confirmed value, matches the AY driver's rate
+#define YM_MASTER_CLOCK            3579545   // MSX standard clock, same as SCC's
+#define YM_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
+#define YM_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
                                                 // full on key-on - ~16 samples (~0.6ms), fast/click-free
-#define FMPAC_RELEASE_STEP            3984      // MELODIC release rate: 16.16 fixed-point step targeting a
+#define YM_RELEASE_STEP            3984      // MELODIC release rate: 16.16 fixed-point step targeting a
                                                 // ~150ms fade to silence on key-off, not an instant cutoff.
                                                 // This is the fix for FM music sounding "thin"/"cut" - real FM
                                                 // pieces lean on overlapping decay tails for their fullness
@@ -25,7 +25,7 @@
                                                 // that. Retune this constant if it still isn't right - up
                                                 // for a lusher/longer tail, down if notes start blurring
                                                 // together too much.
-#define FMPAC_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
+#define YM_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
                                                 // Real drums (hi-hat especially) decay in tens of ms, not
                                                 // hundreds - using the melodic rate here made consecutive
                                                 // hits overlap instead of sounding like distinct hits.
@@ -33,21 +33,21 @@
 /* Carrier sustain level test: map OPLL SL to the same approximate gain
    levels used by the earlier envelope experiment, but move toward the target
    very slowly.  V0 key-on/release behavior remains otherwise unchanged. */
-static const u8 FMPAC_SustainGain[16] __attribute__((section(".dtcm"))) =
+static const u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
 {
     255, 181, 128, 90, 64, 45, 32, 22,
      16,  11,   8,  5,  4,  2,  1,  0
 };
-#define FMPAC_SUSTAIN_TICK_SAMPLES 64
+#define YM_SUSTAIN_TICK_SAMPLES 64
         // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
                             // Real drums (hi-hat especially) decay in tens of ms, not
                             // hundreds - using the melodic rate here made consecutive
                             // hits (fired every 100-150ms in a normal rhythm pattern)
                             // overlap and blend continuously instead of sounding like
                             // distinct hits. Applies to BD/TOM and HH/SD/TOP-CY alike.
-#define FMPAC_OUT_SHIFT               8        // output headroom for everything - melodic channels AND
-                            // percussion now both go through FMPAC_SinTable via real
-                            // phase-selection logic (see FMPACMixer), not a separate
+#define YM_OUT_SHIFT               8        // output headroom for everything - melodic channels AND
+                            // percussion now both go through YM_SinTable via real
+                            // phase-selection logic (see YMMixer), not a separate
                             // noise path, so one shared shift is enough. The earlier
                             // bump to 10 (and a separate, further-attenuated shift just
                             // for percussion) were both compensating for problems that
@@ -67,7 +67,7 @@ static const u8 FMPAC_SustainGain[16] __attribute__((section(".dtcm"))) =
 //@ approximation (fundamental + 1/3 3rd harmonic + 1/5 5th + 1/7 7th),
 //@ giving real harmonic content/brightness for the same one-lookup cost.
 //@----------------------------------------------------------------------------
-static const s8 FMPAC_SinTable[256] __attribute__((section(".dtcm"))) =
+static const s8 YM_SinTable[256] __attribute__((section(".dtcm"))) =
 {
        0,   13,   27,   39,   52,   64,   75,   85,   94,  102,  109,  115,  119,  123,  125,  127,
      127,  127,  125,  124,  121,  119,  116,  113,  110,  107,  104,  101,   99,   98,   97,   96,
@@ -90,7 +90,7 @@ static const s8 FMPAC_SinTable[256] __attribute__((section(".dtcm"))) =
 //@----------------------------------------------------------------------------
 //@ Real Yamaha MUL table, doubled (so index 0's real x0.5 is a whole number).
 //@----------------------------------------------------------------------------
-static const u8 FMPAC_MulTableX2[16] __attribute__((section(".dtcm"))) =
+static const u8 YM_MulTableX2[16] __attribute__((section(".dtcm"))) =
 {
     1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30
 };
@@ -99,7 +99,7 @@ static const u8 FMPAC_MulTableX2[16] __attribute__((section(".dtcm"))) =
 //@ 16-entry instrument table - real Yamaha ROM data. Only mulMod/mulCar are
 //@ read by the mixer right now; everything else is stored for later use.
 //@----------------------------------------------------------------------------
-const FMPAC_Instrument FMPAC_InstrumentROM[16] __attribute__((section(".dtcm"))) =
+const YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
 {
     /*  0 unused/custom */ { 9,12, 0,0, 1,1, 0,0, 0,0, 1,0, 12, 0,1, 2, 0,0,0,0,   0,0,0,0  },
     /*  1 Violin        */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 30, 0,1, 7, 15,0,0,0,  7,8,1,7  },
@@ -122,40 +122,40 @@ const FMPAC_Instrument FMPAC_InstrumentROM[16] __attribute__((section(".dtcm")))
 //@----------------------------------------------------------------------------
 //@ Small helpers
 //@----------------------------------------------------------------------------
-static const FMPAC_Instrument *FMPAC_GetInstrument(const FMPAC *chip, u8 instrument)
+static const YM_Instrument *YM_GetInstrument(const YM *chip, u8 instrument)
 {
     if (instrument == 0)
         return &chip->customInstrument;
-    return &FMPAC_InstrumentROM[instrument & 0x0F];
+    return &YM_InstrumentROM[instrument & 0x0F];
 }
 
-static u32 FMPAC_ComputePhaseIncrement(u16 fNumber, u8 block, u8 mulNibble)
+static u32 YM_ComputePhaseIncrement(u16 fNumber, u8 block, u8 mulNibble)
 {
     // Integer-only: inc = F * 2^block * mulX2 * (masterClock << 12) / (72 * sampleRate)
     // See chat history for the derivation - matches the Yamaha application manual's
     // fmus formula, just rearranged to avoid floating point entirely. Both constants
     // are plain integers now (no lingering compile-time-folded double literals).
-    unsigned long long num = (unsigned long long)fNumber * (unsigned long long)FMPAC_MulTableX2[mulNibble & 0x0F];
+    unsigned long long num = (unsigned long long)fNumber * (unsigned long long)YM_MulTableX2[mulNibble & 0x0F];
     num <<= block;
-    num *= (unsigned long long)FMPAC_MASTER_CLOCK << 12;
-    unsigned long long inc = num / ((unsigned long long)72 * (unsigned long long)FMPAC_SAMPLE_RATE);
+    num *= (unsigned long long)YM_MASTER_CLOCK << 12;
+    unsigned long long inc = num / ((unsigned long long)72 * (unsigned long long)YM_SAMPLE_RATE);
     if (inc > 0xFFFFFFFFULL) inc = 0xFFFFFFFFULL;
     return (u32)inc;
 }
 
-static void FMPAC_UpdateChannelFreq(FMPAC *chip, int ch)
+static void YM_UpdateChannelFreq(YM *chip, int ch)
 {
-    FMPAC_Channel *c = &chip->channels[ch];
-    const FMPAC_Instrument *inst = c->instPtr;
-    c->osc.phaseIncrement = FMPAC_ComputePhaseIncrement(c->fNumber, c->block, inst->mulCar);
+    YM_Channel *c = &chip->channels[ch];
+    const YM_Instrument *inst = c->instPtr;
+    c->osc.phaseIncrement = YM_ComputePhaseIncrement(c->fNumber, c->block, inst->mulCar);
 }
 
-static void FMPAC_UpdateCustomUsers(FMPAC *chip)
+static void YM_UpdateCustomUsers(YM *chip)
 {
     int ch;
-    for (ch = 0; ch < FMPAC_NUM_CHANNELS; ch++)
+    for (ch = 0; ch < YM_NUM_CHANNELS; ch++)
         if (chip->channels[ch].instrument == 0)
-            FMPAC_UpdateChannelFreq(chip, ch);
+            YM_UpdateChannelFreq(chip, ch);
 }
 
 //@----------------------------------------------------------------------------
@@ -168,20 +168,20 @@ static void FMPAC_UpdateCustomUsers(FMPAC *chip)
 //@ the earlier ADSR version, just for one rate instead of a per-instrument
 //@ table.
 //@----------------------------------------------------------------------------
-static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep)
+static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
 {
     if (keyOn)
     {
         osc->releaseAccum = 0;
         if (osc->gain < 255)
         {
-            u16 g = osc->gain + FMPAC_GAIN_RAMP_STEP;
+            u16 g = osc->gain + YM_GAIN_RAMP_STEP;
             osc->gain = (g >= 255) ? 255 : (u8)g;
             osc->sustainCounter = 0;
         }
         else if (osc->gain > osc->sustainGain)
         {
-            if (++osc->sustainCounter >= FMPAC_SUSTAIN_TICK_SAMPLES)
+            if (++osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
             {
                 osc->sustainCounter = 0;
                 osc->gain--;
@@ -239,41 +239,41 @@ static void FMPAC_UpdateGain(FMPAC_Oscillator *osc, u8 keyOn, u32 releaseStep)
  * These approximations give noticeably better note blending and fuller
  * melodic lines at a much lower CPU cost than a full OPLL envelope model.
  */
-static const u16 FMPAC_RRReleaseStepTest[16] =
+static const u16 YM_RRReleaseStepTest[16] =
     {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
 
-static s32 FMPAC_RenderChannel(FMPAC_Oscillator *osc, u8 keyOn, u8 volume,
+static s32 YM_RenderChannel(YM_Oscillator *osc, u8 keyOn, u8 volume,
                                       int isMelodic, u32 releaseStep)
 {
     /* Most active notes spend the vast majority of their time at the
        sustain target.  Once there, skip the bookkeeping entirely. */
     if (!(keyOn && osc->gain == osc->sustainGain))
-        FMPAC_UpdateGain(osc, keyOn, releaseStep);
+        YM_UpdateGain(osc, keyOn, releaseStep);
 
     if (osc->gain == 0) return 0;    // still idle/silent - skip the phase/table work
 
     osc->phase += osc->phaseIncrement;
-    s32 s = FMPAC_SinTable[(osc->phase >> FMPAC_SIN_SHIFT) & 0xFF];
-    return (s * (15 - volume) * osc->gain) >> FMPAC_OUT_SHIFT;
+    s32 s = YM_SinTable[(osc->phase >> YM_SIN_SHIFT) & 0xFF];
+    return (s * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
 }
 
 //@----------------------------------------------------------------------------
 //@ Public interface
 //@----------------------------------------------------------------------------
-void FMPACReset(FMPAC *chip)
+void YMReset(YM *chip)
 {
-    memset(chip, 0, sizeof(FMPAC));
+    memset(chip, 0, sizeof(YM));
     chip->noiseLFSR = 1;    // must not be seeded with 0, or the LFSR locks up
     int ch;
-    for (ch = 0; ch < FMPAC_NUM_CHANNELS; ch++)
+    for (ch = 0; ch < YM_NUM_CHANNELS; ch++)
     {
         chip->channels[ch].instPtr = &chip->customInstrument;
         chip->channels[ch].osc.sustainGain = 255;
-        FMPAC_UpdateChannelFreq(chip, ch);
+        YM_UpdateChannelFreq(chip, ch);
     }
 }
 
-static void FMPAC_RhythmRetrigger(FMPAC_Oscillator *osc, int resetPhase)
+static void YM_RhythmRetrigger(YM_Oscillator *osc, int resetPhase)
 {
     /* YM2413 rhythm bits are trigger/key-on controls, not sustained
        oscillator gates.  A 0->1 write starts a new percussion envelope. */
@@ -284,43 +284,43 @@ static void FMPAC_RhythmRetrigger(FMPAC_Oscillator *osc, int resetPhase)
         osc->phase = 0;
 }
 
-void FMPACWrite(u8 value, u8 address, FMPAC *chip)
+void YMWrite(u8 value, u8 address, YM *chip)
 {
     if (address <= 0x07)
     {
-        FMPAC_Instrument *ci = &chip->customInstrument;
+        YM_Instrument *ci = &chip->customInstrument;
         switch (address)
         {
             case 0x00:
-                ci->amMod = (value & FMPAC_REG_AM_BIT) ? 1 : 0;
-                ci->vibMod = (value & FMPAC_REG_VIB_BIT) ? 1 : 0;
-                ci->egTypeMod = (value & FMPAC_REG_EGTYPE_BIT) ? 1 : 0;
-                ci->ksrMod = (value & FMPAC_REG_KSR_BIT) ? 1 : 0;
-                ci->mulMod = value & FMPAC_REG_MUL_MASK;
+                ci->amMod = (value & YM_REG_AM_BIT) ? 1 : 0;
+                ci->vibMod = (value & YM_REG_VIB_BIT) ? 1 : 0;
+                ci->egTypeMod = (value & YM_REG_EGTYPE_BIT) ? 1 : 0;
+                ci->ksrMod = (value & YM_REG_KSR_BIT) ? 1 : 0;
+                ci->mulMod = value & YM_REG_MUL_MASK;
                 break;
             case 0x01:
-                ci->amCar = (value & FMPAC_REG_AM_BIT) ? 1 : 0;
-                ci->vibCar = (value & FMPAC_REG_VIB_BIT) ? 1 : 0;
-                ci->egTypeCar = (value & FMPAC_REG_EGTYPE_BIT) ? 1 : 0;
-                ci->ksrCar = (value & FMPAC_REG_KSR_BIT) ? 1 : 0;
-                ci->mulCar = value & FMPAC_REG_MUL_MASK;
+                ci->amCar = (value & YM_REG_AM_BIT) ? 1 : 0;
+                ci->vibCar = (value & YM_REG_VIB_BIT) ? 1 : 0;
+                ci->egTypeCar = (value & YM_REG_EGTYPE_BIT) ? 1 : 0;
+                ci->ksrCar = (value & YM_REG_KSR_BIT) ? 1 : 0;
+                ci->mulCar = value & YM_REG_MUL_MASK;
                 break;
             case 0x02:
-                ci->kslMod = value >> FMPAC_REG_KSL_SHIFT;
-                ci->tl = value & FMPAC_REG_TL_MASK;
+                ci->kslMod = value >> YM_REG_KSL_SHIFT;
+                ci->tl = value & YM_REG_TL_MASK;
                 break;
             case 0x03:
-                ci->kslCar = value >> FMPAC_REG_KSL_SHIFT;
-                ci->dc = (value & FMPAC_REG_DC_BIT) ? 1 : 0;
-                ci->dm = (value & FMPAC_REG_DM_BIT) ? 1 : 0;
-                ci->fb = value & FMPAC_REG_FB_MASK;
+                ci->kslCar = value >> YM_REG_KSL_SHIFT;
+                ci->dc = (value & YM_REG_DC_BIT) ? 1 : 0;
+                ci->dm = (value & YM_REG_DM_BIT) ? 1 : 0;
+                ci->fb = value & YM_REG_FB_MASK;
                 break;
-            case 0x04: ci->arMod = value >> FMPAC_REG_AR_SHIFT; ci->drMod = value & FMPAC_REG_DR_MASK; break;
-            case 0x05: ci->arCar = value >> FMPAC_REG_AR_SHIFT; ci->drCar = value & FMPAC_REG_DR_MASK; break;
-            case 0x06: ci->slMod = value >> FMPAC_REG_SL_SHIFT; ci->rrMod = value & FMPAC_REG_RR_MASK; break;
-            case 0x07: ci->slCar = value >> FMPAC_REG_SL_SHIFT; ci->rrCar = value & FMPAC_REG_RR_MASK; break;
+            case 0x04: ci->arMod = value >> YM_REG_AR_SHIFT; ci->drMod = value & YM_REG_DR_MASK; break;
+            case 0x05: ci->arCar = value >> YM_REG_AR_SHIFT; ci->drCar = value & YM_REG_DR_MASK; break;
+            case 0x06: ci->slMod = value >> YM_REG_SL_SHIFT; ci->rrMod = value & YM_REG_RR_MASK; break;
+            case 0x07: ci->slCar = value >> YM_REG_SL_SHIFT; ci->rrCar = value & YM_REG_RR_MASK; break;
         }
-        FMPAC_UpdateCustomUsers(chip);
+        YM_UpdateCustomUsers(chip);
     }
     else if (address == 0x0E)
     {
@@ -343,49 +343,49 @@ void FMPACWrite(u8 value, u8 address, FMPAC *chip)
          * at full gain, otherwise the repeated 0E=20/28 sequences in real
          * music lose their attack/decay behavior.
          */
-        if (value & FMPAC_RHYTHM_ENABLE_BIT)
+        if (value & YM_RHYTHM_ENABLE_BIT)
         {
-            if (!(old & FMPAC_RHYTHM_ENABLE_BIT))
+            if (!(old & YM_RHYTHM_ENABLE_BIT))
             {
                 /* Entering rhythm mode: any selected percussion voice is a new hit. */
-                if (value & FMPAC_RHYTHM_BD_BIT)
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_BD].osc, 1);
-                if (value & FMPAC_RHYTHM_SD_BIT)
-                    FMPAC_RhythmRetrigger(&chip->rhythmSD, 1);
-                if (value & FMPAC_RHYTHM_TOM_BIT)
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_TOMTCY].osc, 1);
-                if (value & FMPAC_RHYTHM_TCY_BIT)
-                    FMPAC_RhythmRetrigger(&chip->rhythmTCY, 0);
-                if (value & FMPAC_RHYTHM_HH_BIT)
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_HHSD].osc, 0);
+                if (value & YM_RHYTHM_BD_BIT)
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_BD].osc, 1);
+                if (value & YM_RHYTHM_SD_BIT)
+                    YM_RhythmRetrigger(&chip->rhythmSD, 1);
+                if (value & YM_RHYTHM_TOM_BIT)
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_TOMTCY].osc, 1);
+                if (value & YM_RHYTHM_TCY_BIT)
+                    YM_RhythmRetrigger(&chip->rhythmTCY, 0);
+                if (value & YM_RHYTHM_HH_BIT)
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_HHSD].osc, 0);
             }
             else
             {
                 /* Normal drum trigger: only newly asserted bits re-attack. */
-                if ((value & FMPAC_RHYTHM_BD_BIT) && !(old & FMPAC_RHYTHM_BD_BIT))
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_BD].osc, 1);
-                if ((value & FMPAC_RHYTHM_SD_BIT) && !(old & FMPAC_RHYTHM_SD_BIT))
-                    FMPAC_RhythmRetrigger(&chip->rhythmSD, 1);
-                if ((value & FMPAC_RHYTHM_TOM_BIT) && !(old & FMPAC_RHYTHM_TOM_BIT))
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_TOMTCY].osc, 1);
-                if ((value & FMPAC_RHYTHM_TCY_BIT) && !(old & FMPAC_RHYTHM_TCY_BIT))
-                    FMPAC_RhythmRetrigger(&chip->rhythmTCY, 0);
-                if ((value & FMPAC_RHYTHM_HH_BIT) && !(old & FMPAC_RHYTHM_HH_BIT))
-                    FMPAC_RhythmRetrigger(&chip->channels[FMPAC_CHANNEL_HHSD].osc, 0);
+                if ((value & YM_RHYTHM_BD_BIT) && !(old & YM_RHYTHM_BD_BIT))
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_BD].osc, 1);
+                if ((value & YM_RHYTHM_SD_BIT) && !(old & YM_RHYTHM_SD_BIT))
+                    YM_RhythmRetrigger(&chip->rhythmSD, 1);
+                if ((value & YM_RHYTHM_TOM_BIT) && !(old & YM_RHYTHM_TOM_BIT))
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_TOMTCY].osc, 1);
+                if ((value & YM_RHYTHM_TCY_BIT) && !(old & YM_RHYTHM_TCY_BIT))
+                    YM_RhythmRetrigger(&chip->rhythmTCY, 0);
+                if ((value & YM_RHYTHM_HH_BIT) && !(old & YM_RHYTHM_HH_BIT))
+                    YM_RhythmRetrigger(&chip->channels[YM_CHANNEL_HHSD].osc, 0);
             }
         }
         else
         {
             /* Leaving rhythm mode mutes the dedicated rhythm voices. */
-            chip->channels[FMPAC_CHANNEL_BD].osc.gain = 0;
-            chip->channels[FMPAC_CHANNEL_TOMTCY].osc.gain = 0;
-            chip->channels[FMPAC_CHANNEL_HHSD].osc.gain = 0;
+            chip->channels[YM_CHANNEL_BD].osc.gain = 0;
+            chip->channels[YM_CHANNEL_TOMTCY].osc.gain = 0;
+            chip->channels[YM_CHANNEL_HHSD].osc.gain = 0;
             chip->rhythmSD.gain = 0;
             chip->rhythmTCY.gain = 0;
         }
 
         /* The melodic key-on field is not used for rhythm voices. */
-        chip->channels[FMPAC_CHANNEL_BD].keyOn = 0;
+        chip->channels[YM_CHANNEL_BD].keyOn = 0;
     }
     else if (address == 0x0F)
     {
@@ -395,42 +395,42 @@ void FMPACWrite(u8 value, u8 address, FMPAC *chip)
     {
         int ch = address - 0x10;
         chip->channels[ch].fNumber = (chip->channels[ch].fNumber & 0x100) | value;
-        FMPAC_UpdateChannelFreq(chip, ch);
+        YM_UpdateChannelFreq(chip, ch);
     }
     else if (address >= 0x20 && address <= 0x28)
     {
         int ch = address - 0x20;
-        FMPAC_Channel *c = &chip->channels[ch];
-        c->sustain = (value & FMPAC_REG_SUS_BIT) ? 1 : 0;
-        c->block = (value >> FMPAC_REG_BLOCK_SHIFT) & FMPAC_REG_BLOCK_MASK;
-        c->fNumber = (c->fNumber & 0x0FF) | ((value & FMPAC_REG_FNUM_MSB_BIT) ? 0x100 : 0);
-        FMPAC_UpdateChannelFreq(chip, ch);
+        YM_Channel *c = &chip->channels[ch];
+        c->sustain = (value & YM_REG_SUS_BIT) ? 1 : 0;
+        c->block = (value >> YM_REG_BLOCK_SHIFT) & YM_REG_BLOCK_MASK;
+        c->fNumber = (c->fNumber & 0x0FF) | ((value & YM_REG_FNUM_MSB_BIT) ? 0x100 : 0);
+        YM_UpdateChannelFreq(chip, ch);
 
-        if (!(chip->rhythmReg & FMPAC_RHYTHM_ENABLE_BIT) || ch < FMPAC_CHANNEL_BD)
-            c->keyOn = (value & FMPAC_REG_KEY_BIT) ? 1 : 0;
+        if (!(chip->rhythmReg & YM_RHYTHM_ENABLE_BIT) || ch < YM_CHANNEL_BD)
+            c->keyOn = (value & YM_REG_KEY_BIT) ? 1 : 0;
     }
     else if (address >= 0x30 && address <= 0x38)
     {
         int ch = address - 0x30;
-        chip->channels[ch].instrument = value >> FMPAC_REG_INST_SHIFT;
-        chip->channels[ch].volume = value & FMPAC_REG_VOL_MASK;
-        chip->channels[ch].instPtr = FMPAC_GetInstrument(chip, chip->channels[ch].instrument);
+        chip->channels[ch].instrument = value >> YM_REG_INST_SHIFT;
+        chip->channels[ch].volume = value & YM_REG_VOL_MASK;
+        chip->channels[ch].instPtr = YM_GetInstrument(chip, chip->channels[ch].instrument);
         chip->channels[ch].osc.sustainGain =
             ((chip->channels[ch].instPtr->slCar & 0x0F) == 15)
             ? 255
-            : FMPAC_SustainGain[chip->channels[ch].instPtr->slCar & 0x0F];
-        if (ch == FMPAC_CHANNEL_BD)  chip->rhythmVolBD = value & FMPAC_REG_VOL_MASK;
-        if (ch == FMPAC_CHANNEL_HHSD)  { chip->rhythmVolHH = value >> FMPAC_REG_INST_SHIFT; chip->rhythmVolSD = value & FMPAC_REG_VOL_MASK; }
-        if (ch == FMPAC_CHANNEL_TOMTCY) { chip->rhythmVolTOM = value >> FMPAC_REG_INST_SHIFT; chip->rhythmVolTCY = value & FMPAC_REG_VOL_MASK; }
-        FMPAC_UpdateChannelFreq(chip, ch);
+            : YM_SustainGain[chip->channels[ch].instPtr->slCar & 0x0F];
+        if (ch == YM_CHANNEL_BD)  chip->rhythmVolBD = value & YM_REG_VOL_MASK;
+        if (ch == YM_CHANNEL_HHSD)  { chip->rhythmVolHH = value >> YM_REG_INST_SHIFT; chip->rhythmVolSD = value & YM_REG_VOL_MASK; }
+        if (ch == YM_CHANNEL_TOMTCY) { chip->rhythmVolTOM = value >> YM_REG_INST_SHIFT; chip->rhythmVolTCY = value & YM_REG_VOL_MASK; }
+        YM_UpdateChannelFreq(chip, ch);
     }
 }
 
-ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
+ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
-    int rhythmOn = chip->rhythmReg & FMPAC_RHYTHM_ENABLE_BIT;
-    int lastMelodic = rhythmOn ? FMPAC_CHANNEL_BD : FMPAC_NUM_CHANNELS;
+    int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
+    int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
     for (i = 0; i < len; i++)
     {
@@ -439,10 +439,10 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
 
         for (ch = 0; ch < lastMelodic; ch++)
         {
-            FMPAC_Channel *cc = &chip->channels[ch];
+            YM_Channel *cc = &chip->channels[ch];
             if (!cc->keyOn && cc->osc.gain == 0) continue;    // fully idle - skip entirely
-            sample += FMPAC_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1,
-                                   (u32)FMPAC_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2);
+            sample += YM_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1,
+                                   (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2);
 
             /*
              * Acoustic Bass (ROM instrument 14): keep the proven baseline
@@ -456,21 +456,21 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
              */
             if (ch == 3 && cc->instrument == 14 && cc->osc.gain != 0)
             {
-                s32 fundamental = FMPAC_SinTable[(cc->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF];
+                s32 fundamental = YM_SinTable[(cc->osc.phase >> YM_SIN_SHIFT) & 0xFF];
                 /* About 33% of the baseline bass voice: a little more weight
                    while keeping the original instrument dominant. */
-                sample += (fundamental * (15 - cc->volume) * cc->osc.gain) >> (FMPAC_OUT_SHIFT + 1);
+                sample += (fundamental * (15 - cc->volume) * cc->osc.gain) >> (YM_OUT_SHIFT + 1);
             }
         }
 
         if (rhythmOn)
         {
-            FMPAC_Channel *bd = &chip->channels[FMPAC_CHANNEL_BD];
-            FMPAC_Channel *hs = &chip->channels[FMPAC_CHANNEL_HHSD];
-            FMPAC_Channel *tt = &chip->channels[FMPAC_CHANNEL_TOMTCY];
+            YM_Channel *bd = &chip->channels[YM_CHANNEL_BD];
+            YM_Channel *hs = &chip->channels[YM_CHANNEL_HHSD];
+            YM_Channel *tt = &chip->channels[YM_CHANNEL_TOMTCY];
 
             /*
-             * Rhythm voices are one-shot envelopes.  FMPAC_RhythmRetrigger()
+             * Rhythm voices are one-shot envelopes.  YM_RhythmRetrigger()
              * starts them at full gain when the corresponding 0E bit rises;
              * after that they decay regardless of whether the bit remains 1.
              *
@@ -480,23 +480,23 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
              */
             if (bd->osc.gain != 0)
             {
-                FMPAC_UpdateGain(&bd->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+                YM_UpdateGain(&bd->osc, 0, YM_PERCUSSION_RELEASE_STEP);
                 if (bd->osc.gain != 0)
                 {
                     bd->osc.phase += bd->osc.phaseIncrement;
-                    s32 s = FMPAC_SinTable[(bd->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF];
-                    sample += (s * (15 - chip->rhythmVolBD) * bd->osc.gain) >> FMPAC_OUT_SHIFT;
+                    s32 s = YM_SinTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+                    sample += (s * (15 - chip->rhythmVolBD) * bd->osc.gain) >> YM_OUT_SHIFT;
                 }
             }
 
             if (tt->osc.gain != 0)
             {
-                FMPAC_UpdateGain(&tt->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+                YM_UpdateGain(&tt->osc, 0, YM_PERCUSSION_RELEASE_STEP);
                 if (tt->osc.gain != 0)
                 {
                     tt->osc.phase += tt->osc.phaseIncrement;
-                    s32 s = FMPAC_SinTable[(tt->osc.phase >> FMPAC_SIN_SHIFT) & 0xFF];
-                    sample += (s * (15 - chip->rhythmVolTOM) * tt->osc.gain) >> FMPAC_OUT_SHIFT;
+                    s32 s = YM_SinTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+                    sample += (s * (15 - chip->rhythmVolTOM) * tt->osc.gain) >> YM_OUT_SHIFT;
                 }
             }
 
@@ -536,8 +536,8 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
                 u32 noiseBit = chip->noiseLFSR & 1;
 
                 /* 10-bit phase outputs corresponding to the OPLL PG. */
-                u32 hhPhase = (chip->channels[FMPAC_CHANNEL_HHSD].osc.phase >> 22) & 0x3FF;
-                u32 cymPhase = (chip->channels[FMPAC_CHANNEL_TOMTCY].osc.phase >> 22) & 0x3FF;
+                u32 hhPhase = (chip->channels[YM_CHANNEL_HHSD].osc.phase >> 22) & 0x3FF;
+                u32 cymPhase = (chip->channels[YM_CHANNEL_TOMTCY].osc.phase >> 22) & 0x3FF;
 
                 /*
                  * Short-noise equation from the OPLL rhythm section:
@@ -550,11 +550,11 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
                     (((cymPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1));
 
                 /* Convert a 10-bit phase position to our 256-entry waveform. */
-#define FMPAC_RHYTHM_WAVE(p)          FMPAC_SinTable[((p) >> 2) & 0xFF]
+#define YM_RHYTHM_WAVE(p)          YM_SinTable[((p) >> 2) & 0xFF]
 
                 if (hs->osc.gain != 0)
                 {
-                    FMPAC_UpdateGain(&hs->osc, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&hs->osc, 0, YM_PERCUSSION_RELEASE_STEP);
                     if (hs->osc.gain != 0)
                     {
                         /*
@@ -568,14 +568,14 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
                         else
                             phase = noiseBit ? 0x034 : 0x0D0;
 
-                        s32 s = FMPAC_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> FMPAC_OUT_SHIFT;
+                        s32 s = YM_RHYTHM_WAVE(phase);
+                        sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> YM_OUT_SHIFT;
                     }
                 }
 
                 if (chip->rhythmSD.gain != 0)
                 {
-                    FMPAC_UpdateGain(&chip->rhythmSD, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&chip->rhythmSD, 0, YM_PERCUSSION_RELEASE_STEP);
                     if (chip->rhythmSD.gain != 0)
                     {
                         /*
@@ -589,24 +589,24 @@ ITCM_CODE void FMPACMixer(int len, s16 *dest, FMPAC *chip)
                         else
                             phase = noiseBit ? 0x000 : 0x100;
 
-                        s32 s = FMPAC_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> FMPAC_OUT_SHIFT;
+                        s32 s = YM_RHYTHM_WAVE(phase);
+                        sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> YM_OUT_SHIFT;
                     }
                 }
 
                 if (chip->rhythmTCY.gain != 0)
                 {
-                    FMPAC_UpdateGain(&chip->rhythmTCY, 0, FMPAC_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&chip->rhythmTCY, 0, YM_PERCUSSION_RELEASE_STEP);
                     if (chip->rhythmTCY.gain != 0)
                     {
                         /* YM2413 top cymbal: short-noise selects 300 or 100. */
                         u32 phase = shortNoise ? 0x300 : 0x100;
-                        s32 s = FMPAC_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> FMPAC_OUT_SHIFT;
+                        s32 s = YM_RHYTHM_WAVE(phase);
+                        sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> YM_OUT_SHIFT;
                     }
                 }
 
-#undef FMPAC_RHYTHM_WAVE
+#undef YM_RHYTHM_WAVE
             }
         }
 

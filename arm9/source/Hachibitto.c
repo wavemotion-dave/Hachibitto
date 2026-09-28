@@ -35,7 +35,7 @@
 #include "topscreen.h"
 #include "fdc.h"
 #include "V9938.h"
-#include "FMPAC.h"
+#include "msx_music.h"
 #include "CRC32.h"
 
 #include "soundbank.h"
@@ -299,7 +299,7 @@ void SmoothStartSound(mm_word len, mm_addr dest)
 
     if (msx_music_capable_game)
     {
-        FMPACMixer(len*2, mixbuf1, &myYM); // Mix on top of AY
+        YMMixer(len*2, mixbuf1, &myYM); // Mix on top of AY
         memset(mixbuf2, 0x00, len*2); // Nothing more to mix...
     }
     else if (msx_scc_capable_game)
@@ -357,7 +357,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             }
 
             ay38910Mixer(len*2, dest, &myAY);
-            FMPACMixer(len*2, dest, &myYM);
+            YMMixer(len*2, dest, &myYM);
             last_sample = ((s16*)dest)[len*2 - 1];
         }
         else if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
@@ -369,53 +369,48 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 return len;
             }
 
-            ay38910Mixer(len*2, mixbuf1, &myAY);
+            ay38910Mixer(len * 2, mixbuf1, &myAY);  // Get AY samples
+            SCCMixer(len * 2, mixbuf2, &mySCC);     // Get SCC samples
+            
+            // ------------------------------------------------------------------------
+            // And now we need to mix them... with a bit of audio filtering on the DSi
+            // ------------------------------------------------------------------------
+            s16 *output = (s16*)dest;
 
-            // ---------------------------------------------------------------------
-            // For any large steps we want to smooth this out so that we don't hear
-            // the AY produce any sharp pops or clicks... this helps but costs CPU.
-            // ---------------------------------------------------------------------
-            int count = len * 2;
-            s16 *p = mixbuf1;
+            int filterAY = isDSiMode();
             s32 smoothed = ay_smoothed;
 
-            if (isDSiMode()) // Only DSi supports audio filters
+            for (int i = 0; i < len * 2; i++)
             {
-                while (count--) {
-                    s32 diff = (s32)*p - smoothed;
+                s32 ay = mixbuf1[i];
+
+                if (filterAY) // We have enough speed on the DSi to do click removal
+                {
+                    s32 diff = ay - smoothed;
+
                     if (diff > MAX_STEP) diff = MAX_STEP;
                     else if (diff < -MAX_STEP) diff = -MAX_STEP;
 
                     smoothed += diff;
-                    *p++ = (s16)smoothed;
+                    ay = smoothed;
                 }
-                ay_smoothed = smoothed;
-            }
 
-            SCCMixer(len*2, mixbuf2, &mySCC);
-            p = (s16*)dest;
-            for (int i = 0; i < len*2; i++)
-            {
-                s32 scc_sample = ((s32)mixbuf2[i]);
+                ay -= ay >> 2;
 
-                // Same cost as the old >>1 attenuation - just a different shift amount,
-                // so this loudness fix is free relative to what you had.
-                s32 ay_sample = (s32)mixbuf1[i] - ((s32)mixbuf1[i] >> 2);
-                scc_sample    = scc_sample - (scc_sample >> 2);
+                s32 scc = mixbuf2[i];
+                scc -= scc >> 2;
 
-                s32 combined = ay_sample + scc_sample;
+                s32 combined = ay + scc;
 
-                // Plain hard clamp - GCC turns this diamond pattern into CMP+MOVGT/MOVLT
-                // on ARMv5, i.e. predicated instructions with no branch and no misprediction
-                // cost at all, not an actual conditional jump. Cheaper than a soft-knee,
-                // which adds real arithmetic (subtract/shift/add) any time it's touched.
-                if (combined > 32767)  combined = 32767;
+                if (combined > 32767) combined = 32767;
                 else if (combined < -32768) combined = -32768;
 
-                *p++ = (s16)combined;
+                output[i] = (s16)combined;
             }
-            p--;
-            last_sample = *p;
+
+            if (filterAY) ay_smoothed = smoothed;
+
+            last_sample = output[len * 2 - 1];
         }
         else  // Pretty simple... just AY (and maybe beeper)
         {
@@ -433,14 +428,12 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                     p[i] = combined;
                 }
             }
-            else
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
-            if (beeperFreq)
+            else if (beeperFreq)
             {
                 ProcessBeeper(len, dest);
             }
-            else
-            if (isDSiMode()) // DSi gets slight audio filter to remove clicks if AY only
+            else if (isDSiMode()) // DSi gets slight audio filter to remove clicks if AY only
             {
                 s16 *p = (s16*)dest;
                 int count = len * 2;
@@ -543,8 +536,8 @@ void sound_chip_reset()
     // -----------------------------------------------------------------
     // The YM2413 chip is the MSX MUSIC standard for late-era games...
     // -----------------------------------------------------------------
-    FMPACReset(&myYM);
-    FMPACMixer(16, mixbuf2, &myYM);   // Do an initial mix conversion to clear the output
+    YMReset(&myYM);
+    YMMixer(16, mixbuf2, &myYM);   // Do an initial mix conversion to clear the output
 }
 
 // -----------------------------------------------------------------------

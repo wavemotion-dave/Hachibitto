@@ -12,7 +12,7 @@
 #define _MSX_GENERIC_H_
 
 #include "Hachibitto.h"
-#include "FMPAC.h"
+#include "msx_music.h"
 #include "cpu/z80/Z80_interface.h"
 #include "cpu/vdp9938/vdp9938.h"
 #include "cpu/ay38910/AY38910.h"
@@ -171,7 +171,7 @@ extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_MSX2[0x8000];
 extern const unsigned char MSXBios_MSX2EXT[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];
-extern const unsigned char MSXBios_FMPAC[0x4000];
+extern const unsigned char MSXBios_MSXMUSIC[0x4000];
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
@@ -183,7 +183,7 @@ extern u8  sccplus_mode;
 extern AY38910 myAY;
 extern AY38910 myAY2;
 extern SCC     mySCC;
-extern FMPAC   myYM;
+extern YM      myYM;
 extern u8 msx_scc_enable;
 extern u8 JoyMode;
 extern u32 JoyState;

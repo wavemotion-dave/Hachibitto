@@ -16,11 +16,8 @@ extern u8 special_memory_access;
 
 extern void ClearCPUInterrupt(void);
 
-extern void cpu_writeport16(register unsigned short Port,register unsigned char Value);
-extern unsigned char cpu_readport16(register unsigned short Port);
-
-extern void cpu_writeport_msx(register unsigned short Port,register unsigned char Value);
-extern unsigned char cpu_readport_msx(register unsigned short Port);
+extern void cpu_writeport_msx(register u8 Port,register unsigned char Value);
+extern unsigned char cpu_readport_msx(register u8 Port);
 
 extern void cpu_writemem16 (u16 address, u8 value);
 extern byte cpu_readmem16 (u16 address);
