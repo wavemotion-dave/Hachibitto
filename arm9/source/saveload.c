@@ -266,6 +266,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(mirror_ram_bank,        sizeof(mirror_ram_bank),        1, handle);
         if (retVal) retVal = fwrite(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
         if (retVal) retVal = fwrite(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
+        if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);        
         
         // -----------------------------------------------------------------------
         // Compress the 128K RAM data using 'high' compression ratio...
@@ -490,6 +491,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(mirror_ram_bank,        sizeof(mirror_ram_bank),        1, handle);
             if (retVal) retVal = fread(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
             if (retVal) retVal = fread(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
+            if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);        
 
             // -----------------------------------------------------------------------
             // Restore Main RAM memory which was saved in a compressed format

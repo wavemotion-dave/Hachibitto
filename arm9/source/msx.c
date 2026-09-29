@@ -369,6 +369,181 @@ u8 readport_keyboard(void)
       }
       return ~key1;
 }
+
+// --------------------------------------------------------------------
+// Arkanoid Vaus paddle
+//
+// Joystick port 1:
+//
+//   Pin 1 = serial DATA  -> PSG R#14 bit 0
+//   Pin 2 = FIRE         -> PSG R#14 bit 1
+//   Pin 6 = CLOCK        -> PSG R#15 bit 0
+//   Pin 8 = RESET/START  -> PSG R#15 bit 4
+//
+// Vaus sends 9 bits, MSB first.
+//
+// Sequence:
+//
+//   pin8 LOW -> HIGH       start conversion
+//   wait
+//   read bit 8
+//   pin6 LOW -> HIGH       shift
+//   read bit 7
+//   pin6 LOW -> HIGH       shift
+//   ...
+//
+// Pin 8 is HIGH for the first clock, then LOW for the remaining clocks.
+// --------------------------------------------------------------------
+ArkanoidPaddle myPaddle;
+
+// -------------------------------------------------------------------------------
+// Experimentally determined that 0-290 is about the usable range in both
+// Arkanoid games which are the only games known to use the paddles. Good enough..
+// -------------------------------------------------------------------------------
+void update_arkanoid_paddle_position(u8 clockwise, u8 speed)
+{
+    if (clockwise)
+    {
+        myPaddle.current_position += speed;
+        if (myPaddle.current_position > 290) myPaddle.current_position = 290;
+    }
+    else
+    {
+        if (myPaddle.current_position > speed) myPaddle.current_position -= speed;
+        else myPaddle.current_position = 0;        
+    }
+}
+
+// --------------------------------------------------------------------
+// Arkanoid Vaus paddle
+//
+// Joystick port 1:
+//
+//   Pin 1 = DATA  -> PSG R#14 bit 0
+//   Pin 2 = FIRE  -> PSG R#14 bit 1, active LOW
+//   Pin 6 = CLOCK -> PSG R#15 bit 0
+//   Pin 8 = START -> PSG R#15 bit 4, active LOW pulse
+//
+// Vaus protocol:
+//
+//   pin 8 LOW  = start a new conversion
+//   pin 8 HIGH = keep conversion result available
+//
+//   read DATA
+//   pin 6 LOW
+//   pin 6 HIGH
+//   read DATA
+//   ... nine bits total
+//
+// The first 9-bit result after a pin-8 conversion is what we present
+// to the game. We emulate the Vaus conversion instantaneously.
+// --------------------------------------------------------------------
+
+// --------------------------------------------------------------------
+// Start a new Vaus conversion.
+//
+// IMPORTANT:
+// The Vaus is triggered by the FALLING edge of pin 8.
+// --------------------------------------------------------------------
+static void arkanoid_start_conversion(ArkanoidPaddle *paddle)
+{
+    uint16_t pos = paddle->current_position;
+
+    /*
+     * Our experimentally calibrated range.
+     *
+     * 150 -> left edge
+     * 305 -> right edge
+     */
+    paddle->shift_register = 150 + ((pos * 145) >> 8);
+
+    paddle->shift_register &= 0x01FF;
+}
+
+
+// --------------------------------------------------------------------
+// Update Vaus control lines
+// --------------------------------------------------------------------
+static void update_arkanoid_paddle(ArkanoidPaddle *paddle,
+                                   uint8_t pin6,
+                                   uint8_t pin8)
+{
+    /*
+     * Pin 8 FALLING edge starts a new conversion.
+     *
+     * Do NOT do anything on the rising edge.
+     *
+     * This is important because pin 8 is supposed to remain HIGH
+     * while the paddle result is being read.
+     */
+    if (!pin8 && paddle->last_pin8_state)
+    {
+        arkanoid_start_conversion(paddle);
+    }
+
+    /*
+     * Pin 6 rising edge shifts the serial register.
+     *
+     * The game reads the current bit BEFORE generating this pulse.
+     *
+     * So:
+     *
+     *     R14 read -> current bit
+     *     pin6 LOW
+     *     pin6 HIGH -> advance to next bit
+     */
+    if (pin6 && !paddle->last_pin6_state)
+    {
+        paddle->shift_register <<= 1;
+    }
+
+    paddle->last_pin6_state = pin6;
+    paddle->last_pin8_state = pin8;
+}
+
+
+// --------------------------------------------------------------------
+// Read Vaus serial data.
+//
+// IMPORTANT: Reading does NOT shift the register.
+// Pin 6 does that.
+// --------------------------------------------------------------------
+static bool read_paddle_pin1(ArkanoidPaddle *paddle)
+{
+    return (paddle->shift_register & 0x0100) != 0;
+}
+
+
+// --------------------------------------------------------------------
+// PSG Port B output
+// --------------------------------------------------------------------
+void ayPortBOutHandler(u8 value)
+{
+    /*
+     * Bit 6 selects joystick port 1.
+     */
+    if ((value & 0x40) == 0)
+    {
+        uint8_t pin6 = (value & 0x01) ? 1 : 0;
+        uint8_t pin8 = (value & 0x10) ? 1 : 0;
+
+        update_arkanoid_paddle(&myPaddle, pin6, pin8);
+
+        /*
+         * Your existing dpad/analog mapping goes here.
+         *
+         * Leave this as whatever code you are currently using
+         * to produce 0..255.
+         */
+        myPaddle.current_position = myPaddle.current_position;
+
+        if (JoyState & JST_FIRE1)
+            myPaddle.button_pressed = 1;
+        else
+            myPaddle.button_pressed = 0;
+    }
+}
+
 // --------------------------------------------------------------------
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
@@ -387,7 +562,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
       if (myAY.ayRegIndex == 14)
       {
           u8 joy1 = 0x00;
-
+          
           // -------------------------------------------------------------
           // Only port 1... not port 2. AY register 15 (PortB) bit 6 is
           // set to 0 for the port 1 joystick and that's the only one
@@ -395,22 +570,61 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
           // -------------------------------------------------------------
           if ((myAY.ayPortBOut & 0x40) == 0)
           {
-              if (myConfig.dpad == DPAD_NORMAL)
-              {
-                  if (JoyState & JST_UP)    joy1 |= 0x01;
-                  if (JoyState & JST_DOWN)  joy1 |= 0x02;
-                  if (JoyState & JST_LEFT)  joy1 |= 0x04;
-                  if (JoyState & JST_RIGHT) joy1 |= 0x08;
-
-                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
-                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
-              }
-              else if (myConfig.dpad == DPAD_DIAGONALS)
+              if (myConfig.dpad == DPAD_DIAGONALS)
               {
                   if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
                   if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
                   if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
                   if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
+
+                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
+                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
+              }
+              else if (myConfig.dpad == DPAD_ARKANOID)
+              {
+                  /*
+                   * joy1 is active-high here because it gets inverted below:
+                   *
+                   *     myAY.ayPortAIn = ~joy1;
+                   *
+                   * Vaus:
+                   *   pin 1 = serial data
+                   *   pin 2 = fire, active LOW
+                   */
+              
+                  /*
+                   * Pin 1 / serial data
+                   *
+                   * Actual PSG input is active-low, so:
+                   *
+                   *   serial bit = 1 -> joy1 bit 0 = 0
+                   *   serial bit = 0 -> joy1 bit 0 = 1
+                   */
+                  if (!read_paddle_pin1(&myPaddle))
+                      joy1 |= 0x01;
+              
+                  /*
+                   * Pin 2 / fire button
+                   *
+                   * Actual Vaus button:
+                   *   0 = pressed
+                   *   1 = released
+                   *
+                   * Since joy1 gets inverted later:
+                   *   joy1 bit 1 = 0 -> PSG bit 1 = 1
+                   *   joy1 bit 1 = 1 -> PSG bit 1 = 0
+                   *
+                   * Therefore we want joy1 bit 1 SET when NOT pressed.
+                   */
+                  if ((JoyState & JST_FIRE1))
+                      joy1 |= 0x02;
+              }
+              else // DPAD_NORMAL or SLIDE-N-GLIDE
+              {
+                  if (JoyState & JST_UP)    joy1 |= 0x01;
+                  if (JoyState & JST_DOWN)  joy1 |= 0x02;
+                  if (JoyState & JST_LEFT)  joy1 |= 0x04;
+                  if (JoyState & JST_RIGHT) joy1 |= 0x08;
 
                   if (JoyState & JST_FIRE1) joy1 |= 0x10;
                   if (JoyState & JST_FIRE2) joy1 |= 0x20;
@@ -1056,34 +1270,6 @@ u8 MSX_GuessROMType(u32 size)
     return type;
 }
 
-// A few games get special config options by default...
-void LoadGameTweaks(void)
-{
-    if (strstr(initial_file_upper, "SNATCHER"))
-    {
-        myConfig.musicExpand = 2;   // Enable SCC+
-    }   
-
-    if (strstr(initial_file_upper, "XAK"))
-    {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
-    }   
-
-    if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
-    {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
-    }   
-
-    if (strstr(initial_file_upper, "FAMICLE"))
-    {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
-    }   
-
-    if (strstr(initial_file_upper, "FRAY"))
-    {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
-    }   
-}
 
 /*********************************************************************************
  * We wipe main RAM with 0x00 values (helps with compression of save states even
@@ -1166,9 +1352,6 @@ void MSX_InitialMemoryLayout(u32 romSize)
     // ---------------------------------------------
     msx_restore_bios();
     
-    // Load game tweaks for some games based on filenames loaded... e.g. Snatcher gets SCC+
-    LoadGameTweaks();
-
     // -----------------------------------------------------------------
     // If we are a .dsk we can point to nothing for the cart and return
     // here unless we have the SCC PLUS expansion mapped in.
@@ -1664,6 +1847,10 @@ void msx_reset(void)
         fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
         fdc_reset(true);
     }
+    
+    // Setup the PortB write - Arkanoid paddles need this...
+    myAY.ayPortBOutFptr = ayPortBOutHandler;
+    myPaddle.current_position = 130;
 }
 
 // -------------------------------------------------------------------

@@ -18,7 +18,6 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <fat.h>
-#include <ctype.h>
 #include <maxmod9.h>
 
 #include "Hachibitto.h"
@@ -1428,7 +1427,12 @@ void Hachibitto_main(void)
       }
       else if  (nds_key & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_START | KEY_SELECT | KEY_R | KEY_L | KEY_X | KEY_Y))
       {
-          if (myConfig.dpad == DPAD_SLIDE_N_GLIDE) // CHUCKIE-EGG Style... hold left/right or up/down for a few frames
+          if (myConfig.dpad == DPAD_ARKANOID)
+          {
+              if (nds_key & KEY_LEFT)  update_arkanoid_paddle_position(0, (nds_key & KEY_B) ? 10:5);
+              if (nds_key & KEY_RIGHT) update_arkanoid_paddle_position(1, (nds_key & KEY_B) ? 10:5);
+          }
+          else if (myConfig.dpad == DPAD_SLIDE_N_GLIDE) // CHUCKIE-EGG Style... hold left/right or up/down for a few frames
           {
                 if (nds_key & KEY_UP)
                 {
@@ -2171,13 +2175,6 @@ u8 LoadGameRom(const char *filename)
     FILE* handle = fopen(filename, "rb");
     if (handle != NULL)
     {
-        // Save the initial filename and file - we need it for save/restore of state
-        strcpy(initial_file, filename);
-        strcpy(initial_file_upper, filename);
-        for (int i=0; i<strlen(initial_file_upper); i++)
-        {
-            initial_file_upper[i] = toupper(initial_file_upper[i]);     // Uppercase string
-        }
         getcwd(initial_path, MAX_ROM_NAME);
 
         // Get file size the 'fast' way - use fstat() instead of fseek() or ftell()
@@ -2194,10 +2191,6 @@ u8 LoadGameRom(const char *filename)
 
             mapperMask = 0x00;  // No MSX mapper mask until we detect it
 
-            // ------------------------------------------------------------------------------
-            // For the MSX emulation, we setup the initial memory map based on ROM size
-            // ------------------------------------------------------------------------------
-            MSX_InitialMemoryLayout(romSize);
             bOK = 1;
         }
         else fclose(handle);
@@ -2301,7 +2294,7 @@ void debug_save()
 {
     if (debug_len > 0) // Only if we have debug data to write...
     {
-        FILE *fp = fopen("debug.log", "w");
+        FILE *fp = fopen("debug.log", "a");
         if (fp)
         {
             fwrite(DEBUG_BUFFER, 1, debug_len, fp);

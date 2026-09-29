@@ -15,6 +15,7 @@
 #include <fat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "Hachibitto.h"
 #include "MSX_generic.h"
@@ -935,6 +936,54 @@ void SetDefaultGameConfig(void)
     if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 0;  // Antarctic Adventure Prototype
     if (file_crc == 0x6af19e75) myConfig.maxSprites  = 0;  // Adventures in the Park
     if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 0;  // Uridium
+
+    // -------------------------------------------------------------------------------------------------------------
+    // Game tweaks for some games based on filenames loaded... e.g. Snatcher gets SCC+, Q-Bert gets diagonals, etc.
+    // -------------------------------------------------------------------------------------------------------------
+    if (strstr(initial_file_upper, "SNATCHER"))
+    {
+        myConfig.musicExpand = 2;   // Enable SCC+
+    }
+
+    if (strstr(initial_file_upper, "XAK"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }
+
+    if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }
+
+    if (strstr(initial_file_upper, "FAMICLE"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }
+
+    if (strstr(initial_file_upper, "FRAY"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }
+
+    if (strstr(initial_file_upper, "ARKANOID"))
+    {
+        myConfig.dpad = DPAD_ARKANOID;
+    }
+
+    if (strstr(initial_file_upper, "CHUCKIE"))
+    {
+        myConfig.dpad = DPAD_SLIDE_N_GLIDE;
+    }
+
+    if (strstr(initial_file_upper, "QBERT"))
+    {
+        myConfig.dpad = DPAD_DIAGONALS;
+    }
+
+    if (strstr(initial_file_upper, "Q-BERT"))
+    {
+        myConfig.dpad = DPAD_DIAGONALS;
+    }
 }
 
 // ----------------------------------------------------------
@@ -1025,7 +1074,7 @@ const struct options_t Option_Table[1][20] =
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
         {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
-        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "SLIDE-N-GLILDE"},                                                                                                           &myConfig.dpad,           3},
+        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,           4},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
         {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
@@ -1399,6 +1448,14 @@ void ReadFileCRCAndConfig(void)
     if (strstr(gpFic[ucGameChoice].szName, ".dsk") != 0) msx_mode = MSX_MODE_DISK;
     if (strstr(gpFic[ucGameChoice].szName, ".DSK") != 0) msx_mode = MSX_MODE_DISK;
 
+    // Save the initial filename and file - we need it for save/restore of state
+    strcpy(initial_file, gpFic[ucGameChoice].szName);
+    strcpy(initial_file_upper, gpFic[ucGameChoice].szName);
+    for (int i=0; i<strlen(initial_file_upper); i++)
+    {
+        initial_file_upper[i] = toupper(initial_file_upper[i]);     // Uppercase string
+    }
+
     FindConfig();    // Try to find keymap and config for this file...
 }
 
@@ -1619,7 +1676,7 @@ void DSPrint_fps(u16 fps)
 {
     u16 *pusScreen,*pusMap;
     char tmpStr[4];
-  
+
     if (fps/100) tmpStr[0] = '0' + fps/100;
     else tmpStr[0] = ' ';
     tmpStr[1] = '0' + (fps%100) / 10;

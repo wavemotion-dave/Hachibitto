@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x000F
+#define CONFIG_VER                  0x0010
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -36,7 +36,8 @@
 
 #define DPAD_NORMAL                 0
 #define DPAD_DIAGONALS              1
-#define DPAD_SLIDE_N_GLIDE          2
+#define DPAD_ARKANOID               2
+#define DPAD_SLIDE_N_GLIDE          3
 
 #define OVL_FULLKBD                 0
 #define OVL_ALPHAKBD                1
@@ -173,6 +174,19 @@ extern const unsigned char MSXBios_MSX2EXT[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];
 extern const unsigned char MSXBios_MSXMUSIC[0x4000];
 
+typedef struct
+{
+    uint16_t current_position;    // host position, 0..300 or so
+    uint8_t  button_pressed;
+
+    uint16_t shift_register;     // 9-bit value
+
+    uint8_t last_pin6_state;
+    uint8_t last_pin8_state;
+} ArkanoidPaddle;
+
+extern ArkanoidPaddle myPaddle;
+
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
 extern u8 *MSXCartPtr[8];
@@ -259,4 +273,6 @@ extern void ShowRandomPreviewSnaps(void);
 extern void IndirectRegWrite9938(u8 Value);
 extern void EnsureSaveDirectory(void);
 extern void intro_logo(void);
+extern void update_arkanoid_paddle_position(u8 clockwise, u8 speed);
+
 #endif
