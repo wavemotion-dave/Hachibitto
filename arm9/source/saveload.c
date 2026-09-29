@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0008  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0009  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -112,45 +112,47 @@ void msxSaveState(void)
         // Save the Memory Map - we must only save offsets so that this is generic when we change code and memory shifts...
         for (u8 i=0; i<8; i++)
         {
-            if ((MemoryMap[i] >= ROM_Memory) && (MemoryMap[i] < ROM_Memory+MAX_CART_SIZE_KB))
+            u8 *shifted_offset = MemoryMap[i] + (0x2000 * i);   // Shift the MemoryMap[] back up to non-offset range for the save/restore
+            
+            if ((shifted_offset >= ROM_Memory) && (shifted_offset < ROM_Memory+MAX_CART_SIZE_KB))
             {
                 Offsets[i].type = TYPE_ROM;
-                Offsets[i].offset = MemoryMap[i] - ROM_Memory;
+                Offsets[i].offset = shifted_offset - ROM_Memory;
             }
-            else if ((MemoryMap[i] >= MSXBios_DISK) && (MemoryMap[i] < MSXBios_DISK+(sizeof(MSXBios_DISK))))
+            else if ((shifted_offset >= MSXBios_DISK) && (shifted_offset < MSXBios_DISK+(sizeof(MSXBios_DISK))))
             {
                 Offsets[i].type = TYPE_FDC;
-                Offsets[i].offset = MemoryMap[i] - MSXBios_DISK;
+                Offsets[i].offset = shifted_offset - MSXBios_DISK;
             }
-            else if ((MemoryMap[i] >= RAM_Memory) && (MemoryMap[i] < RAM_Memory+(sizeof(RAM_Memory))))
+            else if ((shifted_offset >= RAM_Memory) && (shifted_offset < RAM_Memory+(sizeof(RAM_Memory))))
             {
                 Offsets[i].type = TYPE_RAM;
-                Offsets[i].offset = MemoryMap[i] - RAM_Memory;
+                Offsets[i].offset = shifted_offset - RAM_Memory;
             }
-            else if ((MemoryMap[i] >= SRAM_Memory) && (MemoryMap[i] < SRAM_Memory+(sizeof(SRAM_Memory))))
+            else if ((shifted_offset >= SRAM_Memory) && (shifted_offset < SRAM_Memory+(sizeof(SRAM_Memory))))
             {
                 Offsets[i].type = TYPE_SRAM;
-                Offsets[i].offset = MemoryMap[i] - SRAM_Memory;
+                Offsets[i].offset = shifted_offset - SRAM_Memory;
             }
-            else if ((MemoryMap[i] >= BIOS_Memory) && (MemoryMap[i] < BIOS_Memory+(sizeof(BIOS_Memory))))
+            else if ((shifted_offset >= BIOS_Memory) && (shifted_offset < BIOS_Memory+(sizeof(BIOS_Memory))))
             {
                 Offsets[i].type = TYPE_BIOS;
-                Offsets[i].offset = MemoryMap[i] - BIOS_Memory;
+                Offsets[i].offset = shifted_offset - BIOS_Memory;
             }
-            else if ((MemoryMap[i] >= MSXBios_MSX2EXT) && (MemoryMap[i] < MSXBios_MSX2EXT+(sizeof(MSXBios_MSX2EXT))))
+            else if ((shifted_offset >= MSXBios_MSX2EXT) && (shifted_offset < MSXBios_MSX2EXT+(sizeof(MSXBios_MSX2EXT))))
             {
                 Offsets[i].type = TYPE_EBIOS;
-                Offsets[i].offset = MemoryMap[i] - MSXBios_MSX2EXT;
+                Offsets[i].offset = shifted_offset - MSXBios_MSX2EXT;
             }
-            else if ((MemoryMap[i] >= MSXBios_MSXMUSIC) && (MemoryMap[i] < MSXBios_MSXMUSIC+(sizeof(MSXBios_MSXMUSIC))))
+            else if ((shifted_offset >= MSXBios_MSXMUSIC) && (shifted_offset < MSXBios_MSXMUSIC+(sizeof(MSXBios_MSXMUSIC))))
             {
                 Offsets[i].type = TYPE_MSXMUSIC;
-                Offsets[i].offset = MemoryMap[i] - MSXBios_MSXMUSIC;
+                Offsets[i].offset = shifted_offset - MSXBios_MSXMUSIC;
             }
             else
             {
                 Offsets[i].type = TYPE_OTHER;
-                Offsets[i].offset = (u32)MemoryMap[i];
+                Offsets[i].offset = (u32)shifted_offset;
             }
         }
         if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
@@ -355,35 +357,35 @@ void msxLoadState(void)
             {
                 if (Offsets[i].type == TYPE_ROM)
                 {
-                    MemoryMap[i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (ROM_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_FDC)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_DISK + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (MSXBios_DISK + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_RAM)
                 {
-                    MemoryMap[i] = (u8 *) (RAM_Memory + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (RAM_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_SRAM)
                 {
-                    MemoryMap[i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (SRAM_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_BIOS)
                 {
-                    MemoryMap[i] = (u8 *) (BIOS_Memory + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (BIOS_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_EBIOS)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_MSXMUSIC)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_MSXMUSIC + Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (MSXBios_MSXMUSIC + Offsets[i].offset) - (0x2000 * i);
                 }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {
-                    MemoryMap[i] = (u8 *) (Offsets[i].offset);
+                    MemoryMap[i] = (u8 *) (Offsets[i].offset) - (0x2000 * i);
                 }
             }
             

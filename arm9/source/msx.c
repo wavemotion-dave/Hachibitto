@@ -688,26 +688,26 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = BIOS_Memory + 0x0000;
-            MemoryMap[1] = BIOS_Memory + 0x2000;
+            MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
+            MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXCartPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXCartPtr[1]) - 0x2000;
             break;
         case 0x02:  // Slot 2:  Maps to nothing... 0xFF
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = Unmapped_Memory;
-            MemoryMap[1] = Unmapped_Memory;
+            MemoryMap[0] = Unmapped_Memory - 0x0000;
+            MemoryMap[1] = Unmapped_Memory - 0x2000;
             break;
         case 0x03:  // Slot 3:  Maps to our 64K of RAM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 1;
-            MemoryMap[0] = (u8 *)(MSXRamPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXRamPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXRamPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXRamPtr[1]) - 0x2000;
             break;
     }
 
@@ -716,8 +716,8 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = BIOS_Memory + 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000;
+            MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
+            MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             if (msx_mode == MSX_MODE_DISK)  // .dsk based MSX1 game so slide in the FDC Controller ROM
@@ -725,30 +725,30 @@ void msx_slot_map_msx1(unsigned char Value)
                 bCartInPage[1] = 1;
                 bRAMInPage[1] = 0;
                 special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
-                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000 - 0x4000;
+                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000 - 0x6000;
                 break;
             }
             else
             {
                 bCartInPage[1] = 1;
                 bRAMInPage[1] = 0;
-                MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-                MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+                MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
+                MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
                 break;
             }
             // Else fall through to the next case and map nothing...
         case 0x02:  // Slot 2:  Maps to nothing... 0xFF
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = Unmapped_Memory;
-            MemoryMap[3] = Unmapped_Memory;
+            MemoryMap[2] = Unmapped_Memory - 0x4000;
+            MemoryMap[3] = Unmapped_Memory - 0x6000;
             break;
         case 0x03:  // Slot 3:  Maps to our 64K of RAM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 1;
-            MemoryMap[2] = (u8 *)(MSXRamPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXRamPtr[3]);
+            MemoryMap[2] = (u8 *)(MSXRamPtr[2]) - 0x4000;
+            MemoryMap[3] = (u8 *)(MSXRamPtr[3]) - 0x6000;
             break;
     }
 
@@ -757,26 +757,26 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
             break;
         case 0x02:  // Slot 2:  Maps to nothing... 0xFF
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x03:  // Slot 3:  Maps to our 64K of RAM
             bCartInPage[2] = 0;
             bRAMInPage[2] = 1;
-            MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             break;
     }
 
@@ -785,26 +785,26 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXCartPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXCartPtr[7]) - 0xE000;
             break;
         case 0x02:  // Slot 2:  Maps to nothing... 0xFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x03:  // Slot 3 is RAM so we allow RAM writes now
             bCartInPage[3] = 0;
             bRAMInPage[3] = 1;
-            MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXRamPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXRamPtr[7]) - 0xE000;
             break;
     }
 }
@@ -828,33 +828,33 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = BIOS_Memory + 0x0000;
-            MemoryMap[1] = BIOS_Memory + 0x2000;
+            MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
+            MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXCartPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXCartPtr[1]) - 0x2000;
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 1;
-            MemoryMap[0] = (u8 *)(MSXRamPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXRamPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXRamPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXRamPtr[1]) - 0x2000;
             break;
         case 0x03:  // Slot 3:  This is an expanded slot... has Extended BIOS and Disk Controller ROMs
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
             if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0 has Extended BIOS
             {
-                MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
-                MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
+                MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000 - 0x0000;
+                MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000 - 0x2000;
             }
             else // Other subslots have nothing in this page
             {
-                MemoryMap[0] = Unmapped_Memory;
-                MemoryMap[1] = Unmapped_Memory;
+                MemoryMap[0] = Unmapped_Memory - 0x0000;
+                MemoryMap[1] = Unmapped_Memory - 0x2000;
             }
             break;
     }
@@ -864,20 +864,20 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = BIOS_Memory + 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000;
+            MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
+            MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+            MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
+            MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 1;
-            MemoryMap[2] = (u8 *)(MSXRamPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXRamPtr[3]);
+            MemoryMap[2] = (u8 *)(MSXRamPtr[2]) - 0x4000;
+            MemoryMap[3] = (u8 *)(MSXRamPtr[3]) - 0x6000;
             break;
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
@@ -886,18 +886,18 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
             if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
                 special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
-                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000 - 0x4000;
+                MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000 - 0x6000;
             }
             else if ((((msx_subslot & 0x0C) >> 2) == 2) && (myConfig.musicExpand == 1)) // Subslot 2 has MSX MUSIC
             {
-                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000 - 0x4000;
+                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000 - 0x6000;
             }
             else // Other subslots have nothing in this page
             {
-                MemoryMap[2] = Unmapped_Memory;
-                MemoryMap[3] = Unmapped_Memory;
+                MemoryMap[2] = Unmapped_Memory - 0x4000;
+                MemoryMap[3] = Unmapped_Memory - 0x6000;
             }
             break;
     }
@@ -907,26 +907,26 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[2] = 0;
             bRAMInPage[2] = 1;
-            MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
     }
 
@@ -935,27 +935,27 @@ void msx_slot_map_msx2_typeA(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXCartPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXCartPtr[7]) - 0xE000;
             break;
         case 0x02:  // Slot 2:  Maps to our 64K of RAM
             bCartInPage[3] = 0;
             bRAMInPage[3] = 1;
-            MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXRamPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXRamPtr[7]) - 0xE000;
             break;
         case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
             special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
     }    
 }
@@ -981,41 +981,41 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
-                MemoryMap[0] = BIOS_Memory + 0x0000;
-                MemoryMap[1] = BIOS_Memory + 0x2000;
+                MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
+                MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
             }
             else if (((msx_subslot & 0x03) >> 0) == 1) // Subslot 0-1 has Extended BIOS
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
-                MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000;
-                MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000;
+                MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000 - 0x0000;
+                MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000 - 0x2000;
             }
             else // Other subslots map nothing
             {
                 bCartInPage[0] = 0;
                 bRAMInPage[0] = 0;
-                MemoryMap[0] = Unmapped_Memory;
-                MemoryMap[1] = Unmapped_Memory;
+                MemoryMap[0] = Unmapped_Memory - 0x0000;
+                MemoryMap[1] = Unmapped_Memory - 0x2000;
             }
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXCartPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXCartPtr[1]) - 0x2000;
             break;
         case 0x02:  // Slot 2:  Maps to nothing
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = Unmapped_Memory;
-            MemoryMap[1] = Unmapped_Memory;
+            MemoryMap[0] = Unmapped_Memory - 0x0000;
+            MemoryMap[1] = Unmapped_Memory - 0x2000;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 1;
-            MemoryMap[0] = (u8 *)(MSXRamPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXRamPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXRamPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXRamPtr[1]) - 0x2000;
             break;
     }
 
@@ -1026,38 +1026,38 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             bRAMInPage[1] = 0;
             if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 0-0 has main BIOS
             {
-                MemoryMap[2] = BIOS_Memory + 0x4000;
-                MemoryMap[3] = BIOS_Memory + 0x6000;
+                MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
+                MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
             }
             else if ((((msx_subslot & 0x0C) >> 2) == 1) && (myConfig.musicExpand == 1)) // Subslot 0-1 has MSX-MUSIC
             {
-                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000;
-                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000;
+                MemoryMap[2] = (u8 *)MSXBios_MSXMUSIC + 0x0000 - 0x4000;
+                MemoryMap[3] = (u8 *)MSXBios_MSXMUSIC + 0x2000 - 0x6000;
             }
             else // Other subslots map nothing
             {
-                MemoryMap[2] = Unmapped_Memory;
-                MemoryMap[3] = Unmapped_Memory;
+                MemoryMap[2] = Unmapped_Memory - 0x4000;
+                MemoryMap[3] = Unmapped_Memory - 0x6000;
             }
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+            MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
+            MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
             break;
         case 0x02:  // Slot 2:  Maps to Disk Controller
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
             special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
-            MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000;
-            MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000;
+            MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000 - 0x4000;
+            MemoryMap[3] = (u8 *)MSXBios_DISK + 0x2000 - 0x6000;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 1;
-            MemoryMap[2] = (u8 *)(MSXRamPtr[2]);
-            MemoryMap[3] = (u8 *)(MSXRamPtr[3]);
+            MemoryMap[2] = (u8 *)(MSXRamPtr[2]) - 0x4000;
+            MemoryMap[3] = (u8 *)(MSXRamPtr[3]) - 0x6000;
             break;
     }
 
@@ -1066,26 +1066,26 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to nothing... 0xFF (Expanded slot but nothing maps to this page)
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[2] = 1;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
             break;
         case 0x02:  // Slot 2:  Maps to Nothing
             bCartInPage[2] = 0;
             bRAMInPage[2] = 0;
-            MemoryMap[4] = Unmapped_Memory;
-            MemoryMap[5] = Unmapped_Memory;
+            MemoryMap[4] = Unmapped_Memory - 0x8000;
+            MemoryMap[5] = Unmapped_Memory - 0xA000;
             break;
         case 0x03:  // Slot 3:  Maps to our 64K of RAM
             bCartInPage[2] = 0;
             bRAMInPage[2] = 1;
-            MemoryMap[4] = (u8 *)(MSXRamPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXRamPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             break;
     }
 
@@ -1095,26 +1095,26 @@ void msx_slot_map_msx2_typeB(unsigned char Value)
             special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[3] = 1;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXCartPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXCartPtr[7]) - 0xE000;
             break;
         case 0x02:  // Slot 2:  Maps to Nothing
             bCartInPage[3] = 0;
             bRAMInPage[3] = 0;
-            MemoryMap[6] = Unmapped_Memory;
-            MemoryMap[7] = Unmapped_Memory;
+            MemoryMap[6] = Unmapped_Memory - 0xC000;
+            MemoryMap[7] = Unmapped_Memory - 0xE000;
             break;
         case 0x03:  // Slot 3:  Maps to 64K of RAM
             bCartInPage[3] = 0;
             bRAMInPage[3] = 1;
-            MemoryMap[6] = (u8 *)(MSXRamPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXRamPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXRamPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXRamPtr[7]) - 0xE000;
             break;
     }
 }
@@ -1818,15 +1818,15 @@ void msx_restore_bios(void)
     }
 
     // Slot 0 - BIOS is mapped in to start...
-    MemoryMap[0] = BIOS_Memory + 0x0000;
-    MemoryMap[1] = BIOS_Memory + 0x2000;
-    MemoryMap[2] = BIOS_Memory + 0x4000;
-    MemoryMap[3] = BIOS_Memory + 0x6000;
+    MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
+    MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
+    MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
+    MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
 
-    MemoryMap[4] = Unmapped_Memory;
-    MemoryMap[5] = Unmapped_Memory;
-    MemoryMap[6] = Unmapped_Memory;
-    MemoryMap[7] = Unmapped_Memory;
+    MemoryMap[4] = Unmapped_Memory - 0x8000;
+    MemoryMap[5] = Unmapped_Memory - 0xA000;
+    MemoryMap[6] = Unmapped_Memory - 0xC000;
+    MemoryMap[7] = Unmapped_Memory - 0xE000;
 }
 
 

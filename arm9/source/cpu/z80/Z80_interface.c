@@ -60,7 +60,7 @@ ITCM_CODE u8 cpu_readmem16(u16 address)
     }
 
     // Otherwise normal read - just index into the 8K memory block and fetch the byte...
-    return *(MemoryMap[address>>13] + (address&0x1FFF));
+    return (MemoryMap[address>>13][address]);
 }
 
 
@@ -78,25 +78,25 @@ void HandleZemina8K(u32* src, u8 block, u16 address)
     {
         MSXCartPtr[2] = (u8*)src;  // Main ROM
         MSXCartPtr[6] = (u8*)src;  // Mirror
-        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
     }
     else if (bCartInPage[1] && (address >= 0x6000) && (address < 0x8000))
     {
         MSXCartPtr[3] = (u8*)src;  // Main ROM
         MSXCartPtr[7] = (u8*)src;  // Mirror
-        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
     }
     else if (bCartInPage[2] && (address >= 0x8000) && (address < 0xA000))
     {
         MSXCartPtr[4] = (u8*)src;  // Main ROM
         MSXCartPtr[0] = (u8*)src;  // Mirror
-        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
     }
     else if (bCartInPage[2] && (address >= 0xA000) && (address < 0xC000))
     {
         MSXCartPtr[5] = (u8*)src;  // Main ROM
         MSXCartPtr[1] = (u8*)src;  // Mirror
-        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
     }
 }
 
@@ -111,15 +111,15 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
     {
         MSXCartPtr[2] = (u8*)src;
         MSXCartPtr[3] = (u8*)src+0x2000;
-        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
-        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
         // Mirrors
         MSXCartPtr[6] = (u8*)src;
         MSXCartPtr[7] = (u8*)src+0x2000;
         if (bCartInPage[3])
         {
-            MemoryMap[6] = (u8 *)(MSXCartPtr[6]);
-            MemoryMap[7] = (u8 *)(MSXCartPtr[7]);
+            MemoryMap[6] = (u8 *)(MSXCartPtr[6]) - 0xC000;
+            MemoryMap[7] = (u8 *)(MSXCartPtr[7]) - 0xE000;
         }
     }
     else if (bCartInPage[1] && (address >= 0x8000) && (address < 0xC000))
@@ -131,13 +131,13 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
         MSXCartPtr[1] = (u8*)src+0x2000;
         if (bCartInPage[2])
         {
-            MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
-            MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+            MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
+            MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
         }
         if (bCartInPage[0])
         {
-            MemoryMap[0] = (u8 *)(MSXCartPtr[0]);
-            MemoryMap[1] = (u8 *)(MSXCartPtr[1]);
+            MemoryMap[0] = (u8 *)(MSXCartPtr[0]) - 0x0000;
+            MemoryMap[1] = (u8 *)(MSXCartPtr[1]) - 0x2000;
         }
     }
 }
@@ -150,20 +150,20 @@ void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
     {
         MSXCartPtr[2] = (u8*)src;  // Main ROM
         MSXCartPtr[6] = (u8*)src;  // Mirror
-        MemoryMap[2] = MSXCartPtr[2];
+        MemoryMap[2] = MSXCartPtr[2] - 0x4000;
         if (bCartInPage[3])
         {
-            MemoryMap[6] = MSXCartPtr[6];
+            MemoryMap[6] = MSXCartPtr[6] - 0xC000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x6800))
     {
         MSXCartPtr[3] = (u8*)src;  // Main ROM
         MSXCartPtr[7] = (u8*)src;  // Mirror
-        MemoryMap[3] = MSXCartPtr[3];
+        MemoryMap[3] = MSXCartPtr[3] - 0x6000;
         if (bCartInPage[3])
         {
-            MemoryMap[7] = MSXCartPtr[7];
+            MemoryMap[7] = MSXCartPtr[7] - 0xE000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x7000))
@@ -182,11 +182,11 @@ void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
         }
         if (bCartInPage[0])
         {
-            MemoryMap[0] = MSXCartPtr[0];
+            MemoryMap[0] = MSXCartPtr[0] - 0x0000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x7800))
@@ -205,11 +205,11 @@ void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
         if (bCartInPage[0])
         {
-            MemoryMap[1] = MSXCartPtr[1];
+            MemoryMap[1] = MSXCartPtr[1] - 0x2000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xF000) == 0x8000) && sram_write_enabled_a)
@@ -247,10 +247,10 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[6] = (u8*)src;  // Mirror
         }
         
-        MemoryMap[2] = MSXCartPtr[2];
+        MemoryMap[2] = MSXCartPtr[2] - 0x4000;
         if (bCartInPage[3])
         {
-            MemoryMap[6] = MSXCartPtr[6];
+            MemoryMap[6] = MSXCartPtr[6] - 0xC000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x6800))
@@ -266,10 +266,10 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[7] = (u8*)src;  // Mirror
         }
 
-        MemoryMap[3] = MSXCartPtr[3];
+        MemoryMap[3] = MSXCartPtr[3] - 0x6000;
         if (bCartInPage[3])
         {
-            MemoryMap[7] = MSXCartPtr[7];
+            MemoryMap[7] = MSXCartPtr[7] - 0xE000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x7000))
@@ -288,11 +288,11 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
         }
         if (bCartInPage[0])
         {
-            MemoryMap[0] = MSXCartPtr[0];
+            MemoryMap[0] = MSXCartPtr[0] - 0x0000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x7800))
@@ -311,11 +311,11 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
         if (bCartInPage[0])
         {
-            MemoryMap[1] = MSXCartPtr[1];
+            MemoryMap[1] = MSXCartPtr[1] - 0x2000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xE000) == 0x8000) && sram_write_enabled_a)
@@ -350,8 +350,8 @@ void HandleAscii16_SRAM2(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[3] = (u8*)src+0x2000;
         }
         
-        MemoryMap[2] = MSXCartPtr[2];
-        MemoryMap[3] = MSXCartPtr[3];
+        MemoryMap[2] = MSXCartPtr[2] - 0x4000;
+        MemoryMap[3] = MSXCartPtr[3] - 0x6000;
     }
     else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
     {
@@ -370,8 +370,8 @@ void HandleAscii16_SRAM2(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xF000) == 0x8000) && sram_write_enabled_a)
@@ -407,8 +407,8 @@ void HandleAscii16_SRAM8(u32* src, u8 block, u16 address, u8 value)
             MSXCartPtr[2] = (u8*)src;
             MSXCartPtr[3] = (u8*)src+0x2000;
         }
-        MemoryMap[2] = MSXCartPtr[2];
-        MemoryMap[3] = MSXCartPtr[3];
+        MemoryMap[2] = MSXCartPtr[2] - 0x4000;
+        MemoryMap[3] = MSXCartPtr[3] - 0x6000;
     }
     else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
     {
@@ -427,8 +427,8 @@ void HandleAscii16_SRAM8(u32* src, u8 block, u16 address, u8 value)
 
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xF000) == 0x8000) && sram_write_enabled_a)
@@ -453,22 +453,22 @@ void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
     {
         MSXCartPtr[2] = (u8*)src;  // Main ROM
         MSXCartPtr[6] = (u8*)src;  // Mirror
-        MemoryMap[2] = (u8 *)(MSXCartPtr[2]);
+        MemoryMap[2] = (u8 *)(MSXCartPtr[2]) - 0x4000;
 
         if (bCartInPage[3])
         {
-            MemoryMap[6] = MSXCartPtr[6];
+            MemoryMap[6] = MSXCartPtr[6] - 0xC000;
         }
     }
     else if (bCartInPage[1] && ((address & 0xF800) == 0x7000))
     {
         MSXCartPtr[3] = (u8*)src;  // Main ROM
         MSXCartPtr[7] = (u8*)src;  // Mirror
-        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
 
         if (bCartInPage[3])
         {
-            MemoryMap[7] = MSXCartPtr[7];
+            MemoryMap[7] = MSXCartPtr[7] - 0xE000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xF800) == 0x9000))
@@ -489,22 +489,22 @@ void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
 
         MSXCartPtr[4] = (u8*)src;  // Main ROM
         MSXCartPtr[0] = (u8*)src;  // Mirror
-        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
 
         if (bCartInPage[0])
         {
-            MemoryMap[0] = MSXCartPtr[0];
+            MemoryMap[0] = MSXCartPtr[0] - 0x0000;
         }
     }
     else if (bCartInPage[2] && ((address & 0xF800) == 0xB000))
     {
         MSXCartPtr[5] = (u8*)src;  // Main ROM
         MSXCartPtr[1] = (u8*)src;  // Mirror
-        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
 
         if (bCartInPage[0])
         {
-            MemoryMap[1] = MSXCartPtr[1];
+            MemoryMap[1] = MSXCartPtr[1] - 0x2000;
         }
     }
 }
@@ -518,8 +518,8 @@ void HandleXevious(u32* src, u8 block, u16 address)
     {
         MSXCartPtr[2] = (u8*)src;
         MSXCartPtr[3] = (u8*)src+0x2000;
-        MemoryMap[2] = MSXCartPtr[2];
-        MemoryMap[3] = MSXCartPtr[3];
+        MemoryMap[2] = MSXCartPtr[2] - 0x4000;
+        MemoryMap[3] = MSXCartPtr[3] - 0x6000;
     }
     else if (bCartInPage[1] && (address >= 0x7000) && (address <= 0x77FF))
     {
@@ -527,8 +527,8 @@ void HandleXevious(u32* src, u8 block, u16 address)
         MSXCartPtr[5] = (u8*)src+0x2000;
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
     }
 }
@@ -543,19 +543,19 @@ void HandleMajut(u32* src, u8 block, u16 address)
     {
         MSXCartPtr[3] = (u8*)src;  // Main ROM
         MSXCartPtr[7] = (u8*)src;  // Mirror
-        MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+        MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
     }
     else if (bCartInPage[2] && ((address & 0xE000) == 0x8000))
     {
         MSXCartPtr[4] = (u8*)src;  // Main ROM
         MSXCartPtr[0] = (u8*)src;  // Mirror
-        MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+        MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
     }
     else if (bCartInPage[2] && ((address & 0xE000) == 0xA000))
     {
         MSXCartPtr[5] = (u8*)src;  // Main ROM
         MSXCartPtr[1] = (u8*)src;  // Mirror
-        MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+        MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
     }
 }
 
@@ -570,8 +570,8 @@ void HandleXBlam(u32* src, u8 block, u16 address)
         MSXCartPtr[5] = (u8*)src+0x2000;   // Main ROM at A000
         if (bCartInPage[2])
         {
-            MemoryMap[4] = MSXCartPtr[4];
-            MemoryMap[5] = MSXCartPtr[5];
+            MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+            MemoryMap[5] = MSXCartPtr[5] - 0xA000;
         }
     }
 }
@@ -592,8 +592,8 @@ void HandleSuperLodeRunner(u8 value)
 
     if (bCartInPage[2])
     {
-        MemoryMap[4] = MSXCartPtr[4];
-        MemoryMap[5] = MSXCartPtr[5];
+        MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+        MemoryMap[5] = MSXCartPtr[5] - 0xA000;
     }
 }
 
@@ -617,7 +617,7 @@ static inline u8 SCCPlus_WindowIsRAM(u8 winIdx)
 static inline void SCCPlus_MapWindow(u8 idx, u8 page)
 {
     MSXCartPtr[idx] = SRAM_Memory + ((page & 0x07) * 0x2000);
-    MemoryMap[idx]  = MSXCartPtr[idx];
+    MemoryMap[idx]  = MSXCartPtr[idx] - (0x2000 * idx);
 }
 
 // -----------------------------------------------------------------
@@ -688,7 +688,7 @@ void HandleSCCPlus(u16 address, u8 value)
     if (bCartInPage[1] && (address >= 0x4000) && (address <= 0x7FFF))
     {
         if (SCCPlus_WindowIsRAM(2))
-            *(MemoryMap[address>>13] + (address & 0x1FFF)) = value;
+            MemoryMap[address>>13][address] = value;
         else if (((address & 0xF000) == 0x5000) || ((address & 0xF000) == 0x7000))
             HandleSCCPlusBankSelect(address, value);
         return;
@@ -699,7 +699,7 @@ void HandleSCCPlus(u16 address, u8 value)
     {
         u8 winIdx = (address < 0xA000) ? 4 : 5;
         if (SCCPlus_WindowIsRAM(winIdx))
-            *(MemoryMap[address>>13] + (address & 0x1FFF)) = value;
+            MemoryMap[address>>13][address] = value;
         else if (((address & 0xF000) == 0x9000) || ((address & 0xF000) == 0xB000))
             HandleSCCPlusBankSelect(address, value);
         return;
@@ -716,7 +716,7 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
     if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
     {
-        *(MemoryMap[address>>13] + (address&0x1FFF))=value;
+        MemoryMap[address>>13][address]=value;
     }
     else if ((special_memory_access & SPEC_MEM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
@@ -753,19 +753,19 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
             {
                 MSXCartPtr[3] = (u8*)src;  // Main ROM
                 MSXCartPtr[7] = (u8*)src;  // Mirror
-                MemoryMap[3] = (u8 *)(MSXCartPtr[3]);
+                MemoryMap[3] = (u8 *)(MSXCartPtr[3]) - 0x6000;
             }
             else if (bCartInPage[2] && ((address & 0xE000) == 0x8000))
             {
                 MSXCartPtr[4] = (u8*)src;  // Main ROM
                 MSXCartPtr[0] = (u8*)src;  // Mirror
-                MemoryMap[4] = (u8 *)(MSXCartPtr[4]);
+                MemoryMap[4] = (u8 *)(MSXCartPtr[4]) - 0x8000;
             }
             else if (bCartInPage[2] && ((address & 0xE000) == 0xA000))
             {
                 MSXCartPtr[5] = (u8*)src;  // Main ROM
                 MSXCartPtr[1] = (u8*)src;  // Mirror
-                MemoryMap[5] = (u8 *)(MSXCartPtr[5]);
+                MemoryMap[5] = (u8 *)(MSXCartPtr[5]) - 0xA000;
             }
         }
         else if (mapperType == ASC8)
@@ -781,20 +781,20 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
             {
                 MSXCartPtr[2] = (u8*)src;  // Main ROM
                 MSXCartPtr[6] = (u8*)src;  // Mirror
-                MemoryMap[2] = MSXCartPtr[2];
+                MemoryMap[2] = MSXCartPtr[2] - 0x4000;
                 if (bCartInPage[3])
                 {
-                    MemoryMap[6] = MSXCartPtr[6];
+                    MemoryMap[6] = MSXCartPtr[6] - 0xC000;
                 }
             }
             else if (bCartInPage[1] && ((address & 0xF800) == 0x6800))
             {
                 MSXCartPtr[3] = (u8*)src;  // Main ROM
                 MSXCartPtr[7] = (u8*)src;  // Mirror
-                MemoryMap[3] = MSXCartPtr[3];
+                MemoryMap[3] = MSXCartPtr[3] - 0x6000;
                 if (bCartInPage[3])
                 {
-                    MemoryMap[7] = MSXCartPtr[7];
+                    MemoryMap[7] = MSXCartPtr[7] - 0xE000;
                 }
             }
             else if (bCartInPage[1] && ((address & 0xF800) == 0x7000))
@@ -803,11 +803,11 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
                 MSXCartPtr[0] = (u8*)src;  // Mirror
                 if (bCartInPage[2])
                 {
-                    MemoryMap[4] = MSXCartPtr[4];
+                    MemoryMap[4] = MSXCartPtr[4] - 0x8000;
                 }
                 if (bCartInPage[0])
                 {
-                    MemoryMap[0] = MSXCartPtr[0];
+                    MemoryMap[0] = MSXCartPtr[0] - 0x0000;
                 }
             }
             else if (bCartInPage[1] && ((address & 0xF800) == 0x7800))
@@ -816,11 +816,11 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
                 MSXCartPtr[1] = (u8*)src;  // Mirror
                 if (bCartInPage[2])
                 {
-                    MemoryMap[5] = MSXCartPtr[5];
+                    MemoryMap[5] = MSXCartPtr[5] - 0xA000;
                 }
                 if (bCartInPage[0])
                 {
-                    MemoryMap[1] = MSXCartPtr[1];
+                    MemoryMap[1] = MSXCartPtr[1] - 0x2000;
                 }
             }
         }
@@ -849,8 +849,8 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
             {
                 MSXCartPtr[2] = (u8*)src;
                 MSXCartPtr[3] = (u8*)src+0x2000;
-                MemoryMap[2] = MSXCartPtr[2];
-                MemoryMap[3] = MSXCartPtr[3];
+                MemoryMap[2] = MSXCartPtr[2] - 0x4000;
+                MemoryMap[3] = MSXCartPtr[3] - 0x6000;
             }
             else if (bCartInPage[1] && (address & 0xF800) == 0x7000)
             {
@@ -858,8 +858,8 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
                 MSXCartPtr[5] = (u8*)src+0x2000;
                 if (bCartInPage[2])
                 {
-                    MemoryMap[4] = MSXCartPtr[4];
-                    MemoryMap[5] = MSXCartPtr[5];
+                    MemoryMap[4] = MSXCartPtr[4] - 0x8000;
+                    MemoryMap[5] = MSXCartPtr[5] - 0xA000;
                 }
             }
         }

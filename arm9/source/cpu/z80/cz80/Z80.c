@@ -51,8 +51,8 @@ extern u8 *MemoryMap[8];
 // These defines and inline functions are to map maximum
 // speed/efficiency onto the memory system we have.
 // ------------------------------------------------------
-inline byte OpZ80(u32 A)    {return *(MemoryMap[A>>13] + (A&0x1FFF));}
-inline byte RdZ80(word A)   {if (!special_memory_access) return *(MemoryMap[A>>13] + (A&0x1FFF)); else return cpu_readmem16(A);}
+inline byte OpZ80(u32 A)    {return (MemoryMap[A>>13][A]);}
+inline byte RdZ80(word A)   {if (!special_memory_access) return (MemoryMap[A>>13][A]); else return cpu_readmem16(A);}
 #define     WrZ80(A,V)       cpu_writemem16(A,V)
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)

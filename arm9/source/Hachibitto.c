@@ -71,7 +71,7 @@ u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE_KB = 1256;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
+u32 MAX_CART_SIZE_KB = 1275;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
                                 
 u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
@@ -1855,7 +1855,7 @@ int main(int argc, char **argv)
     }
     else // For older DS units... 1.25MB max
     {
-        MAX_CART_SIZE_KB = 1256;
+        MAX_CART_SIZE_KB = 1275;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
 
@@ -1967,10 +1967,13 @@ int main(int argc, char **argv)
     return(0);
 }
 
-// ----------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------------------
 // Used by the MSX handler to point to different 8K segments of memory as RAM and Carts are swapped in/out.
 // This is one of the most important data structures in our system as it universally maps what to read/write.
-// ----------------------------------------------------------------------------------------------------------
+// Please note: to gain an almost 5% speed-up, wherever these are written, we offset them by the appropriate 
+// amount. So MemoryMap[0] is offset by -0x0000 and MemoryMap[3] is offset by -0x6000, etc. This way we don't
+// need to do any masking when we fetch bytes in the Z80 and those fetches happen a million times per second.
+// -----------------------------------------------------------------------------------------------------------
 u8 *MemoryMap[8]    __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
 // -------------------------------------
@@ -2267,7 +2270,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (64*1024)
+#define MAX_DEBUG_BUF_SIZE   (32*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;

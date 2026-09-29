@@ -546,6 +546,7 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
                overwrite (never OR against raw background). */
 #define SPR_SET(n) do{ P[n]=C; O[n]=CurrentEpoch; }while(0)
 #define SPR_OR(n)  do{ if(O[n]==CurrentEpoch) P[n]|=C; else { P[n]=C; O[n]=CurrentEpoch; } }while(0)
+#define SPR_SET16(n) do{ *(u16 *)(P+n) = (u16)C | ((u16)C<<8); *(u16 *)(O+n) = (u16)CurrentEpoch | ((u16)CurrentEpoch<<8); }while(0)
 
   /* No extra sprites yet */
   VDPStatus[0]&=~0x5F;
@@ -678,20 +679,36 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
           {
             if (J)
             {
-                if(J&0x80) { SPR_SET(0);SPR_SET(1); }
-                if(J&0x40) { SPR_SET(2);SPR_SET(3); }
-                if(J&0x20) { SPR_SET(4);SPR_SET(5); }
-                if(J&0x10) { SPR_SET(6);SPR_SET(7); }
-                if(J&0x08) { SPR_SET(8);SPR_SET(9); }
-                if(J&0x04) { SPR_SET(10);SPR_SET(11); }
-                if(J&0x02) { SPR_SET(12);SPR_SET(13); }
-                if(J&0x01) { SPR_SET(14);SPR_SET(15); }
+                if ((u32)P&1)
+                {
+                    if(J&0x80) { SPR_SET(0);SPR_SET(1); }
+                    if(J&0x40) { SPR_SET(2);SPR_SET(3); }
+                    if(J&0x20) { SPR_SET(4);SPR_SET(5); }
+                    if(J&0x10) { SPR_SET(6);SPR_SET(7); }
+                    if(J&0x08) { SPR_SET(8);SPR_SET(9); }
+                    if(J&0x04) { SPR_SET(10);SPR_SET(11); }
+                    if(J&0x02) { SPR_SET(12);SPR_SET(13); }
+                    if(J&0x01) { SPR_SET(14);SPR_SET(15); }
+                }
+                else
+                {
+                    if(J&0x80) { SPR_SET16(0);  }
+                    if(J&0x40) { SPR_SET16(2);  }
+                    if(J&0x20) { SPR_SET16(4);  }
+                    if(J&0x10) { SPR_SET16(6);  }
+                    if(J&0x08) { SPR_SET16(8);  }
+                    if(J&0x04) { SPR_SET16(10); }
+                    if(J&0x02) { SPR_SET16(12); }
+                    if(J&0x01) { SPR_SET16(14); }
+                }
             }
             if(IH>8)
             {
               J=PT[16];
               if (J)
               {
+                if ((u32)P&1)
+                {
                   if(J&0x80) { SPR_SET(16);SPR_SET(17); }
                   if(J&0x40) { SPR_SET(18);SPR_SET(19); }
                   if(J&0x20) { SPR_SET(20);SPR_SET(21); }
@@ -700,6 +717,18 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
                   if(J&0x04) { SPR_SET(26);SPR_SET(27); }
                   if(J&0x02) { SPR_SET(28);SPR_SET(29); }
                   if(J&0x01) { SPR_SET(30);SPR_SET(31); }
+                }
+                else
+                {
+                  if(J&0x80) { SPR_SET16(16); }
+                  if(J&0x40) { SPR_SET16(18); }
+                  if(J&0x20) { SPR_SET16(20); }
+                  if(J&0x10) { SPR_SET16(22); }
+                  if(J&0x08) { SPR_SET16(24); }
+                  if(J&0x04) { SPR_SET16(26); }
+                  if(J&0x02) { SPR_SET16(28); }
+                  if(J&0x01) { SPR_SET16(30); }
+                }
               }
             }
           }
