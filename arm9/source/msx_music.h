@@ -228,7 +228,8 @@ extern const YM_Instrument YM_InstrumentROM[16];
 //@ Public interface - same shape as the SCC driver.
 //@----------------------------------------------------------------------------
 void YMReset(YM *chip);
-void YMWrite(u8 value, u8 address, YM *chip);   // address = resolved register 0x00-0x38, not a Z80 address
-void YMMixer(int len, s16 *dest, YM *chip);    // accumulates into dest - see YM.c
+void YMWrite(u8 value, u8 address, YM *chip);     // address = resolved register 0x00-0x38, not a Z80 address
+void YMMixer(int len, s16 *dest, YM *chip);       // accumulates into dest - see msx_music.c
+void YMMixerFast(int len, s16 *dest, YM *chip);   // accumulates into dest - see msx_music.c (DS-Lite version)
 
 #endif // YM_H

@@ -361,7 +361,10 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             }
 
             ay38910Mixer(len*2, dest, &myAY);
-            YMMixer(len*2, dest, &myYM);
+            if (isDSiMode())
+                YMMixer(len*2, dest, &myYM);        // Normal mixer for faster DSi/XL/LL
+            else
+                YMMixerFast(len*2, dest, &myYM);    // Lower quality but faster for DS-Lite/Phat
             last_sample = ((s16*)dest)[len*2 - 1];
         }
         else if (msx_scc_capable_game)   // If SCC is enabled, we need to mix the AY with the SCC chips
@@ -433,7 +436,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 }
             }
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
-            else if (beeperFreq)
+            else if (myConfig.beeper && beeperFreq)
             {
                 ProcessBeeper(len, dest);
             }
@@ -2128,7 +2131,7 @@ void msxUpdateScreen(void)
 
     if (!skip_render)
     {
-        if (frame_number & 1)
+        if (drawn_frame_number & 1)
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
         else 
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);
@@ -2215,7 +2218,7 @@ void PatchZ80(register Z80 *r)
 /** VDP and checking for interrupt requests.                 **/
 /**************************************************************/
 int mid_frame_interrupt=0;
-u32 LoopZ80()
+u32 LoopZ80(void)
 {
   // Execute 1 scanline worth of CPU instructions
   u32 cycles_to_process = VDP9938_CLOCKS_PER_LINE + (myConfig.cpuBoost * 20) + CPU.CycleDeficit;

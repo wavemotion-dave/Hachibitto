@@ -112,6 +112,22 @@ static const u8 YM_MulTableX2[16] __attribute__((section(".dtcm"))) =
     1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30
 };
 
+// Exact 3-step advance of the YM noise LFSR.
+// Indexed by the original low 3 bits.
+// Must be in DTCM/fast RAM if possible.
+static const u32 YM_NoiseAdvance3[8] __attribute__((section(".dtcm")))
+=
+{
+    0x000000,
+    0x200080,
+    0x400100,
+    0x600180,
+    0x800200,
+    0xA00280,
+    0xC00300,
+    0xE00380
+};
+
 //@----------------------------------------------------------------------------
 //@ 16-entry instrument table - real Yamaha ROM data. Only mulMod/mulCar are
 //@ read by the mixer right now; everything else is stored for later use.
@@ -256,7 +272,7 @@ static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
  * These approximations give noticeably better note blending and fuller
  * melodic lines at a much lower CPU cost than a full OPLL envelope model.
  */
-static const u16 YM_RRReleaseStepTest[16] =
+static const u16 YM_RRReleaseStepTest[16] __attribute__((section(".dtcm"))) =
     {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
 
 static s32 YM_RenderChannel(YM_Oscillator *osc, u8 keyOn, u8 volume,
@@ -660,3 +676,402 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
     }
 }
 
+// =====================================================================================
+// DS-Lite fast mixer
+//
+// Generates one FM sample for every two output samples.
+//
+// IMPORTANT:
+//   State advances at 2x the normal per-output-sample increment, so pitch and
+//   envelope timing remain approximately correct.
+//
+// This deliberately trades high-frequency audio fidelity for CPU speed.
+// DSi/XL/LL should continue using the normal YMMixer().
+// =====================================================================================
+
+static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
+{
+    if (keyOn)
+    {
+        osc->releaseAccum = 0;
+
+        if (osc->gain < 255)
+        {
+            u16 g = osc->gain + (YM_GAIN_RAMP_STEP << 1);
+            osc->gain = (g >= 255) ? 255 : (u8)g;
+            osc->sustainCounter = 0;
+        }
+        else if (osc->gain > osc->sustainGain)
+        {
+            osc->sustainCounter += 2;
+
+            if (osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
+            {
+                osc->sustainCounter = 0;
+                osc->gain--;
+            }
+        }
+        else
+        {
+            osc->sustainCounter = 0;
+        }
+    }
+    else if (osc->gain > 0)
+    {
+        osc->sustainCounter = 0;
+
+        // All release steps currently used by the emulator are well below
+        // 65536 even after doubling, so one test is sufficient.
+        osc->releaseAccum += releaseStep << 1;
+
+        if (osc->releaseAccum >= 0x10000)
+        {
+            osc->releaseAccum -= 0x10000;
+            osc->gain--;
+        }
+    }
+}
+
+
+static inline s32 YM_RenderChannel2(
+    YM_Oscillator *osc,
+    u8 keyOn,
+    u8 volume,
+    u32 releaseStep)
+{
+    if (!(keyOn && osc->gain == osc->sustainGain))
+        YM_UpdateGain2(osc, keyOn, releaseStep);
+
+    if (osc->gain == 0)
+        return 0;
+
+    // Advance TWO audio samples at once.
+    osc->phase += osc->phaseIncrement << 1;
+
+    // Only ONE waveform lookup/multiply for the two output samples.
+    s32 s = YM_SinTable[(osc->phase >> YM_SIN_SHIFT) & 0xFF];
+
+    return (s * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
+}
+
+
+// =====================================================================================
+// DS-Lite ultra-fast mixer helpers
+//
+// One synthesis sample is generated for every THREE output samples.
+//
+// State advances by three samples at a time, but only one waveform lookup/multiply
+// is performed.
+//
+// This is intentionally aggressive.  The resulting audio has a ~9.3 kHz effective
+// sample-and-hold rate, but FM-PAC music should remain recognizable and pitched
+// correctly.
+// =====================================================================================
+
+static inline void YM_UpdateGain3(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
+{
+    if (keyOn)
+    {
+        osc->releaseAccum = 0;
+
+        if (osc->gain < 255)
+        {
+            u16 g = osc->gain + (YM_GAIN_RAMP_STEP * 3);
+            osc->gain = (g >= 255) ? 255 : (u8)g;
+            osc->sustainCounter = 0;
+        }
+        else if (osc->gain > osc->sustainGain)
+        {
+            osc->sustainCounter += 3;
+
+            if (osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
+            {
+                osc->sustainCounter = 0;
+                osc->gain--;
+            }
+        }
+        else
+        {
+            osc->sustainCounter = 0;
+        }
+    }
+    else if (osc->gain > 0)
+    {
+        osc->sustainCounter = 0;
+
+        osc->releaseAccum += releaseStep * 3;
+
+        if (osc->releaseAccum >= 0x10000)
+        {
+            osc->releaseAccum -= 0x10000;
+            osc->gain--;
+        }
+    }
+}
+
+
+static inline s32 YM_RenderChannel3(
+    YM_Oscillator *osc,
+    u8 keyOn,
+    u8 attenuation,
+    u32 releaseStep)
+{
+    if (!(keyOn && osc->gain == osc->sustainGain))
+        YM_UpdateGain3(osc, keyOn, releaseStep);
+
+    if (osc->gain == 0)
+        return 0;
+
+    // Advance THREE audio samples at once.
+    osc->phase += osc->phaseIncrement * 3;
+
+    // Only ONE waveform lookup/multiply for all three output samples.
+    s32 s = YM_SinTable[(osc->phase >> YM_SIN_SHIFT) & 0xFF];
+
+    return (s * attenuation * osc->gain) >> YM_OUT_SHIFT;
+}
+
+
+void YMMixerFast(int len, s16 *dest, YM *chip)
+{
+    int i;
+    int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
+    int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
+
+    const int volBD  = 15 - chip->rhythmVolBD;
+    const int volHH  = 15 - chip->rhythmVolHH;
+    const int volSD  = 15 - chip->rhythmVolSD;
+    const int volTOM = 15 - chip->rhythmVolTOM;
+    const int volTCY = 15 - chip->rhythmVolTCY;
+
+    for (i = 0; i < len; i += 3)
+    {
+        s32 sample = 0;
+        int ch;
+
+        for (ch = 0; ch < lastMelodic; ch++)
+        {
+            YM_Channel *cc = &chip->channels[ch];
+
+            if (!cc->keyOn && cc->osc.gain == 0)
+                continue;
+
+            int attenuation = 15 - cc->volume;
+
+            sample += YM_RenderChannel3(
+                &cc->osc,
+                cc->keyOn,
+                attenuation,
+                (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2);
+
+            // Acoustic Bass fundamental.
+            if (ch == 3 &&
+                cc->instrument == 14 &&
+                cc->osc.gain != 0)
+            {
+                s32 fundamental =
+                    YM_SinTable[(cc->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+
+                sample +=
+                    (fundamental * attenuation * cc->osc.gain) >>
+                    (YM_OUT_SHIFT + 1);
+            }
+        }
+
+        if (rhythmOn)
+        {
+            YM_Channel *bd = &chip->channels[YM_CHANNEL_BD];
+            YM_Channel *hs = &chip->channels[YM_CHANNEL_HHSD];
+            YM_Channel *tt = &chip->channels[YM_CHANNEL_TOMTCY];
+
+            // Bass Drum
+            if (bd->osc.gain != 0)
+            {
+                YM_UpdateGain3(&bd->osc, 0, YM_PERCUSSION_RELEASE_STEP);
+
+                if (bd->osc.gain != 0)
+                {
+                    bd->osc.phase += bd->osc.phaseIncrement * 3;
+
+                    s32 s =
+                        YM_SinTable[
+                            (bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+
+                    sample +=
+                        (s * volBD * bd->osc.gain) >>
+                        YM_OUT_SHIFT;
+                }
+            }
+
+            // Tom-Tom
+            if (tt->osc.gain != 0)
+            {
+                YM_UpdateGain3(&tt->osc, 0, YM_PERCUSSION_RELEASE_STEP);
+
+                if (tt->osc.gain != 0)
+                {
+                    tt->osc.phase += tt->osc.phaseIncrement * 3;
+
+                    s32 s =
+                        YM_SinTable[
+                            (tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+
+                    sample +=
+                        (s * volTOM * tt->osc.gain) >>
+                        YM_OUT_SHIFT;
+                }
+            }
+
+            // Noise percussion
+            if (hs->osc.gain != 0 ||
+                chip->rhythmSD.gain != 0 ||
+                chip->rhythmTCY.gain != 0)
+            {
+                /*
+                 * Advance the LFSR THREE steps at once.
+                 *
+                 * This is mathematically identical to:
+                 *
+                 *   step
+                 *   step
+                 *   step
+                 *
+                 * in the old code.
+                 */
+                u32 noise = chip->noiseLFSR;
+
+                chip->noiseLFSR =
+                    (noise >> 3) ^ YM_NoiseAdvance3[noise & 7];
+
+                u32 noiseBit = chip->noiseLFSR & 1;
+
+                u32 hhPhase =
+                    (chip->channels[YM_CHANNEL_HHSD].osc.phase >> 22) &
+                    0x3FF;
+
+                u32 cymPhase =
+                    (chip->channels[YM_CHANNEL_TOMTCY].osc.phase >> 22) &
+                    0x3FF;
+
+                u32 shortNoise =
+                    (((hhPhase >> 2) & 1) ^ ((hhPhase >> 7) & 1)) |
+                    (((hhPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1)) |
+                    (((cymPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1));
+
+                #define YM_RHYTHM_WAVE_FAST(p) \
+                    YM_SinTable[((p) >> 2) & 0xFF]
+
+                // Hi-Hat
+                if (hs->osc.gain != 0)
+                {
+                    YM_UpdateGain3(
+                        &hs->osc,
+                        0,
+                        YM_PERCUSSION_RELEASE_STEP);
+
+                    if (hs->osc.gain != 0)
+                    {
+                        u32 phase;
+
+                        if (shortNoise)
+                            phase = noiseBit ? 0x2D0 : 0x234;
+                        else
+                            phase = noiseBit ? 0x034 : 0x0D0;
+
+                        s32 s = YM_RHYTHM_WAVE_FAST(phase);
+
+                        sample +=
+                            (s * volHH * hs->osc.gain) >>
+                            YM_OUT_SHIFT;
+                    }
+                }
+
+                // Snare Drum
+                if (chip->rhythmSD.gain != 0)
+                {
+                    YM_UpdateGain3(
+                        &chip->rhythmSD,
+                        0,
+                        YM_PERCUSSION_RELEASE_STEP);
+
+                    if (chip->rhythmSD.gain != 0)
+                    {
+                        u32 phase;
+
+                        if (hhPhase & 0x100)
+                            phase = noiseBit ? 0x300 : 0x200;
+                        else
+                            phase = noiseBit ? 0x000 : 0x100;
+
+                        s32 s = YM_RHYTHM_WAVE_FAST(phase);
+
+                        sample +=
+                            (s * volSD * chip->rhythmSD.gain) >>
+                            YM_OUT_SHIFT;
+                    }
+                }
+
+                // Top Cymbal
+                if (chip->rhythmTCY.gain != 0)
+                {
+                    YM_UpdateGain3(
+                        &chip->rhythmTCY,
+                        0,
+                        YM_PERCUSSION_RELEASE_STEP);
+
+                    if (chip->rhythmTCY.gain != 0)
+                    {
+                        u32 phase =
+                            shortNoise ? 0x300 : 0x100;
+
+                        s32 s = YM_RHYTHM_WAVE_FAST(phase);
+
+                        sample +=
+                            (s * volTCY * chip->rhythmTCY.gain) >>
+                            YM_OUT_SHIFT;
+                    }
+                }
+
+                #undef YM_RHYTHM_WAVE_FAST
+            }
+        }
+
+        sample += (chip->outputFilterState - sample) >> 4;
+        chip->outputFilterState = sample;
+
+        // Output sample 0
+        s32 mixed = ((s32)dest[i] + 32767) + sample;
+
+        if (mixed > 32767)
+            mixed = 32767;
+
+        dest[i] = (s16)mixed;
+
+        // Last partial block / samples 1 and 2
+        if (i + 2 < len)
+        {
+            mixed = ((s32)dest[i + 1] + 32767) + sample;
+
+            if (mixed > 32767)
+                mixed = 32767;
+
+            dest[i + 1] = (s16)mixed;
+
+            mixed = ((s32)dest[i + 2] + 32767) + sample;
+
+            if (mixed > 32767)
+                mixed = 32767;
+
+            dest[i + 2] = (s16)mixed;
+        }
+        else if (i + 1 < len)
+        {
+            mixed = ((s32)dest[i + 1] + 32767) + sample;
+
+            if (mixed > 32767)
+                mixed = 32767;
+
+            dest[i + 1] = (s16)mixed;
+        }
+    }
+}

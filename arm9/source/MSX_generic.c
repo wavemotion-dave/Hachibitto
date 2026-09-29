@@ -919,7 +919,7 @@ void SetDefaultGameConfig(void)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
-    myConfig.reserved0    = 0;
+    myConfig.beeper       = 0;                           // Beeper disabled
     myConfig.reserved1    = 0;
     myConfig.reserved2    = 0;
     myConfig.reserved3    = 0;
@@ -947,22 +947,22 @@ void SetDefaultGameConfig(void)
 
     if (strstr(initial_file_upper, "XAK"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "FAMICLE"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "FRAY"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if (strstr(initial_file_upper, "ARKANOID"))
@@ -1076,8 +1076,9 @@ const struct options_t Option_Table[1][20] =
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,           4},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
-        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%"},                                                                                                                           &myConfig.cpuBoost,       2},
+        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,       3},
         {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
+        {"BEEPER",         {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.beeper,         2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},

@@ -85,7 +85,7 @@ struct __attribute__((__packed__)) Config_t
     u8  splitRefresh;
     u8  scaleScreen;
     u8  maskBorders;
-    u8  reserved0;
+    u8  beeper;
     u8  reserved1;
     u8  reserved2;
     u8  reserved3;
@@ -266,7 +266,7 @@ extern u8   HachibittoChooseFile(void);
 extern u8   showMessage(char *szCh1, char *szCh2);
 extern u8   msxInit(char *szGame);
 extern u8   LoadGameRom(const char *path);
-extern u32  LoopZ80();
+extern u32  LoopZ80(void);
 extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
 extern void SaveConfig(bool bShow);
 extern void ShowRandomPreviewSnaps(void);
