@@ -1004,7 +1004,7 @@ void SetDefaultGameConfig(void)
 
     if (strstr(initial_file_upper, "BLADE") && strstr(initial_file_upper, "LORDS"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        myConfig.musicExpand = 0;   // The poor-man msx-music sounds terrible with this one.
     }
 
     if (strstr(initial_file_upper, "MAD") && strstr(initial_file_upper, "HOUSE"))
@@ -1119,7 +1119,7 @@ void SetDefaultGameConfig(void)
 
     if (strstr(initial_file_upper, "FAMICLE"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if ((strstr(initial_file_upper, "MASTER 3")) || (strstr(initial_file_upper, "MASTER3")) || (strstr(initial_file_upper, "MASTER III")))
