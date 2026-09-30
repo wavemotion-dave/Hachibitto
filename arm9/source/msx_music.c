@@ -180,7 +180,12 @@ static void YM_UpdateChannelFreq(YM *chip, int ch)
 {
     YM_Channel *c = &chip->channels[ch];
     const YM_Instrument *inst = c->instPtr;
-    c->osc.phaseIncrement = YM_ComputePhaseIncrement(c->fNumber, c->block, inst->mulCar);
+
+    c->osc.phaseIncrement =
+        YM_ComputePhaseIncrement(c->fNumber, c->block, inst->mulCar);
+
+    c->osc.modPhaseIncrement =
+        YM_ComputePhaseIncrement(c->fNumber, c->block, inst->mulMod);
 }
 
 static void YM_UpdateCustomUsers(YM *chip)
@@ -275,19 +280,58 @@ static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
 static const u16 YM_RRReleaseStepTest[16] __attribute__((section(".dtcm"))) =
     {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
 
-static s32 YM_RenderChannel(YM_Oscillator *osc, u8 keyOn, u8 volume,
-                                      int isMelodic, u32 releaseStep)
+ITCM_CODE static s32 YM_RenderChannel(YM_Oscillator *osc, u8 keyOn, u8 volume,
+                            int isMelodic, u32 releaseStep,
+                            const YM_Instrument *inst)
 {
     /* Most active notes spend the vast majority of their time at the
-       sustain target.  Once there, skip the bookkeeping entirely. */
+       sustain target. Once there, skip the bookkeeping entirely. */
     if (!(keyOn && osc->gain == osc->sustainGain))
         YM_UpdateGain(osc, keyOn, releaseStep);
 
-    if (osc->gain == 0) return 0;    // still idle/silent - skip the phase/table work
+    if (osc->gain == 0)
+        return 0;
 
+    /*
+     * Advance the modulator.
+     */
+    osc->modPhase += osc->modPhaseIncrement;
+
+    s32 mod = YM_SinTable[
+        (osc->modPhase >> YM_SIN_SHIFT) & 0xFF
+    ];
+
+    /*
+     * Modulation depth.
+     *
+     * TL is converted to a deliberately modest FM depth.
+     * With >>2 the useful range is 0..15.
+     */
+    s32 depth = (s32)(63 - (inst->tl & 0x3F)) >> 2;
+
+    /*
+     * Advance carrier.
+     */
     osc->phase += osc->phaseIncrement;
-    s32 s = YM_SinTable[(osc->phase >> YM_SIN_SHIFT) & 0xFF];
-    return (s * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
+
+    /*
+     * The old code built a 32-bit fixed-point phase offset:
+     *
+     *     (mod * depth) << 16
+     *
+     * and then added it to the 32-bit carrier phase before shifting
+     * by 24 bits.
+     *
+     * Since we only use the upper 8 bits for the waveform lookup,
+     * calculate the resulting table-index offset directly.
+     */
+    s32 modIndex = (mod * depth) >> 8;
+
+    s32 carrier = YM_SinTable[
+        ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF
+    ];
+
+    return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
 }
 
 //@----------------------------------------------------------------------------
@@ -474,9 +518,14 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         {
             YM_Channel *cc = &chip->channels[ch];
             if (!cc->keyOn && cc->osc.gain == 0) continue;    // fully idle - skip entirely
-            sample += YM_RenderChannel(&cc->osc, cc->keyOn, cc->volume, 1,
-                                   (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2);
-
+            sample += YM_RenderChannel(
+                &cc->osc,
+                cc->keyOn,
+                cc->volume,
+                1,
+                (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2,
+                cc->instPtr
+            );
             /*
              * Acoustic Bass (ROM instrument 14): keep the proven baseline
              * waveform as the main voice, but add a small clean fundamental
@@ -608,22 +657,22 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 
                 if (chip->rhythmSD.gain != 0)
                 {
-                    YM_UpdateGain(&chip->rhythmSD, 0, YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&chip->rhythmSD, 0, 2000);
+
                     if (chip->rhythmSD.gain != 0)
                     {
-                        /*
-                         * YM2413 SD:
-                         * if carrier phase bit 8 is set, select 300/200;
-                         * otherwise select 000/100; noise chooses within the pair.
-                         */
                         u32 phase;
+
                         if (hhPhase & 0x100)
                             phase = noiseBit ? 0x300 : 0x200;
                         else
                             phase = noiseBit ? 0x000 : 0x100;
 
                         s32 s = YM_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain) >> YM_OUT_SHIFT;
+                        
+                        sample +=
+                            (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain * 19) >>
+                            (YM_OUT_SHIFT + 4);
                     }
                 }
 

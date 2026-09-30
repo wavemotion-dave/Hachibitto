@@ -962,19 +962,44 @@ void SetDefaultGameConfig(void)
         myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
+    if (strstr(initial_file_upper, "Aleste"))
+    {
+        if (!isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "Monogatari"))
+    {
+        if (!isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
     if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "ILLUSION") && strstr(initial_file_upper, "CITY"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "PSYCH") && strstr(initial_file_upper, "WORLD"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "FAMICLE"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if ((strstr(initial_file_upper, "MASTER 3")) || (strstr(initial_file_upper, "MASTER3")) || (strstr(initial_file_upper, "MASTER III")))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "SINGULAR") && strstr(initial_file_upper, "STONE"))
     {
         myConfig.musicExpand = 1;   // Enable MSX MUSIC
-    }
-
-    if (strstr(initial_file_upper, "FAMICLE"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "FRAY"))

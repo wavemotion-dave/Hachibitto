@@ -2269,7 +2269,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (16*1024)
+#define MAX_DEBUG_BUF_SIZE   (128*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;
@@ -2299,7 +2299,7 @@ void debug_save()
 {
     if (debug_len > 0) // Only if we have debug data to write...
     {
-        FILE *fp = fopen("debug.log", "a");
+        FILE *fp = fopen("debug.log", "w");
         if (fp)
         {
             fwrite(DEBUG_BUFFER, 1, debug_len, fp);

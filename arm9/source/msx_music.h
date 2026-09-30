@@ -21,6 +21,9 @@
 //  measured to be far too expensive on this hardware.  In particular,
 //  moving lookup tables to faster memory produced only a small improvement,
 //  indicating that the dominant cost was the per-sample synthesis work.
+// 
+//  We use a simplified 2-op FM phase modulation using the instrument's modulator MUL/TL,
+//  improving instrument character while keeping the DSi mixer performance-friendly.
 //
 //  Current melodic synthesis:
 //    - Each channel uses a single oscillator rather than the OPLL's
@@ -120,6 +123,8 @@ typedef struct
 {
     u32 phase;
     u32 phaseIncrement;
+    u32 modPhase;
+    u32 modPhaseIncrement;    
     u32 releaseAccum;
     u32 envelopeLevel;
     u32 envelopeAccum;
