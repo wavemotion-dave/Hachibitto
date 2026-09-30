@@ -1761,13 +1761,11 @@ ITCM_CODE void Loop9938(void)
       // ---------------------------------------------------------------
       if (timingFrames & frame_skip_mask[myConfig.frameSkip])
       {
-          debug[1]++;
           skip_render  = 1; // This whole frame is skipped
           scan_sprites = 1; // But we still need to scan sprites
       }
       else
       {
-          debug[3]++;
           // ---------------------------------------------------------------
           // We can only show 192 lines... so only refresh the line if the
           // line will actually be one of the ones rendered to the DS LCD.

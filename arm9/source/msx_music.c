@@ -197,7 +197,7 @@ static void YM_UpdateCustomUsers(YM *chip)
 }
 
 //@----------------------------------------------------------------------------
-//@ One oscillator, one sample. No FM, no ADSR - just a tone with a gain
+//@ One oscillator, one sample. Minimal FM, no ADSR - mostly a tone with a gain
 //@----------------------------------------------------------------------------
 //@ Shared by both render functions below. Attack is instant-ish (whole-unit
 //@ steps, same as before). Release is a proper fractional ramp - a whole-
@@ -248,7 +248,7 @@ ITCM_CODE static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 re
 }
 
 //@----------------------------------------------------------------------------
-//@ One oscillator, one sample. No FM, no ADSR - just a tone with a gain
+//@ One oscillator, one sample. Minimal FM, no ADSR - just a tone with a gain
 //@ that ramps toward its key-on/off target. Takes keyOn/volume explicitly
 //@ (rather than reading a channel struct's fields directly) so the same
 //@ function serves both ordinary melodic channels and the tonal rhythm
@@ -453,12 +453,7 @@ void YMWrite(u8 value, u8 address, YM *chip)
     }
 }
 
-static inline s32 YM_RenderChannel2FM(
-    YM_Oscillator *osc,
-    u8 keyOn,
-    u8 volume,
-    u32 releaseStep,
-    const YM_Instrument *inst)
+static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, u8 volume, u32 releaseStep, const YM_Instrument *inst)
 {
     /*
      * Advance the envelope by TWO audio samples.
@@ -477,9 +472,7 @@ static inline s32 YM_RenderChannel2FM(
      */
     osc->modPhase += osc->modPhaseIncrement << 1;
 
-    s32 mod = YM_SinTable[
-        (osc->modPhase >> YM_SIN_SHIFT) & 0xFF
-    ];
+    s32 mod = YM_SinTable[(osc->modPhase >> YM_SIN_SHIFT) & 0xFF];
 
     s32 depth = (s32)(63 - (inst->tl & 0x3F)) >> 2;
 
@@ -487,9 +480,7 @@ static inline s32 YM_RenderChannel2FM(
 
     s32 modIndex = (mod * depth) >> 8;
 
-    s32 carrier = YM_SinTable[
-        ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF
-    ];
+    s32 carrier = YM_SinTable[((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF];
 
     return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
 }
@@ -533,9 +524,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 cc->osc.gain != 0)
             {
                 s32 fundamental =
-                    YM_SinTable[
-                        (cc->osc.phase >> YM_SIN_SHIFT) & 0xFF
-                    ];
+                    YM_SinTable[(cc->osc.phase >> YM_SIN_SHIFT) & 0xFF];
 
                 sample +=
                     (fundamental *
@@ -571,10 +560,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 {
                     bd->osc.phase += bd->osc.phaseIncrement << 1;
 
-                    s32 s =
-                        YM_SinTable[
-                            (bd->osc.phase >> YM_SIN_SHIFT) & 0xFF
-                        ];
+                    s32 s = YM_SinTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
 
                     sample +=
                         (s *
@@ -599,10 +585,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 {
                     tt->osc.phase += tt->osc.phaseIncrement << 1;
 
-                    s32 s =
-                        YM_SinTable[
-                            (tt->osc.phase >> YM_SIN_SHIFT) & 0xFF
-                        ];
+                    s32 s = YM_SinTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
 
                     sample +=
                         (s *
@@ -810,11 +793,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 // DSi/XL/LL should continue using the normal YMMixer().
 // =====================================================================================
 
-static inline s32 YM_RenderChannel2(
-    YM_Oscillator *osc,
-    u8 keyOn,
-    u8 volume,
-    u32 releaseStep)
+static inline s32 YM_RenderChannel2(YM_Oscillator *osc, u8 keyOn, u8 volume, u32 releaseStep)
 {
     if (!(keyOn && osc->gain == osc->sustainGain))
         YM_UpdateGain2(osc, keyOn, releaseStep);
@@ -887,11 +866,7 @@ static inline void YM_UpdateGain3(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
 }
 
 
-static inline s32 YM_RenderChannel3(
-    YM_Oscillator *osc,
-    u8 keyOn,
-    u8 attenuation,
-    u32 releaseStep)
+static inline s32 YM_RenderChannel3(YM_Oscillator *osc, u8 keyOn, u8 attenuation, u32 releaseStep)
 {
     if (!(keyOn && osc->gain == osc->sustainGain))
         YM_UpdateGain3(osc, keyOn, releaseStep);
@@ -909,6 +884,9 @@ static inline s32 YM_RenderChannel3(
 }
 
 
+// -----------------------------------------------------------------------
+// Call this one from DS-Lite/Phat only... it's deliberately simplified.
+// -----------------------------------------------------------------------
 void YMMixerFast(int len, s16 *dest, YM *chip)
 {
     int i;
