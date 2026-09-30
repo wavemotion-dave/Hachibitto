@@ -473,7 +473,6 @@ void ResetZ80(Z80 *R)
   CPU.NumInts           = 0;
   CPU.Trace             = 0;
   CPU.TrapBadOps        = 1;
-  CPU.TotalInstructions = 0;
 
   JumpZ80(CPU.PC.W);
 }
@@ -488,17 +487,16 @@ ITCM_CODE int ExecZ80(register int RunCycles)
 {
   register byte I;
   register pair J;
+  register u8 **MM = MemoryMap;
 
   for(CPU.ICount=RunCycles;;)
   {
     while(CPU.ICount>0)
     {
       /* Read opcode and count cycles */
-      I=OpZ80(CPU.PC.W++);
+      I=MM[CPU.PC.W>>13][CPU.PC.W]; CPU.PC.W++;
       CPU.ICount-=Cycles[I];
       
-      CPU.TotalInstructions++;  // Only counting base instructions... good enough for FDC timing
-
       /* Interpret opcode */
       switch(I)
       {

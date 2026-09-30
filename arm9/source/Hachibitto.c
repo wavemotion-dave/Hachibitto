@@ -71,7 +71,7 @@ u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE_KB = 1275;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
+u32 MAX_CART_SIZE_KB = 1250;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
                                 
 u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
 u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
@@ -625,8 +625,6 @@ void ShowDebugZ80(void)
 {
     u8 idx=1;
     
-    debug[6] = mySCC.chControl;
-
     sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
     DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
@@ -1855,7 +1853,7 @@ int main(int argc, char **argv)
     }
     else // For older DS units... 1.25MB max
     {
-        MAX_CART_SIZE_KB = 1275;
+        MAX_CART_SIZE_KB = 1250;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
 
@@ -2139,6 +2137,7 @@ void msxUpdateScreen(void)
         else 
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);
     }
+
     skip_render=0;
 }
 
@@ -2270,7 +2269,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE  128
-#define MAX_DEBUG_BUF_SIZE   (32*1024)
+#define MAX_DEBUG_BUF_SIZE   (16*1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32  debug_len = 0;

@@ -39,7 +39,7 @@ u32 drawn_frame_number  __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpochSaved    __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
-u8 frame_skip_mask      __attribute__((section(".dtcm"))) = 0;
+u8 frame_skip_mask[3]   __attribute__((section(".dtcm"))) = {0x00, 0x01, 0x03}; // None, Light, Aggressive
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -1759,13 +1759,15 @@ ITCM_CODE void Loop9938(void)
       // ---------------------------------------------------------------
       // On the DS-Lite/Phat, we have to frameskip every other frame...
       // ---------------------------------------------------------------
-      if (timingFrames & frame_skip_mask)
+      if (timingFrames & frame_skip_mask[myConfig.frameSkip])
       {
+          debug[1]++;
           skip_render  = 1; // This whole frame is skipped
           scan_sprites = 1; // But we still need to scan sprites
       }
       else
       {
+          debug[3]++;
           // ---------------------------------------------------------------
           // We can only show 192 lines... so only refresh the line if the
           // line will actually be one of the ones rendered to the DS LCD.
@@ -1817,7 +1819,7 @@ ITCM_CODE void Loop9938(void)
       // -------------------------------------
       // !!!Into the Vertical Blank!!!
       // -------------------------------------
-      if (!(timingFrames & frame_skip_mask))
+      if (!(timingFrames & frame_skip_mask[myConfig.frameSkip]))
       {
           drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
       }
@@ -1874,28 +1876,6 @@ void Reset9938(void)
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
 
     BuildNibbleLUT();
-
-    // ---------------------------------------------------------------------------------------------
-    // For the DS-Lite/Phat we need some level of frameskip... the MSX2 has just too much happening!
-    // ---------------------------------------------------------------------------------------------
-    if (isDSiMode())
-    {
-        frame_skip_mask = 0;    // Never need to skip any frames for DSi mode - the CPU is fast enough!
-    }
-    else
-    {
-        frame_skip_mask = 1;
-
-        // Snatcher and Manbow need help...
-        if (strstr(initial_file_upper, "MANBOW"))
-        {
-            frame_skip_mask = 3;
-        }
-        if (strstr(initial_file_upper, "SNATCHER"))
-        {
-            frame_skip_mask = 3;
-        }
-    }
 
     if (myConfig.machineType == MACHINE_MSX1)
     {

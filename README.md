@@ -71,3 +71,6 @@ Version History :
 -----------------------
 Version 1.0 - 29-Sep-2026 by wavemotion-dave
 * First major version released.
+* Hotfix 1.0a with fix for Save Config on DS-Lite/Phat.
+* Hotfix 1.0b with new Z80 handling to improve speed 5%
+

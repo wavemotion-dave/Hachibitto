@@ -42,7 +42,7 @@ struct FDC_t
     u16 indexPulseCounter;      // Driven by LoopFDC() at scanline granularity
     u16 sector_byte_counter;
     u16 write_track_byte_counter;
-    u32 cycle_deadline;         // CPU.TotalCycles value at which the current busy wait completes    
+    u32 busy_countdown;
 };
 
 struct FDC_GEOMETRY_t

@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0010
+#define CONFIG_VER                  0x0011
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -86,7 +86,7 @@ struct __attribute__((__packed__)) Config_t
     u8  scaleScreen;
     u8  maskBorders;
     u8  beeper;
-    u8  reserved1;
+    u8  frameSkip;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;
@@ -95,7 +95,7 @@ struct __attribute__((__packed__)) Config_t
     u8  reserved7;
 };
 
-#define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (1024*1024)))   // We use the back-end 256K of the ROM buffer for compression
+#define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (MAX_CART_SIZE_KB * 1024) - (300 * 1024)))   // We use the back-end 256K of the ROM buffer for compression
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
             

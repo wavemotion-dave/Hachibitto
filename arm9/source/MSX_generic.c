@@ -920,13 +920,19 @@ void SetDefaultGameConfig(void)
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
     myConfig.beeper       = 0;                           // Beeper disabled
-    myConfig.reserved1    = 0;
+    myConfig.frameSkip    = (isDSiMode() ? 0:1);         // Frame Skip is disabled on DSi and above
     myConfig.reserved2    = 0;
     myConfig.reserved3    = 0;
     myConfig.reserved4    = 0;
     myConfig.reserved5    = 0;
     myConfig.reserved6    = 0;
     myConfig.reserved7    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
+    
+    // For smaller games, even on the DS-Lite we can generally get away with no frameskip
+    if (!isDSiMode())
+    {
+        if (file_size <= (48*1024)) myConfig.frameSkip = 0;
+    }
 
     // ----------------------------------------------------------------------------------
     // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
@@ -943,6 +949,12 @@ void SetDefaultGameConfig(void)
     if (strstr(initial_file_upper, "SNATCHER"))
     {
         myConfig.musicExpand = 2;   // Enable SCC+
+        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
+    }
+
+    if (strstr(initial_file_upper, "MANBOW"))
+    {
+        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
     }
 
     if (strstr(initial_file_upper, "XAK"))
@@ -953,6 +965,11 @@ void SetDefaultGameConfig(void)
     if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
     {
         if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC
+    }
+
+    if (strstr(initial_file_upper, "SINGULAR") && strstr(initial_file_upper, "STONE"))
+    {
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "FAMICLE"))
@@ -1082,6 +1099,7 @@ const struct options_t Option_Table[1][20] =
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
+        {"FRAMESKIP",      {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                                     &myConfig.frameSkip,      3},
         {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
         {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
         {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},
