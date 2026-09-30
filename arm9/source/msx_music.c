@@ -206,20 +206,23 @@ static void YM_UpdateCustomUsers(YM *chip)
 //@ the earlier ADSR version, just for one rate instead of a per-instrument
 //@ table.
 //@----------------------------------------------------------------------------
-static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
+ITCM_CODE static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
 {
     if (keyOn)
     {
         osc->releaseAccum = 0;
+
         if (osc->gain < 255)
         {
-            u16 g = osc->gain + YM_GAIN_RAMP_STEP;
+            u16 g = osc->gain + (YM_GAIN_RAMP_STEP << 1);
             osc->gain = (g >= 255) ? 255 : (u8)g;
             osc->sustainCounter = 0;
         }
         else if (osc->gain > osc->sustainGain)
         {
-            if (++osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
+            osc->sustainCounter += 2;
+
+            if (osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
             {
                 osc->sustainCounter = 0;
                 osc->gain--;
@@ -233,12 +236,13 @@ static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
     else if (osc->gain > 0)
     {
         osc->sustainCounter = 0;
-        osc->releaseAccum += releaseStep;
-        while (osc->releaseAccum >= 0x10000)
+
+        osc->releaseAccum += releaseStep << 1;
+
+        if (osc->releaseAccum >= 0x10000)
         {
             osc->releaseAccum -= 0x10000;
             osc->gain--;
-            if (osc->gain == 0) break;
         }
     }
 }
@@ -279,60 +283,6 @@ static void YM_UpdateGain(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
  */
 static const u16 YM_RRReleaseStepTest[16] __attribute__((section(".dtcm"))) =
     {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
-
-ITCM_CODE static s32 YM_RenderChannel(YM_Oscillator *osc, u8 keyOn, u8 volume,
-                            int isMelodic, u32 releaseStep,
-                            const YM_Instrument *inst)
-{
-    /* Most active notes spend the vast majority of their time at the
-       sustain target. Once there, skip the bookkeeping entirely. */
-    if (!(keyOn && osc->gain == osc->sustainGain))
-        YM_UpdateGain(osc, keyOn, releaseStep);
-
-    if (osc->gain == 0)
-        return 0;
-
-    /*
-     * Advance the modulator.
-     */
-    osc->modPhase += osc->modPhaseIncrement;
-
-    s32 mod = YM_SinTable[
-        (osc->modPhase >> YM_SIN_SHIFT) & 0xFF
-    ];
-
-    /*
-     * Modulation depth.
-     *
-     * TL is converted to a deliberately modest FM depth.
-     * With >>2 the useful range is 0..15.
-     */
-    s32 depth = (s32)(63 - (inst->tl & 0x3F)) >> 2;
-
-    /*
-     * Advance carrier.
-     */
-    osc->phase += osc->phaseIncrement;
-
-    /*
-     * The old code built a 32-bit fixed-point phase offset:
-     *
-     *     (mod * depth) << 16
-     *
-     * and then added it to the 32-bit carrier phase before shifting
-     * by 24 bits.
-     *
-     * Since we only use the upper 8 bits for the waveform lookup,
-     * calculate the resulting table-index offset directly.
-     */
-    s32 modIndex = (mod * depth) >> 8;
-
-    s32 carrier = YM_SinTable[
-        ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF
-    ];
-
-    return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
-}
 
 //@----------------------------------------------------------------------------
 //@ Public interface
@@ -503,48 +453,103 @@ void YMWrite(u8 value, u8 address, YM *chip)
     }
 }
 
+static inline s32 YM_RenderChannel2FM(
+    YM_Oscillator *osc,
+    u8 keyOn,
+    u8 volume,
+    u32 releaseStep,
+    const YM_Instrument *inst)
+{
+    /*
+     * Advance the envelope by TWO audio samples.
+     */
+    if (!(keyOn && osc->gain == osc->sustainGain))
+        YM_UpdateGain2(osc, keyOn, releaseStep);
+
+    if (osc->gain == 0)
+        return 0;
+
+    /*
+     * Advance both FM operators by TWO samples.
+     *
+     * We still calculate the modulator and carrier, unlike the
+     * DS-Lite fast mixer.
+     */
+    osc->modPhase += osc->modPhaseIncrement << 1;
+
+    s32 mod = YM_SinTable[
+        (osc->modPhase >> YM_SIN_SHIFT) & 0xFF
+    ];
+
+    s32 depth = (s32)(63 - (inst->tl & 0x3F)) >> 2;
+
+    osc->phase += osc->phaseIncrement << 1;
+
+    s32 modIndex = (mod * depth) >> 8;
+
+    s32 carrier = YM_SinTable[
+        ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF
+    ];
+
+    return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
+}
+
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
     int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
     int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
-    for (i = 0; i < len; i++)
+    for (i = 0; i < len; i += 2)
     {
         s32 sample = 0;
         int ch;
 
+        /*
+         * -----------------------------------------------------------------
+         * Melodic channels
+         * -----------------------------------------------------------------
+         */
         for (ch = 0; ch < lastMelodic; ch++)
         {
             YM_Channel *cc = &chip->channels[ch];
-            if (!cc->keyOn && cc->osc.gain == 0) continue;    // fully idle - skip entirely
-            sample += YM_RenderChannel(
+
+            if (!cc->keyOn && cc->osc.gain == 0)
+                continue;
+
+            sample += YM_RenderChannel2FM(
                 &cc->osc,
                 cc->keyOn,
                 cc->volume,
-                1,
                 (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2,
                 cc->instPtr
             );
+
             /*
-             * Acoustic Bass (ROM instrument 14): keep the proven baseline
-             * waveform as the main voice, but add a small clean fundamental
-             * underneath it.  The baseline waveform is deliberately harmonic-rich;
-             * this quiet sine component adds low-end weight without changing the
-             * instrument's characteristic attack/timbre or touching any other voice.
-             *
-             * This is intentionally NOT FM.  It is a cheap depth test: one extra
-             * table lookup and multiply only while channel 3 / instrument 14 is active.
+             * Acoustic Bass fundamental.
              */
-            if (ch == 3 && cc->instrument == 14 && cc->osc.gain != 0)
+            if (ch == 3 &&
+                cc->instrument == 14 &&
+                cc->osc.gain != 0)
             {
-                s32 fundamental = YM_SinTable[(cc->osc.phase >> YM_SIN_SHIFT) & 0xFF];
-                /* About 33% of the baseline bass voice: a little more weight
-                   while keeping the original instrument dominant. */
-                sample += (fundamental * (15 - cc->volume) * cc->osc.gain) >> (YM_OUT_SHIFT + 1);
+                s32 fundamental =
+                    YM_SinTable[
+                        (cc->osc.phase >> YM_SIN_SHIFT) & 0xFF
+                    ];
+
+                sample +=
+                    (fundamental *
+                     (15 - cc->volume) *
+                     cc->osc.gain) >>
+                    (YM_OUT_SHIFT + 1);
             }
         }
 
+        /*
+         * -----------------------------------------------------------------
+         * Rhythm
+         * -----------------------------------------------------------------
+         */
         if (rhythmOn)
         {
             YM_Channel *bd = &chip->channels[YM_CHANNEL_BD];
@@ -552,112 +557,152 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             YM_Channel *tt = &chip->channels[YM_CHANNEL_TOMTCY];
 
             /*
-             * Rhythm voices are one-shot envelopes.  YM_RhythmRetrigger()
-             * starts them at full gain when the corresponding 0E bit rises;
-             * after that they decay regardless of whether the bit remains 1.
-             *
-             * This is important for Aleste: its trace repeatedly writes 0E=28
-             * between frame updates, but only occasionally writes 0E=20 followed
-             * immediately by 0E=28 to create the actual re-trigger.
+             * Bass Drum
              */
             if (bd->osc.gain != 0)
             {
-                YM_UpdateGain(&bd->osc, 0, YM_PERCUSSION_RELEASE_STEP);
+                YM_UpdateGain2(
+                    &bd->osc,
+                    0,
+                    YM_PERCUSSION_RELEASE_STEP
+                );
+
                 if (bd->osc.gain != 0)
                 {
-                    bd->osc.phase += bd->osc.phaseIncrement;
-                    s32 s = YM_SinTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
-                    sample += (s * (15 - chip->rhythmVolBD) * bd->osc.gain) >> YM_OUT_SHIFT;
-                }
-            }
+                    bd->osc.phase += bd->osc.phaseIncrement << 1;
 
-            if (tt->osc.gain != 0)
-            {
-                YM_UpdateGain(&tt->osc, 0, YM_PERCUSSION_RELEASE_STEP);
-                if (tt->osc.gain != 0)
-                {
-                    tt->osc.phase += tt->osc.phaseIncrement;
-                    s32 s = YM_SinTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
-                    sample += (s * (15 - chip->rhythmVolTOM) * tt->osc.gain) >> YM_OUT_SHIFT;
+                    s32 s =
+                        YM_SinTable[
+                            (bd->osc.phase >> YM_SIN_SHIFT) & 0xFF
+                        ];
+
+                    sample +=
+                        (s *
+                         (15 - chip->rhythmVolBD) *
+                         bd->osc.gain) >>
+                        YM_OUT_SHIFT;
                 }
             }
 
             /*
-             * YM2413 rhythm mode is NOT a generic white-noise generator.
-             *
-             * The OPLL combines the noise bit with selected phase bits from the
-             * HH and top-cymbal phase generators. SD, HH and TCY then select one
-             * of several fixed phase positions from their waveform. This is the
-             * important missing ingredient in the previous versions: feeding the
-             * LFSR amplitude directly to the DAC produces a sharp broadband tick,
-             * whereas the real chip produces a much denser, phase-shaped drum
-             * waveform.
-             *
-             * This follows the compact rhythm equations used by emu2413:
-             *   SD:  phase bit 8 + noise bit
-             *   CYM: short-noise bit
-             *   HH:  short-noise bit + noise bit
-             * The existing fast 256-entry waveform table is used for the selected
-             * phase positions, so this adds no large table or expensive FM path.
+             * Tom-Tom
              */
-            if (hs->osc.gain != 0 || chip->rhythmSD.gain != 0 || chip->rhythmTCY.gain != 0)
+            if (tt->osc.gain != 0)
+            {
+                YM_UpdateGain2(
+                    &tt->osc,
+                    0,
+                    YM_PERCUSSION_RELEASE_STEP
+                );
+
+                if (tt->osc.gain != 0)
+                {
+                    tt->osc.phase += tt->osc.phaseIncrement << 1;
+
+                    s32 s =
+                        YM_SinTable[
+                            (tt->osc.phase >> YM_SIN_SHIFT) & 0xFF
+                        ];
+
+                    sample +=
+                        (s *
+                         (15 - chip->rhythmVolTOM) *
+                         tt->osc.gain) >>
+                        YM_OUT_SHIFT;
+                }
+            }
+
+            /*
+             * -----------------------------------------------------------------
+             * Noise percussion
+             *
+             * Advance the YM2413 LFSR TWO steps, since this synthesis sample
+             * represents two output samples.
+             * -----------------------------------------------------------------
+             */
+            if (hs->osc.gain != 0 ||
+                chip->rhythmSD.gain != 0 ||
+                chip->rhythmTCY.gain != 0)
             {
                 /*
-                 * Keep the YM2413-style 23-bit noise generator running continuously.
-                 * emu2413 clocks it by:
-                 *
-                 *     if (noise & 1) noise ^= 0x800200;
-                 *     noise >>= 1;
-                 *
-                 * This is deliberately different from the old 17-bit LFSR.
+                 * LFSR step #1
                  */
                 if (chip->noiseLFSR & 1)
                     chip->noiseLFSR ^= 0x800200;
+
                 chip->noiseLFSR >>= 1;
                 chip->noiseLFSR &= 0x7FFFFF;
-                u32 noiseBit = chip->noiseLFSR & 1;
-
-                /* 10-bit phase outputs corresponding to the OPLL PG. */
-                u32 hhPhase = (chip->channels[YM_CHANNEL_HHSD].osc.phase >> 22) & 0x3FF;
-                u32 cymPhase = (chip->channels[YM_CHANNEL_TOMTCY].osc.phase >> 22) & 0x3FF;
 
                 /*
-                 * Short-noise equation from the OPLL rhythm section:
-                 * (HH bit2 xor bit7) | (HH bit3 xor CYM bit5) |
-                 * (CYM bit3 xor CYM bit5)
+                 * LFSR step #2
                  */
+                if (chip->noiseLFSR & 1)
+                    chip->noiseLFSR ^= 0x800200;
+
+                chip->noiseLFSR >>= 1;
+                chip->noiseLFSR &= 0x7FFFFF;
+
+                u32 noiseBit = chip->noiseLFSR & 1;
+
+                u32 hhPhase =
+                    (chip->channels[YM_CHANNEL_HHSD].osc.phase >> 22) &
+                    0x3FF;
+
+                u32 cymPhase =
+                    (chip->channels[YM_CHANNEL_TOMTCY].osc.phase >> 22) &
+                    0x3FF;
+
                 u32 shortNoise =
                     (((hhPhase >> 2) & 1) ^ ((hhPhase >> 7) & 1)) |
                     (((hhPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1)) |
                     (((cymPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1));
 
-                /* Convert a 10-bit phase position to our 256-entry waveform. */
-#define YM_RHYTHM_WAVE(p)          YM_SinTable[((p) >> 2) & 0xFF]
+#define YM_RHYTHM_WAVE_2(p) \
+                    YM_SinTable[((p) >> 2) & 0xFF]
 
+                /*
+                 * Hi-Hat
+                 */
                 if (hs->osc.gain != 0)
                 {
-                    YM_UpdateGain(&hs->osc, 0, YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain2(
+                        &hs->osc,
+                        0,
+                        YM_PERCUSSION_RELEASE_STEP
+                    );
+
                     if (hs->osc.gain != 0)
                     {
-                        /*
-                         * YM2413 HH:
-                         * short_noise ? {2D0,234} : {034,0D0},
-                         * selected by the noise bit.
-                         */
                         u32 phase;
+
                         if (shortNoise)
                             phase = noiseBit ? 0x2D0 : 0x234;
                         else
                             phase = noiseBit ? 0x034 : 0x0D0;
 
-                        s32 s = YM_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> YM_OUT_SHIFT;
+                        s32 s = YM_RHYTHM_WAVE_2(phase);
+
+                        sample +=
+                            (s *
+                             (15 - chip->rhythmVolHH) *
+                             hs->osc.gain) >>
+                            YM_OUT_SHIFT;
                     }
                 }
 
+                /*
+                 * Snare Drum
+                 *
+                 * Keep the tuned DSi version exactly as-is:
+                 * 2000 release and 19/16 gain.
+                 */
                 if (chip->rhythmSD.gain != 0)
                 {
-                    YM_UpdateGain(&chip->rhythmSD, 0, 2000);
+                    YM_UpdateGain2(
+                        &chip->rhythmSD,
+                        0,
+                        2000
+                    );
 
                     if (chip->rhythmSD.gain != 0)
                     {
@@ -668,60 +713,87 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                         else
                             phase = noiseBit ? 0x000 : 0x100;
 
-                        s32 s = YM_RHYTHM_WAVE(phase);
-                        
+                        s32 s = YM_RHYTHM_WAVE_2(phase);
+
                         sample +=
-                            (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain * 19) >>
+                            (s *
+                             (15 - chip->rhythmVolSD) *
+                             chip->rhythmSD.gain * 19) >>
                             (YM_OUT_SHIFT + 4);
                     }
                 }
 
+                /*
+                 * Top Cymbal
+                 */
                 if (chip->rhythmTCY.gain != 0)
                 {
-                    YM_UpdateGain(&chip->rhythmTCY, 0, YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain2(
+                        &chip->rhythmTCY,
+                        0,
+                        YM_PERCUSSION_RELEASE_STEP
+                    );
+
                     if (chip->rhythmTCY.gain != 0)
                     {
-                        /* YM2413 top cymbal: short-noise selects 300 or 100. */
-                        u32 phase = shortNoise ? 0x300 : 0x100;
-                        s32 s = YM_RHYTHM_WAVE(phase);
-                        sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> YM_OUT_SHIFT;
+                        u32 phase =
+                            shortNoise ? 0x300 : 0x100;
+
+                        s32 s = YM_RHYTHM_WAVE_2(phase);
+
+                        sample +=
+                            (s *
+                             (15 - chip->rhythmVolTCY) *
+                             chip->rhythmTCY.gain) >>
+                            YM_OUT_SHIFT;
                     }
                 }
 
-#undef YM_RHYTHM_WAVE
+#undef YM_RHYTHM_WAVE_2
             }
         }
 
         /*
-         * The DS output path is a little unforgiving at the very top end.  The
-         * FM-PAC baseline waveform is intentionally harmonic-rich, so the upper
-         * harmonics of some bright instruments can sound slightly sharper on the
-         * handheld than on the reference hardware.  A very gentle one-pole low-pass
-         * here trims only the extreme top: 15/16 of the current sample plus 1/16 of
-         * the previous sample.  DC and bass are essentially unchanged, while the
-         * Nyquist end is reduced by about 1.2 dB.  This is deliberately global and
-         * tiny so the rhythm character and the carefully tuned instrument balance
-         * remain intact.
+         * Output filter.
+         *
+         * One filter update per synthesized sample, which is consistent
+         * with the reduced-rate synthesis.
          */
-        /* Equivalent to (sample * 15 + previous) >> 4, but avoids a
-           multiply on this per-output-sample hot path. */
-        sample += (chip->outputFilterState - sample) >> 4;
+        sample +=
+            (chip->outputFilterState - sample) >> 4;
+
         chip->outputFilterState = sample;
 
-        // AY driver outputs unsigned-centered PCM (silence = 32768) but writes it into
-        // this shared s16 buffer via raw reinterpretation rather than converting to
-        // signed first - so AY's "silence" actually lands at -32768 (the bit pattern
-        // for unsigned 32768 read back as signed) instead of 0. Without this offset,
-        // FM-PAC's own correctly-centered output gets added on top of that heavily
-        // negative baseline and any negative half of FM-PAC's waveform clips away
-        // instantly against the -32768 floor. This offset cancels that bias back out.
-        // FM-PAC is only ever paired with this specific AY driver (confirmed), so this
-        // is safe to leave here rather than fixing it at the AY driver's own output -
-        // but if that ever changes, this is the first place to look.
-        s32 mixed = ((s32)dest[i] + 32767) + sample;
-        if (mixed > 32767) mixed = 32767;
-        if (mixed < -32768) mixed = -32768;
+        /*
+         * Output sample 0
+         */
+        s32 mixed =
+            ((s32)dest[i] + 32767) + sample;
+
+        if (mixed > 32767)
+            mixed = 32767;
+
+        if (mixed < -32768)
+            mixed = -32768;
+
         dest[i] = (s16)mixed;
+
+        /*
+         * Hold the synthesized sample for output sample 1.
+         */
+        if (i + 1 < len)
+        {
+            mixed =
+                ((s32)dest[i + 1] + 32767) + sample;
+
+            if (mixed > 32767)
+                mixed = 32767;
+
+            if (mixed < -32768)
+                mixed = -32768;
+
+            dest[i + 1] = (s16)mixed;
+        }
     }
 }
 
@@ -737,50 +809,6 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 // This deliberately trades high-frequency audio fidelity for CPU speed.
 // DSi/XL/LL should continue using the normal YMMixer().
 // =====================================================================================
-
-static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
-{
-    if (keyOn)
-    {
-        osc->releaseAccum = 0;
-
-        if (osc->gain < 255)
-        {
-            u16 g = osc->gain + (YM_GAIN_RAMP_STEP << 1);
-            osc->gain = (g >= 255) ? 255 : (u8)g;
-            osc->sustainCounter = 0;
-        }
-        else if (osc->gain > osc->sustainGain)
-        {
-            osc->sustainCounter += 2;
-
-            if (osc->sustainCounter >= YM_SUSTAIN_TICK_SAMPLES)
-            {
-                osc->sustainCounter = 0;
-                osc->gain--;
-            }
-        }
-        else
-        {
-            osc->sustainCounter = 0;
-        }
-    }
-    else if (osc->gain > 0)
-    {
-        osc->sustainCounter = 0;
-
-        // All release steps currently used by the emulator are well below
-        // 65536 even after doubling, so one test is sufficient.
-        osc->releaseAccum += releaseStep << 1;
-
-        if (osc->releaseAccum >= 0x10000)
-        {
-            osc->releaseAccum -= 0x10000;
-            osc->gain--;
-        }
-    }
-}
-
 
 static inline s32 YM_RenderChannel2(
     YM_Oscillator *osc,
@@ -889,7 +917,6 @@ void YMMixerFast(int len, s16 *dest, YM *chip)
 
     const int volBD  = 15 - chip->rhythmVolBD;
     const int volHH  = 15 - chip->rhythmVolHH;
-    const int volSD  = 15 - chip->rhythmVolSD;
     const int volTOM = 15 - chip->rhythmVolTOM;
     const int volTCY = 15 - chip->rhythmVolTCY;
 
@@ -1038,10 +1065,7 @@ void YMMixerFast(int len, s16 *dest, YM *chip)
                 // Snare Drum
                 if (chip->rhythmSD.gain != 0)
                 {
-                    YM_UpdateGain3(
-                        &chip->rhythmSD,
-                        0,
-                        YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain3(&chip->rhythmSD,0,2000);
 
                     if (chip->rhythmSD.gain != 0)
                     {
@@ -1055,8 +1079,8 @@ void YMMixerFast(int len, s16 *dest, YM *chip)
                         s32 s = YM_RHYTHM_WAVE_FAST(phase);
 
                         sample +=
-                            (s * volSD * chip->rhythmSD.gain) >>
-                            YM_OUT_SHIFT;
+                            (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain * 19) >>
+                            (YM_OUT_SHIFT + 4);
                     }
                 }
 

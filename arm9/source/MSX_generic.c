@@ -977,12 +977,142 @@ void SetDefaultGameConfig(void)
         if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
     }
 
+    if (strstr(initial_file_upper, "SLAYER") && strstr(initial_file_upper, "VI"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+    
+    if (strstr(initial_file_upper, "GOLVELLIUS 2") || strstr(initial_file_upper, "GOLVELLIUS II"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
     if (strstr(initial_file_upper, "ILLUSION") && strstr(initial_file_upper, "CITY"))
     {
         if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
     }
 
+    if (strstr(initial_file_upper, "SUPER") && strstr(initial_file_upper, "COOKS"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
     if (strstr(initial_file_upper, "PSYCH") && strstr(initial_file_upper, "WORLD"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "BLADE") && strstr(initial_file_upper, "LORDS"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "MAD") && strstr(initial_file_upper, "HOUSE"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+    
+    if (strstr(initial_file_upper, "DAIKOUKAI") && strstr(initial_file_upper, "JIDAI"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "DEAD") && strstr(initial_file_upper, "BRAIN"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "EUROPE") && strstr(initial_file_upper, "WAR"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "FAMILY") && strstr(initial_file_upper, "STADIUM"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "FLEET") && strstr(initial_file_upper, "COMMANDER 2"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "GAMBLER") && strstr(initial_file_upper, "JIKICHUSHINPA"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "MAISON") && strstr(initial_file_upper, "IKKOKU"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "EMERALD") && strstr(initial_file_upper, "DRAGON"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "PENGUIN-KUN") && strstr(initial_file_upper, "WARS"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "BLASTER") && strstr(initial_file_upper, "BURN"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "LAYDOCK") && strstr(initial_file_upper, "LAST"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "BUSHOUHUUNROKU"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "SENKOKUGUNYUDEN"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "FARDRAUT"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "SUIKODEN"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "PAC-MANIA"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "GENCHOHISI"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "QUINPL"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "UNDEADLINE"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "CRIMSON"))
+    {
+        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+    }
+
+    if (strstr(initial_file_upper, "FEEDBACK"))
     {
         if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
     }
