@@ -89,7 +89,7 @@ The Hachibitto HB-8 Fantasy Console :
 
 ![Hachibitto Memory Map](images/MemoryMap.png)
 
-<img width="582" height="606" alt="image" src="https://github.com/user-attachments/assets/c82c24e7-9706-43c8-bb50-04ae3cf569a5" />
+![Hachibitto Memory Map](images/demo.jpg)
 
 Version History :
 -----------------------
