@@ -21,7 +21,7 @@ Features :
 * Standard PSG, 2x PSG, SCC, SCC+ and MSX-MUSIC available.
 * SRAM carts backed to SD card automatically.
 * Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!).
-* Arkanoid paddle controllers supported (only 2 games known to make use of it).
+* Arkanoid paddle controllers supported (only 2 games known to make use of it - hold B button to speed up paddle movement).
 * High Score saving for 10 scores with initials, date/time.
 * Favorites list so you can mark games as 'like' or 'love' - a yellow or red heart icon will mark your favorite games.
 * Solid Z80 core that passes the ZEXDOC test suite (covering everything except undocumented flags which are partially supported for the few games that need them).
@@ -56,6 +56,30 @@ Thanks to Flubba for the AY38910 and SCC sound cores. You can seek out his lates
 Also thanks to Marat Fayzullin, as the author of fMSX - which is where the CZ80 CPU core and initial VDP9938 handling came from.
 
 And Nishi.
+
+Options :
+-----------------------
+![Hachibitto Options](images/Options.png)
+
+* MSX Mapper - Generally leave as 'GUESS' as it will search the internal database (10,000 games) and if not found will attempt to determine the mapper from the ROM size/contents. 
+* Machine Type - Usually Type 'A' for standard slot layout for a typical MSX2 machine. Type B for some disk conversions that expect RAM/Disk controller to be in a different configuration (usually the result of sloppy programming). MSX1 Legacy if you want to force the MSX1 VDP handling.
+* Keyboard Type - Usually full keyboard layout but you can select the simplified Alpha keyboard which helps when playing text-heavy games that need a lot of key input.
+* Max Sprites - Normally real hardware can only render 4/8 sprites per line (MSX1 legacy vs MSX2) but the emulation allows all 32 to be displayed without flicker.
+* Auto Fire - can be set for Button 1 and/or Button 2.
+* Joystick - Generally leave at 'Normal' but can be set to 'Diagonals' for Q-Bert games or 'Slilde-n-Glide' to help make turns onto ladders easier for games like Chuckie Egg. 
+* Split Timing - The horizontal line interrupt split is tricky in emulation. To help avoid visual artifacts, this can be set to smooth over 1 or 2 lines. Play with it if you see visual artifacts on the split between static/score area and scrolling area on any game.
+* CPU Speed - Generally leave at 'Normal' but you can boost any game by 10% or 20% to give more CPU cycles per line while maintaining the same VDP interrupt rate. Helps games like Aleste and Zanac from slowing down.
+* Music Expand - Can use this to enable SCC+ simulated cart (for Snatcher) or MSX-MUSIC for the games that take advantage of it. Many games will auto-configure.
+* Beeper - some "lazy" ZX Spectrum ports still use the 1-bit speaker output. It costs emulated CPU time so it's not universally enabled. 
+* Y-Offset - used to shift the screen up or down. Even easier is to use the Right Shoulder Button + UP/DOWN on the d-pad to shift the screen.  Buttons X/Y will pan up or down.
+* Screen Scale - can be used to compress 212 scanline games down to 192. Generally recommended to use Pan UP/DOWN instead as compression will obviously drop some scanlines.
+* Border Mask - can be used to hide the left/right 8 pixels so games that scroll "choppy" are a bit less visually bothersome.
+* Frameskip - on the DSi or above, should default to 'None' and you can leave it there... every game locks in at 60Hz. For the older hardware, some light frameskip is required.
+
+Known Issues :
+-----------------------
+* MSX-MUSIC is vastly simplified processing so that it will run on the older DS hardware. Sound is passable but nowhere near authentic.
+* Lubeck with MSX-MUSIC enabled crashes. Reason is unknown.
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------
