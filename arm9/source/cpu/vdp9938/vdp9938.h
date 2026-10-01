@@ -107,7 +107,6 @@ extern u32 ColTabM;
 extern u32 ChrGenM;
 extern u32 SprTabM;
 
-
 /** WrData9938() *********************************************/
 /** Write a value V to the VDP Data Port.                   **/
 /*************************************************************/
@@ -125,5 +124,6 @@ static inline __attribute__((always_inline)) void WrData9938(byte V)  // This on
 
 extern u32 frame_number;
 extern u32 drawn_frame_number;
+extern u16 screen7Pan;
 
 #endif

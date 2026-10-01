@@ -226,6 +226,7 @@ extern u8 msx_irq_pending;
 extern u8 palette_latch;
 extern uint8_t OccBuf[320];
 extern u16 beeperFreq;
+extern u8 zoom_screen7;
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need

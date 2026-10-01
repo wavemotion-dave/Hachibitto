@@ -39,6 +39,7 @@ u32 drawn_frame_number      __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpochSaved        __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
+u16 screen7Pan              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
                             {1,0,1,0,1,0,1,0,   1,0,1,0,1,0,1,0},  // Light: 50% (every other frame drawn)
@@ -774,6 +775,7 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 
 #undef SPR_SET
 #undef SPR_OR
+#undef SPR_SET16
 }
 
 /** ScanColorSprites() ******************************************/
@@ -1355,12 +1357,323 @@ ITCM_CODE void RefreshLine6(u8 uY)
 }
 
 
+/*
+ * Screen 7 zoom-mode sprite renderer.
+ *
+ * ZBuf points to the first visible output pixel (256 pixels).
+ * Sprite pixels are doubled horizontally and clipped to that viewport.
+ * screen7Pan is measured in Screen 7 source pixels and is even.
+ *
+ * This deliberately preserves the original sprite-counting, priority,
+ * transparency, magnification, and status-register logic.
+ */
+void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
+{
+    static const uint8_t SprHeights[4] = { 8,16,16,32 };
+    uint8_t C,IH,OH,J,OrThem;
+    uint8_t *P,*PT,*AT,*O;
+    int L,K;
+    int spriteX;
+    unsigned int M;
+
+    u8 CurrentEpoch = ++CurrentEpochSaved;
+
+    /*
+     * Map a normal sprite pixel n to two zoom output pixels.
+     * spriteX is the doubled sprite origin minus the viewport pan.
+     * The unsigned bounds checks reject negative coordinates too.
+     */
+#define SPR_SET(n) do {                                      \
+    int _x = spriteX + ((n) << 1);                           \
+    if ((unsigned)_x < 255u) {                              \
+        P[_x] = C; P[_x+1] = C;                            \
+        O[_x] = CurrentEpoch; O[_x+1] = CurrentEpoch;       \
+    }                                                        \
+} while (0)
+
+#define SPR_OR(n) do {                                       \
+    int _x = spriteX + ((n) << 1);                           \
+    if ((unsigned)_x < 255u) {                              \
+        if (O[_x] == CurrentEpoch) P[_x] |= C;               \
+        else { P[_x] = C; O[_x] = CurrentEpoch; }            \
+        if (O[_x+1] == CurrentEpoch) P[_x+1] |= C;           \
+        else { P[_x+1] = C; O[_x+1] = CurrentEpoch; }        \
+    }                                                        \
+} while (0)
+
+#define SPR_SET16(n) do {                                    \
+    int _x = spriteX + ((n) << 1);                           \
+    if ((unsigned)_x < 253u) {                              \
+        P[_x] = C; P[_x+1] = C;                             \
+        P[_x+2] = C; P[_x+3] = C;                           \
+        O[_x] = CurrentEpoch; O[_x+1] = CurrentEpoch;       \
+        O[_x+2] = CurrentEpoch; O[_x+3] = CurrentEpoch;     \
+    }                                                        \
+} while (0)
+
+    VDPStatus[0] &= ~0x5F;
+
+    if (SpritesOFF)
+        return;
+
+    OrThem = 0;
+    OH = SprHeights[VDP[1] & 0x03];
+    IH = SprHeights[VDP[1] & 0x02];
+    AT = SprTab - 4;
+    C = MAXSPRITE2 + 1;
+    M = 0;
+
+    /* Count displayed sprites, retaining the normal sprite limit. */
+    for (L = 0; L < 32; ++L)
+    {
+        M <<= 1;
+        AT += 4;
+
+        K = AT[0];
+        if (K == 216)
+            break;
+
+        K = (uint8_t)(K - VScroll);
+        if (K > 256 - IH)
+            K -= 256;
+
+        if ((Y > K) && (Y <= K + OH))
+        {
+            if (!--C)
+            {
+                VDPStatus[0] |= 0x40;
+                if (!myConfig.maxSprites)
+                    break;
+            }
+
+            M |= 1;
+        }
+    }
+
+    VDPStatus[0] |= L < 32 ? L : 31;
+
+    u8 zeroNotTransparent = (VDP[8] & 0x20);
+
+    /* Draw the selected sprites in the same order as ColorSprites(). */
+    for (; M; M >>= 1, AT -= 4)
+    {
+        if (!(M & 1))
+            continue;
+
+        K = (uint8_t)(AT[0] - VScroll);
+        if (K > 256 - IH)
+            K -= 256;
+
+        J = Y - K - 1;
+        J = OH > IH ? (J >> 1) : J;
+
+        C = SprTab[-0x0200 + ((AT - SprTab) << 2) + J];
+        OrThem |= C & 0x40;
+
+        if ((C & 0x0F) || zeroNotTransparent)
+        {
+            PT = SprGen +
+                 ((int)(IH > 8 ? AT[2] & 0xFC : AT[2]) << 3) + J;
+
+            /*
+             * In the normal renderer, the padded ZBuf origin and the
+             * early-clock bit together determine the sprite's screen X.
+             * Convert that coordinate to the zoomed source coordinate.
+             */
+            spriteX =
+                ((int)AT[1] - ((C & 0x80) ? 32 : 0)) * 2
+                - (int)screen7Pan
+                + 32;                
+
+            P = ZBuf;
+            O = OccBuf;
+
+            C &= 0x0F;
+            J = PT[0];
+
+            if (OrThem & 0x20)
+            {
+                /* Overlapping sprites: preserve the original OR rules. */
+                if (OH > IH)
+                {
+                    if (J)
+                    {
+                        if (J & 0x80) { SPR_OR(0);  SPR_OR(1);  }
+                        if (J & 0x40) { SPR_OR(2);  SPR_OR(3);  }
+                        if (J & 0x20) { SPR_OR(4);  SPR_OR(5);  }
+                        if (J & 0x10) { SPR_OR(6);  SPR_OR(7);  }
+                        if (J & 0x08) { SPR_OR(8);  SPR_OR(9);  }
+                        if (J & 0x04) { SPR_OR(10); SPR_OR(11); }
+                        if (J & 0x02) { SPR_OR(12); SPR_OR(13); }
+                        if (J & 0x01) { SPR_OR(14); SPR_OR(15); }
+                    }
+
+                    if (IH > 8)
+                    {
+                        J = PT[16];
+                        if (J)
+                        {
+                            if (J & 0x80) { SPR_OR(16); SPR_OR(17); }
+                            if (J & 0x40) { SPR_OR(18); SPR_OR(19); }
+                            if (J & 0x20) { SPR_OR(20); SPR_OR(21); }
+                            if (J & 0x10) { SPR_OR(22); SPR_OR(23); }
+                            if (J & 0x08) { SPR_OR(24); SPR_OR(25); }
+                            if (J & 0x04) { SPR_OR(26); SPR_OR(27); }
+                            if (J & 0x02) { SPR_OR(28); SPR_OR(29); }
+                            if (J & 0x01) { SPR_OR(30); SPR_OR(31); }
+                        }
+                    }
+                }
+                else
+                {
+                    if (J)
+                    {
+                        if (J & 0x80) SPR_OR(0);
+                        if (J & 0x40) SPR_OR(1);
+                        if (J & 0x20) SPR_OR(2);
+                        if (J & 0x10) SPR_OR(3);
+                        if (J & 0x08) SPR_OR(4);
+                        if (J & 0x04) SPR_OR(5);
+                        if (J & 0x02) SPR_OR(6);
+                        if (J & 0x01) SPR_OR(7);
+                    }
+
+                    if (IH > 8)
+                    {
+                        J = PT[16];
+                        if (J)
+                        {
+                            if (J & 0x80) SPR_OR(8);
+                            if (J & 0x40) SPR_OR(9);
+                            if (J & 0x20) SPR_OR(10);
+                            if (J & 0x10) SPR_OR(11);
+                            if (J & 0x08) SPR_OR(12);
+                            if (J & 0x04) SPR_OR(13);
+                            if (J & 0x02) SPR_OR(14);
+                            if (J & 0x01) SPR_OR(15);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                /* Non-overlapping sprites: retain original pattern logic. */
+                if (OH > IH)
+                {
+                    if (J)
+                    {
+                        if (J & 0x80) { SPR_SET(0);  SPR_SET(1);  }
+                        if (J & 0x40) { SPR_SET(2);  SPR_SET(3);  }
+                        if (J & 0x20) { SPR_SET(4);  SPR_SET(5);  }
+                        if (J & 0x10) { SPR_SET(6);  SPR_SET(7);  }
+                        if (J & 0x08) { SPR_SET(8);  SPR_SET(9);  }
+                        if (J & 0x04) { SPR_SET(10); SPR_SET(11); }
+                        if (J & 0x02) { SPR_SET(12); SPR_SET(13); }
+                        if (J & 0x01) { SPR_SET(14); SPR_SET(15); }
+                    }
+
+                    if (IH > 8)
+                    {
+                        J = PT[16];
+                        if (J)
+                        {
+                            if (J & 0x80) { SPR_SET(16); SPR_SET(17); }
+                            if (J & 0x40) { SPR_SET(18); SPR_SET(19); }
+                            if (J & 0x20) { SPR_SET(20); SPR_SET(21); }
+                            if (J & 0x10) { SPR_SET(22); SPR_SET(23); }
+                            if (J & 0x08) { SPR_SET(24); SPR_SET(25); }
+                            if (J & 0x04) { SPR_SET(26); SPR_SET(27); }
+                            if (J & 0x02) { SPR_SET(28); SPR_SET(29); }
+                            if (J & 0x01) { SPR_SET(30); SPR_SET(31); }
+                        }
+                    }
+                }
+                else
+                {
+                    if (J)
+                    {
+                        if (J & 0x80) SPR_SET(0);
+                        if (J & 0x40) SPR_SET(1);
+                        if (J & 0x20) SPR_SET(2);
+                        if (J & 0x10) SPR_SET(3);
+                        if (J & 0x08) SPR_SET(4);
+                        if (J & 0x04) SPR_SET(5);
+                        if (J & 0x02) SPR_SET(6);
+                        if (J & 0x01) SPR_SET(7);
+                    }
+
+                    if (IH > 8)
+                    {
+                        J = PT[16];
+                        if (J)
+                        {
+                            if (J & 0x80) SPR_SET(8);
+                            if (J & 0x40) SPR_SET(9);
+                            if (J & 0x20) SPR_SET(10);
+                            if (J & 0x10) SPR_SET(11);
+                            if (J & 0x08) SPR_SET(12);
+                            if (J & 0x04) SPR_SET(13);
+                            if (J & 0x02) SPR_SET(14);
+                            if (J & 0x01) SPR_SET(15);
+                        }
+                    }
+                }
+            }
+        }
+
+        OrThem >>= 1;
+    }
+
+#undef SPR_SET
+#undef SPR_OR
+#undef SPR_SET16
+}
+
+ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
+{
+    DEBUG_REFRESH(7);
+
+    if (!ScreenON)
+    {
+        memset(XBuf + (uY << 8), XPal[BGColor], 256);
+    }
+    else
+    {
+        uint8_t *P = RefreshBorder(uY);
+
+        const u8 *src =
+            ChrTab + (((int)(uY + VScroll) << 8) & ChrTabM & 0xFFFF);
+
+        if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x10000)
+            src -= 0x10000;
+
+        // Pan horizontally through the 512-pixel source.
+        // Two pixels are packed into each byte.
+        src += (screen7Pan >> 1);
+
+        // Expand packed 4-bit pixels into 256 output pixels.
+        for (int i = 0; i < 128; i++)
+        {
+            u8 v = src[i];
+
+            P[i * 2]     = (v >> 4) & 0x0F;
+            P[i * 2 + 1] = v & 0x0F;
+        }
+
+        ColorSprites_Zoomed(uY, P - 32);
+        CommitLine(uY);
+    }
+}
+
+
 /** RefreshLine7() ********************************************/
 /** Refresh VDP9938 Screen 7: 512x212, 16 colors bitmap    **/
 /*************************************************************/
 ITCM_CODE void RefreshLine7(u8 uY)
 {
     DEBUG_REFRESH(7);
+    
+    if (zoom_screen7 == 2) return RefreshLine7_Zoomed(uY);
 
     if (!ScreenON)
     {
@@ -1395,7 +1708,6 @@ ITCM_CODE void RefreshLine7(u8 uY)
         CommitLine(uY);
     }
 }
-
 
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
@@ -1841,6 +2153,10 @@ ITCM_CODE void Loop9938(void)
       {
           if(CheckSprites()) VDPStatus[0] |= VDP9938_STAT_OVRLAP;
       }
+      
+      // Get ready for the next frame... clear the sprite Occupancy buffer
+      memset(OccBuf, 0, sizeof(OccBuf));
+      CurrentEpochSaved = 1;
   }
 }
 

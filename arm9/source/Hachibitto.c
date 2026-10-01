@@ -61,6 +61,7 @@ u8  slide_dampen        __attribute__((section(".dtcm"))) = 0;
 u8  DelayFirstOutput    __attribute__((section(".dtcm"))) = 0;
 u8  bFirstSoundOutput   __attribute__((section(".dtcm"))) = 1;
 u8  skip_render         __attribute__((section(".dtcm"))) = 0;
+u8  zoom_screen7        __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // The MSX systems have ROM, RAM, BIOS, Music Carts or SRAM. So we create generic buffers
@@ -576,6 +577,8 @@ void ResetMSX(void)
 
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
+    
+    zoom_screen7  = 0;                    // Assume no zoom to start
 
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it
@@ -781,6 +784,12 @@ void DisplayStatusLine(bool bForce)
         DSPrint(1,15,0, (key_ctrl  ? "@":" "));
         DSPrint(2,15,(key_ctrl  ? 2:0), (key_ctrl  ? "@":" "));
 
+        if (zoom_screen7) // Pan and Scan on Mode 7
+        {
+            key_graph = 0;
+            DSPrint(4,21,0, ":;<");
+            DSPrint(4,22,0, "Z[\\");
+        }
         DSPrint(5,23,(key_graph ? 2:0), (key_graph ? "]":" "));
     }
 }
@@ -889,6 +898,7 @@ u8 MiniMenu(void)
 u8 last_special_key = 0;
 u8 last_special_key_dampen = 0;
 u8 last_kbd_key = 0;
+u8 dampen_zoom = 0;
 
 u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
 {
@@ -982,7 +992,15 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
     else if ((iTy >= 162) && (iTy < 192)) // Row 6 (SPACE BAR and icons row)
     {
         if      ((iTx >= 1)   && (iTx < 30))   kbd_key = KBD_KEY_CAPS;
-        else if ((iTx >= 30)  && (iTx < 53))   {kbd_key = KBD_KEY_GRAPH; last_special_key = KBD_KEY_GRAPH; last_special_key_dampen = 20;}
+        else if ((iTx >= 30)  && (iTx < 53))   // Graph Key... also Zoom for Screen 7
+        {
+            if (zoom_screen7 == 1) {if (!dampen_zoom) zoom_screen7 = 2; dampen_zoom=10;}
+            else if (zoom_screen7 == 2) {if (!dampen_zoom) zoom_screen7 = 1; dampen_zoom=10;}
+            else
+            {
+                kbd_key = KBD_KEY_GRAPH; last_special_key = KBD_KEY_GRAPH; last_special_key_dampen = 20;
+            }
+        }
         else if ((iTx >= 53)  && (iTx < 163))  kbd_key = ' ';
         else if ((iTx >= 163) && (iTx < 192))  kbd_key = KBD_KEY_KANA;
         else if ((iTx >= 192) && (iTx < 255))  return MENU_CHOICE_MENU;
@@ -1190,7 +1208,16 @@ void Hachibitto_main(void)
         {
             ShowDebugZ80();
         }
-
+        
+        if (ScrMode == 7)
+        {
+            if (!zoom_screen7) zoom_screen7 = 1;
+        }
+        else
+        {
+            zoom_screen7 = 0;
+        }
+        
         // ---------------------------------------------------------------------------------
         // Hold the key press for a brief instant... some machines take longer than others
         // (eg MSX needs to see the keypress for many tens of milliseconds)... This allows
@@ -1373,6 +1400,7 @@ void Hachibitto_main(void)
                 SaveNow=LoadNow = 0;
                 lastUN = 0;  dampenClick = 0;
                 last_kbd_key = 0;
+                if (dampen_zoom) dampen_zoom--;
             }
       }
 
@@ -1386,6 +1414,16 @@ void Hachibitto_main(void)
 
       JoyStickMap  = 0;
       nds_key  = keysCurrent();     // Get any current keys pressed on the NDS
+
+      // ----------------------------------------------------------------------
+      // If we are in Screen 7 'Zoom' mode, the L/R keys take on new meaning...
+      // ----------------------------------------------------------------------
+      if ((zoom_screen7 == 2) && (nds_key & (KEY_L | KEY_R)))
+      {
+            if (nds_key & KEY_R) {if (screen7Pan < 256) screen7Pan+=4;}
+            if (nds_key & KEY_L) {if (screen7Pan > 0) screen7Pan-=4;}
+            nds_key &= ~(KEY_L | KEY_R);
+      }
 
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
       {

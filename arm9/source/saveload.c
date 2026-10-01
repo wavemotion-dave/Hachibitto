@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0009  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x000A  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -261,6 +261,8 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&CurrentEpochSaved,     sizeof(CurrentEpochSaved),      1, handle);
         if (retVal) retVal = fwrite(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
         if (retVal) retVal = fwrite(&palette_latch,         sizeof(palette_latch),          1, handle);
+        if (retVal) retVal = fwrite(&zoom_screen7,          sizeof(zoom_screen7),           1, handle);
+        if (retVal) retVal = fwrite(&screen7Pan,            sizeof(screen7Pan),             1, handle);
         if (retVal) retVal = fwrite(OccBuf,                 sizeof(OccBuf),                 1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
@@ -486,6 +488,8 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&CurrentEpochSaved,     sizeof(CurrentEpochSaved),      1, handle);
             if (retVal) retVal = fread(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
             if (retVal) retVal = fread(&palette_latch,         sizeof(palette_latch),          1, handle);
+            if (retVal) retVal = fread(&zoom_screen7,          sizeof(zoom_screen7),           1, handle);
+            if (retVal) retVal = fread(&screen7Pan,            sizeof(screen7Pan),             1, handle);
             if (retVal) retVal = fread(OccBuf,                 sizeof(OccBuf),                 1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
