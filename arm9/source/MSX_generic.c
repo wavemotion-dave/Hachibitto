@@ -974,7 +974,8 @@ void SetDefaultGameConfig(void)
 
     if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
+        myConfig.musicExpand = 1;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "SLAYER") && strstr(initial_file_upper, "VI"))

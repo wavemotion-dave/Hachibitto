@@ -29,17 +29,21 @@ volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we r
 // Look up table for colors - pre-generated and in VRAM for maximum speed!
 u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
 
-u8 XPal[256]            __attribute__((section(".dtcm"))) = {0};
-u8 XPalReal0            __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
-u8 ALatch               __attribute__((section(".dtcm"))) = 0;
-u8 OH                   __attribute__((section(".dtcm"))) = 0;
-u8 IH                   __attribute__((section(".dtcm"))) = 0;
-u32 frame_number        __attribute__((section(".dtcm"))) = 0;
-u32 drawn_frame_number  __attribute__((section(".dtcm"))) = 0;
-u8 CurrentEpochSaved    __attribute__((section(".dtcm"))) = 0;
-u8 msx_irq_pending      __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
-u8 palette_latch        __attribute__((section(".dtcm"))) = 0;
-u8 frame_skip_mask[3]   __attribute__((section(".dtcm"))) = {0x00, 0x01, 0x03}; // None, Light, Aggressive
+u8 XPal[256]                __attribute__((section(".dtcm"))) = {0};
+u8 XPalReal0                __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
+u8 ALatch                   __attribute__((section(".dtcm"))) = 0;
+u8 OH                       __attribute__((section(".dtcm"))) = 0;
+u8 IH                       __attribute__((section(".dtcm"))) = 0;
+u32 frame_number            __attribute__((section(".dtcm"))) = 0;
+u32 drawn_frame_number      __attribute__((section(".dtcm"))) = 0;
+u8 CurrentEpochSaved        __attribute__((section(".dtcm"))) = 0;
+u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
+u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
+u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
+                            {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
+                            {1,0,1,0,1,0,1,0,   1,0,1,0,1,0,1,0},  // Light: 50% (every other frame drawn)
+                            {1,0,1,0,0,0,1,0,   0,0,1,0,0,0,1,0}   // Aggressive: 31.2% frames drawn
+                        };
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -1316,7 +1320,7 @@ ITCM_CODE void RefreshLine6(u8 uY)
         u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
         const u8 * restrict src = &ChrTab[addr & 0x7FFF];
 
-        if (drawn_frame_number & 1) // Render the B pixels
+        if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2)) // Render the B pixels
         {
             for (int i = 0; i < 128; i += 2)
             {
@@ -1375,7 +1379,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
         {
             u32 chunk0 = *s32++;
             u32 chunk1 = *s32++;
-            if (drawn_frame_number & 1) // Render the B pixels
+            if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2)) // Render the B pixels
             {
                 *dst32++ = (chunk0 & 0x0F0F0F0F);
                 *dst32++ = (chunk1 & 0x0F0F0F0F);
@@ -1757,14 +1761,9 @@ ITCM_CODE void Loop9938(void)
       u8 scan_sprites = 0;
 
       // ---------------------------------------------------------------
-      // On the DS-Lite/Phat, we have to frameskip every other frame...
+      // On the DS-Lite/Phat, we have to frameskip some frames...
       // ---------------------------------------------------------------
-      if (timingFrames & frame_skip_mask[myConfig.frameSkip])
-      {
-          skip_render  = 1; // This whole frame is skipped
-          scan_sprites = 1; // But we still need to scan sprites
-      }
-      else
+      if (frame_draw_mask[myConfig.frameSkip][timingFrames & 0xF])
       {
           // ---------------------------------------------------------------
           // We can only show 192 lines... so only refresh the line if the
@@ -1781,6 +1780,11 @@ ITCM_CODE void Loop9938(void)
           {
               scan_sprites = 1; // We still need to scan sprites
           }
+      }
+      else
+      {
+          skip_render  = 1; // This whole frame is skipped
+          scan_sprites = 1; // But we still need to scan sprites
       }
 
       // ----------------------------------------------------------
@@ -1817,7 +1821,7 @@ ITCM_CODE void Loop9938(void)
       // -------------------------------------
       // !!!Into the Vertical Blank!!!
       // -------------------------------------
-      if (!(timingFrames & frame_skip_mask[myConfig.frameSkip]))
+      if (frame_draw_mask[myConfig.frameSkip][timingFrames & 0xF])
       {
           drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
       }

@@ -2132,7 +2132,8 @@ void msxUpdateScreen(void)
 
     if (!skip_render)
     {
-        if (drawn_frame_number & 1)
+        // Alternate frame buffers except for aggressive skip (then just render into the A buffer)
+        if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2))
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
         else 
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);

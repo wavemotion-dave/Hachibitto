@@ -239,7 +239,7 @@ void fdc_state_machine(void)
                     FDC.status |= (ST_BUSY | ST_INDEX_DRQ);              // Data Ready and no errors... still busy
                     FDC.data = FDC.track_buffer[FDC.track_buffer_idx++]; // Read data from our track buffer
                     FDC.wait_for_read = 1;                               // Wait for the CPU to fetch the data
-                    FDC.busy_countdown = FDC_LOOPS_PER_BYTE;      // Pace the next byte
+                    FDC.busy_countdown = FDC_LOOPS_PER_BYTE;             // Pace the next byte
                     if (++FDC.sector_byte_counter >= Geom.sectorSize)    // Did we cross a sector boundary?
                     {
                         if (FDC.command & 0x10) FDC.sector++;       // Bump the sector number only if multiple sector command
@@ -380,14 +380,6 @@ void fdc_write(u8 addr, u8 data)
             FDC.data = data;                // Grab the data
             FDC.status &= ~ST_INDEX_DRQ;    // Clear Data Request
             FDC.wait_for_write = 0;
-            break;
-        case 4: //  D4h is Write-only. xxMSDDDD where Bit0 activates Drive A, Bit1 activates Drive B, etc.
-            FDC.drive = (data & 0x01 ? 0:1);
-            if (FDC.drive < Geom.drives) // Don't record the side/motor bits if this drive isn't valid for us
-            {
-                FDC.side  = (data & 0x10 ? 1:0);
-                FDC.motor = (data & 0x20 ? 1:0);
-            }
             break;
         default: break;
     }
