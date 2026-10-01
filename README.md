@@ -21,7 +21,7 @@ Features :
 * Standard PSG, 2x PSG, SCC, SCC+ and MSX-MUSIC available.
 * SRAM carts backed to SD card automatically.
 * Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!).
-* Arkanoid paddle controllers supported (only 2 games known to make use of it).
+* Arkanoid paddle controllers supported (only 2 games known to make use of it - hold B button to speed up paddle movement).
 * High Score saving for 10 scores with initials, date/time.
 * Favorites list so you can mark games as 'like' or 'love' - a yellow or red heart icon will mark your favorite games.
 * Solid Z80 core that passes the ZEXDOC test suite (covering everything except undocumented flags which are partially supported for the few games that need them).
@@ -56,6 +56,15 @@ Thanks to Flubba for the AY38910 and SCC sound cores. You can seek out his lates
 Also thanks to Marat Fayzullin, as the author of fMSX - which is where the CZ80 CPU core and initial VDP9938 handling came from.
 
 And Nishi.
+
+Options :
+-----------------------
+![Hachibitto Options](images/Options.png)
+
+Known Issues :
+-----------------------
+* MSX-MUSIC is vastly simplified processing so that it will run on the older DS hardware. Sound is passable but nowhere near authentic.
+* Lubeck with MSX-MUSIC enabled crashes. Reason is unknown.
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------
