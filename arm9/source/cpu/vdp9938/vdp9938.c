@@ -40,11 +40,33 @@ u8 CurrentEpochSaved        __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
 u16 screen7Pan              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
+u8 Screen8LineHasSprites    __attribute__((section(".dtcm"))) = 0;   // Sprite rendering on Scree 8 is expensive... track it
+
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
                             {1,0,1,0,1,0,1,0,   1,0,1,0,1,0,1,0},  // Light: 50% (every other frame drawn)
                             {1,0,1,0,0,0,1,0,   0,0,1,0,0,0,1,0}   // Aggressive: 31.2% frames drawn
                         };
+
+u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
+{
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
+      0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255
+};
 
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
@@ -543,6 +565,9 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 
   // Local copy is slightly faster than a global fetch...
   u8 CurrentEpoch = (++CurrentEpochSaved);
+  
+  // Assume no sprites until proven otherwise
+  Screen8LineHasSprites = 0;
 
   /* SPR_SET: unconditional overwrite (background OR earlier-sprite pixel),
      and record that this pixel now holds sprite data.
@@ -594,6 +619,9 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 
   /* Mark last checked sprite (9th in line, Y=216, or sprite #31) */
   VDPStatus[0]|=L<32? L:31;
+  
+  // Mark if Screen has any sprites for Screen 8 fast processing
+  Screen8LineHasSprites = (M != 0);
 
   u8 zeroNotTransparent = (VDP[8]&0x20); // Zero index is a real color.. we can use BG_PALETTE[16]
 
@@ -1383,32 +1411,22 @@ void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
      * spriteX is the doubled sprite origin minus the viewport pan.
      * The unsigned bounds checks reject negative coordinates too.
      */
-#define SPR_SET(n) do {                                      \
-    int _x = spriteX + ((n) << 1);                           \
+#define SPR_SET(n) do {                                     \
+    int _x = spriteX + ((n) << 1);                          \
     if ((unsigned)_x < 255u) {                              \
-        P[_x] = C; P[_x+1] = C;                            \
-        O[_x] = CurrentEpoch; O[_x+1] = CurrentEpoch;       \
-    }                                                        \
-} while (0)
-
-#define SPR_OR(n) do {                                       \
-    int _x = spriteX + ((n) << 1);                           \
-    if ((unsigned)_x < 255u) {                              \
-        if (O[_x] == CurrentEpoch) P[_x] |= C;               \
-        else { P[_x] = C; O[_x] = CurrentEpoch; }            \
-        if (O[_x+1] == CurrentEpoch) P[_x+1] |= C;           \
-        else { P[_x+1] = C; O[_x+1] = CurrentEpoch; }        \
-    }                                                        \
-} while (0)
-
-#define SPR_SET16(n) do {                                    \
-    int _x = spriteX + ((n) << 1);                           \
-    if ((unsigned)_x < 253u) {                              \
         P[_x] = C; P[_x+1] = C;                             \
-        P[_x+2] = C; P[_x+3] = C;                           \
         O[_x] = CurrentEpoch; O[_x+1] = CurrentEpoch;       \
-        O[_x+2] = CurrentEpoch; O[_x+3] = CurrentEpoch;     \
-    }                                                        \
+    }                                                       \
+} while (0)
+
+#define SPR_OR(n) do {                                      \
+    int _x = spriteX + ((n) << 1);                          \
+    if ((unsigned)_x < 255u) {                              \
+        if (O[_x] == CurrentEpoch) P[_x] |= C;              \
+        else { P[_x] = C; O[_x] = CurrentEpoch; }           \
+        if (O[_x+1] == CurrentEpoch) P[_x+1] |= C;          \
+        else { P[_x+1] = C; O[_x+1] = CurrentEpoch; }       \
+    }                                                       \
 } while (0)
 
     VDPStatus[0] &= ~0x5F;
@@ -1480,10 +1498,7 @@ void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
              * early-clock bit together determine the sprite's screen X.
              * Convert that coordinate to the zoomed source coordinate.
              */
-            spriteX =
-                ((int)AT[1] - ((C & 0x80) ? 32 : 0)) * 2
-                - (int)screen7Pan
-                + 32;                
+            spriteX = ((int)AT[1] - ((C & 0x80) ? 32 : 0)) * 2 - (int)screen7Pan + 32;                
 
             P = ZBuf;
             O = OccBuf;
@@ -1626,9 +1641,14 @@ void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
 
 #undef SPR_SET
 #undef SPR_OR
-#undef SPR_SET16
 }
 
+// -------------------------------------------------------------------------------------
+// Called only when the user has asked to zoom a Screen 7 mode. Not really playable
+// in this state since the aspect ratio will be stretched horizontally but can be
+// used to temporarily zoom in to read some bit of text or other hard to see area
+// that might have been difficult with rendering of 512 pixels down to 256 for the DS.
+// -------------------------------------------------------------------------------------
 ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
 {
     DEBUG_REFRESH(7);
@@ -1639,7 +1659,7 @@ ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
     }
     else
     {
-        uint8_t *P = RefreshBorder(uY);
+        uint16_t *P = (uint16_t *)RefreshBorder(uY);
 
         const u8 *src =
             ChrTab + (((int)(uY + VScroll) << 8) & ChrTabM & 0xFFFF);
@@ -1656,11 +1676,10 @@ ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
         {
             u8 v = src[i];
 
-            P[i * 2]     = (v >> 4) & 0x0F;
-            P[i * 2 + 1] = v & 0x0F;
+            P[i]     = ((v & 0x0F) << 8) | ((v >> 4) & 0x0F);
         }
 
-        ColorSprites_Zoomed(uY, P - 32);
+        ColorSprites_Zoomed(uY, (u8*)P - 32);
         CommitLine(uY);
     }
 }
@@ -1709,6 +1728,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
     }
 }
 
+
 /** RefreshLine8() ********************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap   **/
 /*************************************************************/
@@ -1716,26 +1736,53 @@ void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
     
-    // -------------------------------------------------------------------
-    // We purposely don't call RefreshLine() as we need the speed of a
-    // direct rendering into XBuf[]. This could cause problems if we
-    // have sprites that clip at the left edge... but what can you do?!
-    // It's unlikely there will be any kind of sprite tricks happening
-    // for the Screen 8 mode so we're probably okay. Emulation isn't easy.
-    // -------------------------------------------------------------------
     if (!ScreenON)
     {
       memset(XBuf + (uY<<8), XPal[BGColor], 256);
     }
     else
     {
-        uint16_t *P = (uint16_t *) (XBuf + (uY << 8));
+        uint8_t *P = RefreshBorder(uY);
         uint8_t *S = (uint8_t *) ChrTab+(((int)(uY+VScroll)<<8)&ChrTabM&0xFFFF);
         if (FlipEvenOdd && OddPage && VDP_Memory<=S-0x10000) S-=0x10000;
 
         memcpy(P, S, 256); // Blast all 256-pixels across into our destination buffer
 
-        ColorSprites(uY, XBuf + (uY << 8)-32);
+        ColorSprites(uY, P - 32);
+        
+        if (Screen8LineHasSprites)
+        {
+            u8 epoch = CurrentEpochSaved;
+            u8 *occ = OccBuf + 32;
+            u8 *pixels = P;
+            u32 *out = (u32 *)pixels;
+
+            for (int x = 0; x < 256; x += 4)
+            {
+                u32 b0 = pixels[x];
+                u32 b1 = pixels[x + 1];
+                u32 b2 = pixels[x + 2];
+                u32 b3 = pixels[x + 3];
+
+                if (occ[x] == epoch)
+                    b0 = Screen8SpriteByteLUT[b0];
+
+                if (occ[x + 1] == epoch)
+                    b1 = Screen8SpriteByteLUT[b1];
+
+                if (occ[x + 2] == epoch)
+                    b2 = Screen8SpriteByteLUT[b2];
+
+                if (occ[x + 3] == epoch)
+                    b3 = Screen8SpriteByteLUT[b3];
+
+                out[x >> 2] = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+            }
+        }
+        
+        u32 * restrict dst = (u32 *)(XBuf + ((u16)uY << 8));
+        const u8 * restrict src = (const u8 *)(LineScratch + LS_BASE);
+        memcpy(dst, src, 256);      
     }
 }
 
@@ -1869,6 +1916,9 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case 46: VDPDraw(value);break;
   }
 
+  // ---------------------------------------------------------------------------------------
+  // If any of the base registers change... check for new mode and recompute VRAM pointers.
+  // ---------------------------------------------------------------------------------------
   if (iReg <= 8) CheckNewMode();
 }
 
@@ -2156,7 +2206,7 @@ ITCM_CODE void Loop9938(void)
       
       // Get ready for the next frame... clear the sprite Occupancy buffer
       memset(OccBuf, 0, sizeof(OccBuf));
-      CurrentEpochSaved = 1;
+      CurrentEpochSaved = 0;  // Will be immediately incremented to 1 and so not match our cleared OccBuf[]
   }
 }
 
@@ -2192,8 +2242,7 @@ void Reset9938(void)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
-
-    BuildNibbleLUT();
+    CurrentEpochSaved = 0;                           // Will be immediately incremented to 1 and so not match our cleared OccBuf[]
 
     if (myConfig.machineType == MACHINE_MSX1)
     {
@@ -2244,6 +2293,7 @@ void Reset9938(void)
     // Our background/foreground color table makes computations FAST!
     // ---------------------------------------------------------------
     RebuildLutTablehh();
+    BuildNibbleLUT();
 }
 
 // End of file
