@@ -198,6 +198,7 @@ tScrMode SCR[MAXSCREEN+1] __attribute__((section(".dtcm")))  = {
   { RefreshLine6, 0x60,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 6:  512x192x4   */
   { RefreshLine7, 0x20,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 7:  512x192x16  */
   { RefreshLine8, 0x20,0x00,0x00,0xFC,0x1F,0x00,0x00,0x03 }, /* SCR 8:  256x192x256 */
+  { RefreshLine80,0x7C,0xF8,0x3F,0x00,0x03,0x07,0x00,0x00 }, /* SCR 0:  80 Columns  */
 };
 
 void (*RefreshLine)(u8 uY) __attribute__((section(".dtcm"))) = RefreshLine0;
@@ -1786,6 +1787,56 @@ void RefreshLine8(u8 uY)
     }
 }
 
+
+/** RefreshLine80() *******************************************/
+/** Refresh line Y (0..191) of SCREEN 0, 80-column text.     **/
+/** Each 6-pixel character is reduced to 3 output pixels.    **/
+/*************************************************************/
+void RefreshLine80(u8 Y)
+{
+    register u8 *T;
+    register u8 *P;
+    register u8 K;
+    register u8 Offset;
+    register u8 FC, BC;
+
+    DEBUG_REFRESH(9);
+
+    P = XBuf + (Y << 8);
+    BC = XPal[BGColor];
+    FC = XPal[FGColor];
+
+    if (!ScreenON)
+    {
+        memset(P, BC, 256);
+        return;
+    }
+
+    // Screen 80 has 80 characters per row, with 8 scanlines per character.
+    T = ChrTab + (Y >> 3) * 80;
+    Offset = Y & 0x07;
+
+    // The 480-pixel text line becomes 240 output pixels.
+    // Center it with the same 8-pixel borders used by Screen 0.
+    memset(P, BC, 8);
+    P += 8;
+
+    for (int X = 0; X < 80; X++)
+    {
+        K = ChrGen[((int)*T++ << 3) + Offset];
+
+        // Combine adjacent source pixels to retain thin glyph strokes.
+        // The six glyph pixels are bits 7..2 of the pattern byte.
+        P[0] = (K & 0xC0) ? FC : BC;
+        P[1] = (K & 0x30) ? FC : BC;
+        P[2] = (K & 0x0C) ? FC : BC;
+
+        P += 3;
+    }
+
+    memset(P, BC, 8);
+}
+
 /*********************************************************************************
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'
  ********************************************************************************/
@@ -1820,7 +1871,7 @@ void CheckNewMode(void)
     case 0x04: newMode=6;break;
     case 0x05: newMode=7;break;
     case 0x07: newMode=8;break;
-    case 0x12: newMode=0;break; // Really 80 columns but ...
+    case 0x12: newMode=9;break; // Screen 0 with 80 columns... not REALLY screen 9
     default:   newMode=ScrMode;break;
   }
 

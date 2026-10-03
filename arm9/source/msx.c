@@ -69,20 +69,33 @@ static uint8_t rtc_bank = 0;      // Active bank selected by Reg 13 (0-3)
 
 // Complete 4-bank RAM array initialized with valid MSX2 checksums
 static uint8_t rtc_ram[4][16] = {
-    // Bank 0: Time/Date & Mode Regs
+    // Bank 0: Time & Date Tracking
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 },
 
-    // Bank 1: Screen Mode / Colors (60Hz / NTSC Setup)
-    // Index 9 is set to 0x00 (forcing 60Hz / NTSC)
-    // Other indices define default foreground, background, border colors, and text width (e.g., 80 chars)
-    { 0x0F, 0x04, 0x04, 0x01, 0x00, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0, 0 },
+    // Bank 1: Alarm Settings (Do not place System/Screen settings here)
+    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0, 0, 0 },
 
-    // Bank 2: Palette Data + Valid MSX2 ROM Checksum in Reg 12/13
+    // Bank 2: MSX system initialization settings
+    {
+        0x0A,  // Reg 0: RTC settings valid — REQUIRED
+        0x00,  // Reg 1: X adjust
+        0x00,  // Reg 2: Y adjust
+        0x00,  // Reg 3: SCREEN 0, normal display
+        0x08,  // Reg 4: WIDTH low nibble
+        0x02,  // Reg 5: WIDTH high bits (40 columns)
+        0x0F,  // Reg 6: Initial text color
+        0x04,  // Reg 7: Initial background color
+        0x04,  // Reg 8: Initial border color
+        0x00,  // Reg 9: Default transfer/keyboard options
+        0x00,  // Reg 10: BEEP settings
+        0x00,  // Reg 11: Startup logo colors
+        0x01,  // Reg 12: Area code (US)
+        0x00, 0x00, 0x00
+    },
+    
+    // Bank 3: Color Palette Settings + General Validation Checksums
     { 0x04, 0x04, 0x07, 0x05, 0x02, 0x02, 0x07, 0x07,
-      0x01, 0x01, 0x03, 0x03, 0x08, 0x05, 0x00, 0x00 },
-
-    // Bank 3: Extended Flags
-    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 }
+      0x01, 0x01, 0x03, 0x03, 0x08, 0x05, 0x00, 0x00 }
 };
 
 // WRITE PORT 0xB4: Selects Register Index ONLY

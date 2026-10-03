@@ -3,7 +3,7 @@
 
 #include <nds.h>
 
-#define MAXSCREEN           8   // Highest screen mode supported
+#define MAXSCREEN           9   // Highest screen mode supported
 
 #define VDP9938_BASE        10738635    // Standard 3.58 Mhz
 
@@ -79,6 +79,7 @@ extern void RefreshLine5(u8 uY);
 extern void RefreshLine6(u8 uY);
 extern void RefreshLine7(u8 uY);
 extern void RefreshLine8(u8 uY);
+extern void RefreshLine80(u8 uY);
 extern void RefereshPreviousLine(void);
 extern void ScanColorSprites(uint8_t Y);
 extern void vdp_9938_write_palette(u8 index, u8 color_grb);
