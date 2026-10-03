@@ -58,7 +58,6 @@ volatile u32 dsVSyncCount = 0;  // So compiler doesn't cache this as it changes 
 u32 last_vsync_count    __attribute__((section(".dtcm"))) = 0xFEEDBEEF;
 s8  temp_offset         __attribute__((section(".dtcm"))) = 0;
 u8  slide_dampen        __attribute__((section(".dtcm"))) = 0;
-u8  DelayFirstOutput    __attribute__((section(".dtcm"))) = 0;
 u8  bFirstSoundOutput   __attribute__((section(".dtcm"))) = 1;
 u8  skip_render         __attribute__((section(".dtcm"))) = 0;
 u8  zoom_screen7        __attribute__((section(".dtcm"))) = 0;
@@ -116,7 +115,7 @@ u8 kbd_keys[12]      __attribute__((section(".dtcm")));           // Up to 12 po
 
 u8 bStartSoundEngine = false;  // Set to true to unmute sound after 1 frame of rendering...
 int bg0, bg1, bg0b, bg1b;      // Some vars for NDS background screen handling
-volatile u16 vusCptVBL  = 0;   // We use this as a basic timer for the Mario sprite... could be removed if another timer can be utilized
+volatile u16 vusCptVBL  = 0;   // We use this as a basic timer for the random screenshots shown
 u8 touch_debounce       = 0;   // A bit of touch-screen debounce
 u8 key_debounce         = 0;   // A bit of key debounce
 u8 msx_caps_lock        = 0;   // Set to 1 when MSX caps lock is active
@@ -316,9 +315,8 @@ void SmoothStartSound(mm_word len, mm_addr dest)
         memset(mixbuf2, 0x00, len*2); // Nothing more to mix...
     }
 
-    // >>1 instead of /2 - signed division makes GCC emit sign-correction
-    // code even for a constant divisor of 2; a plain shift is one instruction.
-    s32 sound_sample = ((s32)mixbuf2[256]);
+    // Grab the last sample...
+    s32 sound_sample = ((s32)mixbuf2[(len*2)-1]);
 
     // Same cost as the old >>1 attenuation - just a different shift amount,
     // so this loudness fix is free relative to what you had.
@@ -528,24 +526,24 @@ void sound_chip_reset()
     ay38910Reset(&myAY);             // Reset the "AY" sound chip
     ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
-    ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to clear the output
+    ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to prime the output
 
     ay38910Reset(&myAY2);             // Reset the 2xPSG "AY" sound chip
     ay38910IndexW(0x07, &myAY2);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY2);       // All OFF (negative logic)
-    ay38910Mixer(8, mixbuf2, &myAY2); // Do an initial mix conversion to clear the output
+    ay38910Mixer(8, mixbuf2, &myAY2); // Do an initial mix conversion to prime the output
 
     // -----------------------------------------------------------------
     // The SCC sound chip is just for a few select Konami MSX1 games
     // -----------------------------------------------------------------
     SCCReset(&mySCC);
-    SCCMixer(16, mixbuf2, &mySCC);     // Do an initial mix conversion to clear the output
+    SCCMixer(8, mixbuf2, &mySCC);     // Do an initial mix conversion to prime the output
 
     // -----------------------------------------------------------------
     // The YM2413 chip is the MSX MUSIC standard for late-era games...
     // -----------------------------------------------------------------
     YMReset(&myYM);
-    YMMixer(16, mixbuf2, &myYM);   // Do an initial mix conversion to clear the output
+    YMMixer(8, mixbuf2, &myYM);       // Do an initial mix conversion to prime the output
 }
 
 // -----------------------------------------------------------------------
@@ -1140,8 +1138,6 @@ void Hachibitto_main(void)
   // Force the sound engine to turn on when we start emulation
   bStartSoundEngine = true;
 
-  DelayFirstOutput = (myConfig.machineType == MACHINE_MSX1 ? 0:140); // Number of frames to skip before first output to the screen (1.4 seconds)
-
   // -------------------------------------------------------------------
   // Stay in this loop running the MSX game until the user exits...
   // -------------------------------------------------------------------
@@ -1178,7 +1174,8 @@ void Hachibitto_main(void)
             DisplayStatusLine(false);
             emuActFrames = 0;
         }
-        emuActFrames++;
+        
+        emuActFrames++; // This one can go above or below 60... used for FPS calculation
 
         // ---------------------------------------------
         // We only support NTSC 60 frames per second...
@@ -1209,6 +1206,7 @@ void Hachibitto_main(void)
             ShowDebugZ80();
         }
         
+        // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
         if (ScrMode == 7)
         {
             if (!zoom_screen7) zoom_screen7 = 1;
@@ -1287,7 +1285,6 @@ void Hachibitto_main(void)
                           if (showMessage("DO YOU REALLY WANT TO", "RESET THE CURRENT GAME ?") == ID_SHM_YES)
                           {
                               memset((u8*)0x06000000, 0x00, 0x40000); // Ensure screen is clear...
-                              DelayFirstOutput = 145; // Number of frames to skip before first output to the screen (1 second)
                               ResetMSX();
                           }
                           BottomScreenKeypad();
@@ -1422,7 +1419,7 @@ void Hachibitto_main(void)
       {
             if (nds_key & KEY_R) {if (screen7Pan < 256) screen7Pan+=4;}
             if (nds_key & KEY_L) {if (screen7Pan > 0) screen7Pan-=4;}
-            nds_key &= ~(KEY_L | KEY_R);
+            nds_key &= ~(KEY_L | KEY_R); // We lose the ability for normal handling of these keys
       }
 
       if ((nds_key & KEY_L) && (nds_key & KEY_R) && (nds_key & KEY_X))
@@ -1466,7 +1463,7 @@ void Hachibitto_main(void)
       }
       else if  (nds_key & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_START | KEY_SELECT | KEY_R | KEY_L | KEY_X | KEY_Y))
       {
-          if (myConfig.dpad == DPAD_ARKANOID)
+          if (myConfig.dpad == DPAD_ARKANOID) // This is a paddle controller and we nudge the position with left/right
           {
               if (nds_key & KEY_LEFT)  update_arkanoid_paddle_position(0, (nds_key & KEY_B) ? 10:5);
               if (nds_key & KEY_RIGHT) update_arkanoid_paddle_position(1, (nds_key & KEY_B) ? 10:5);
@@ -1581,7 +1578,7 @@ void Hachibitto_main(void)
               }
           }
       }
-      else
+      else // Nothing pressed... let slide-n-glide counters drift down
       {
           if (slide_n_glide_key_up)    slide_n_glide_key_up--;
           if (slide_n_glide_key_down)  slide_n_glide_key_down--;
@@ -2162,12 +2159,6 @@ u8 msxInit(char *szGame)
  ********************************************************************************/
 void msxUpdateScreen(void)
 {
-    if (DelayFirstOutput)
-    {
-        DelayFirstOutput--;
-        return;
-    }
-
     if (!skip_render)
     {
         // Alternate frame buffers except for aggressive skip (then just render into the A buffer)

@@ -14,7 +14,7 @@
 /**  - VDP Command execution 'in parallel' with CPU         **/
 /**  - Corrected behaviour of VDP commands                  **/
 /**  - Made it easier to implement correct S7/8 mapping     **/
-/**    by concentrating VDP_Memory access in one single place     **/
+/**    by concentrating VDP_Memory access in one single place **/
 /**  - Made use of the 'in parallel' VDP command exec       **/
 /**    and correct timing. You must call the function       **/
 /**    LoopVDP() from LoopZ80 in MSX.c. You must call it    **/
@@ -117,7 +117,7 @@ static struct {
   uint8_t CL;
   uint8_t LO;
   uint8_t CM;
-} MMC;
+} MMC __attribute__((section(".dtcm")));
 
 /*************************************************************/
 /** Function prototypes                                     **/
@@ -164,11 +164,11 @@ static void HmmcEngine(void);
 /*************************************************************/
 /** Variables visible only in this module                   **/
 /*************************************************************/
-static uint8_t Mask[4] = { 0x0F,0x03,0x0F,0xFF };
-static int  PPB[4]  = { 2,4,2,1 };
-static int  PPL[4]  = { 256,512,512,256 };
-static int  VdpOpsCnt=1;
-static void (*VdpEngine)(void)=0;
+static uint8_t Mask[4]          __attribute__((section(".dtcm"))) = { 0x0F,0x03,0x0F,0xFF } ;
+static int  PPB[4]              __attribute__((section(".dtcm"))) = { 2,4,2,1 };
+static int  PPL[4]              __attribute__((section(".dtcm"))) = { 256,512,512,256 };
+static int  VdpOpsCnt           __attribute__((section(".dtcm"))) = 1;
+static void (*VdpEngine)(void)  __attribute__((section(".dtcm"))) = 0;
 
                       /*  SprOn SprOn SprOf SprOf */
                       /*  ScrOf ScrOn ScrOf ScrOn */

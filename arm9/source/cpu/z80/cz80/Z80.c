@@ -29,28 +29,18 @@
 #include "../Z80_interface.h"
 #include "../../../printf.h"
 
-extern u32 JoyState;;
-extern u8 kbd_key;
-
 extern Z80 CPU;
 extern void debug_printf(const char * str, ...);
 u32 halt_counter=0;
 extern u32 debug[];
 extern u32 DX, DY;
-
-#define INLINE static inline
+extern u8 *MemoryMap[8];
 
 /** System-Dependent Stuff ***********************************/
 /** This is system-dependent code put here to speed things  **/
 /** up. It has to stay inlined to be fast.                  **/
 /*************************************************************/
 
-extern u8 *MemoryMap[8];
-
-// ------------------------------------------------------
-// These defines and inline functions are to map maximum
-// speed/efficiency onto the memory system we have.
-// ------------------------------------------------------
 inline byte OpZ80(u32 A)    {return (MemoryMap[A>>13][A]);}
 inline byte RdZ80(word A)   {if (!special_memory_access) return (MemoryMap[A>>13][A]); else return cpu_readmem16(A);}
 #define     WrZ80(A,V)       cpu_writemem16(A,V)

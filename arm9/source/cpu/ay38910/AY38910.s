@@ -361,6 +361,14 @@ ay38910RegFR:
 portBInDummy:
 	ldrb r0,[r2,#ayPortBIn]
 	bx lr
+    
+#ifdef NDS
+	.section .itcm, "ax", %progbits		;@ For the NDS ARM9
+#elif GBA
+	.section .iwram, "ax", %progbits	;@ For the GBA
+#else
+	.section .text
+#endif
 ;@----------------------------------------------------------------------------
 calculateVolumes:			;@ r2 = ayptr, r11 = attenuation
 ;@----------------------------------------------------------------------------

@@ -32,20 +32,13 @@
 #define YM_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
 #define YM_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
                                              // full on key-on - ~16 samples (~0.6ms), fast/click-free
-#define YM_RELEASE_STEP            3984      // MELODIC release rate: 16.16 fixed-point step targeting a
-                                             // ~150ms fade to silence on key-off, not an instant cutoff.
-                                             // This is the fix for FM music sounding "thin"/"cut" - real FM
-                                             // pieces lean on overlapping decay tails for their fullness
-                                             // (unlike AY music, which doesn't use per-note envelopes at
-                                             // all), and cutting every note off in <1ms removed exactly
-                                             // that. Retune this constant if it still isn't right - up
-                                             // for a lusher/longer tail, down if notes start blurring
-                                             // together too much.
-#define YM_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
-                                             // Real drums (hi-hat especially) decay in tens of ms, not
-                                             // hundreds - using the melodic rate here made consecutive
-                                             // hits overlap instead of sounding like distinct hits.
 
+#define YM_RELEASE_STEP            3500      // MELODIC release rate: lower = longer/lusher
+                                             // tail; higher = faster fade and less overlap.
+
+#define YM_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: higher = faster decay
+                                             // for more distinct drum hits.
+                                             
 /* Carrier sustain level test: map OPLL SL to the same approximate gain
    levels used by the earlier envelope experiment, but move toward the target
    very slowly.  V0 key-on/release behavior remains otherwise unchanged. */
@@ -54,13 +47,7 @@ static const u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
     255, 181, 128, 90, 64, 45, 32, 22,
      16,  11,   8,  5,  4,  2,  1,  0
 };
-#define YM_SUSTAIN_TICK_SAMPLES 64
-                            // PERCUSSION release rate: ~30ms, NOT the melodic 150ms.
-                            // Real drums (hi-hat especially) decay in tens of ms, not
-                            // hundreds - using the melodic rate here made consecutive
-                            // hits (fired every 100-150ms in a normal rhythm pattern)
-                            // overlap and blend continuously instead of sounding like
-                            // distinct hits. Applies to BD/TOM and HH/SD/TOP-CY alike.
+#define YM_SUSTAIN_TICK_SAMPLES 64  // Samples between sustain-level gain reductions
 
 #define YM_OUT_SHIFT  8     // Output headroom for everything - melodic channels AND
                             // percussion now both go through YM_SinTable via real
@@ -102,6 +89,32 @@ static const s8 YM_SinTable[256] __attribute__((section(".dtcm"))) =
     -116, -116, -116, -115, -114, -112, -110, -108, -106, -104, -102, -101,  -99,  -98,  -97,  -96,
      -96,  -96,  -97,  -98,  -99, -101, -104, -107, -110, -113, -116, -119, -121, -124, -125, -127,
     -127, -127, -125, -123, -119, -115, -109, -102,  -94,  -85,  -75,  -64,  -52,  -39,  -27,  -13,
+};
+
+/*
+ * Pure sine-wave lookup table for FM carrier generation.
+ * Blended with YM_SinTable to reduce excessive harmonic content
+ * and produce a smoother, less shrill tone. Stored in DTCM
+ * for fast access during DSi audio mixing.
+ */
+static const s8 YM_CarrierSineTable[256] __attribute__((section(".dtcm"))) =
+{
+      0,   3,   6,   9,  12,  16,  19,  22,  25,  28,  31,  34,  37,  40,  43,  46,
+     49,  51,  54,  57,  60,  63,  65,  68,  71,  73,  76,  78,  81,  83,  85,  88,
+     90,  92,  94,  96,  98, 100, 102, 104, 106, 108, 109, 111, 112, 114, 115, 117,
+    118, 119, 120, 121, 122, 123, 124, 125, 125, 126, 126, 127, 127, 127, 127, 127,
+    127, 127, 127, 127, 127, 126, 126, 125, 125, 124, 123, 122, 121, 120, 119, 118,
+    117, 115, 114, 112, 111, 109, 108, 106, 104, 102, 100,  98,  96,  94,  92,  90,
+     88,  85,  83,  81,  78,  76,  73,  71,  68,  65,  63,  60,  57,  54,  51,  49,
+     46,  43,  40,  37,  34,  31,  28,  25,  22,  19,  16,  12,   9,   6,   3,   0,
+      0,  -3,  -6,  -9, -12, -16, -19, -22, -25, -28, -31, -34, -37, -40, -43, -46,
+    -49, -51, -54, -57, -60, -63, -65, -68, -71, -73, -76, -78, -81, -83, -85, -88,
+    -90, -92, -94, -96, -98,-100,-102,-104,-106,-108,-109,-111,-112,-114,-115,-117,
+   -118,-119,-120,-121,-122,-123,-124,-125,-125,-126,-126,-127,-127,-127,-127,-127,
+   -127,-127,-127,-127,-127,-126,-126,-125,-125,-124,-123,-122,-121,-120,-119,-118,
+   -117,-115,-114,-112,-111,-109,-108,-106,-104,-102,-100, -98, -96, -94, -92, -90,
+    -88, -85, -83, -81, -78, -76, -73, -71, -68, -65, -63, -60, -57, -54, -51, -49,
+    -46, -43, -40, -37, -34, -31, -28, -25, -22, -19, -16, -12,  -9,  -6,  -3,   0
 };
 
 //@----------------------------------------------------------------------------
@@ -480,7 +493,14 @@ static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, u8 volume, u
 
     s32 modIndex = (mod * depth) >> 8;
 
-    s32 carrier = YM_SinTable[((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF];
+    u32 carrierIndex =
+    ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
+
+    s32 originalCarrier = YM_SinTable[carrierIndex];
+    s32 sineCarrier = YM_CarrierSineTable[carrierIndex];
+
+    /* 3/8 original waveform + 5/8 sine */
+    s32 carrier = sineCarrier + (((originalCarrier - sineCarrier) * 3) >> 3);
 
     return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
 }
@@ -1126,3 +1146,5 @@ void YMMixerFast(int len, s16 *dest, YM *chip)
         }
     }
 }
+
+// End of file

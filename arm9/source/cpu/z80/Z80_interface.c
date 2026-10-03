@@ -620,10 +620,10 @@ static inline void SCCPlus_MapWindow(u8 idx, u8 page)
     MemoryMap[idx]  = MSXCartPtr[idx] - (0x2000 * idx);
 }
 
-// -----------------------------------------------------------------
-// No more "magic value" trick - just records the page and remaps.
+// ------------------------------------------------------------------------
+// When SCC+ switches banks, records the page and remap memory accordingly.
 // Only reached when the relevant window is NOT in forced-RAM mode.
-// -----------------------------------------------------------------
+// ------------------------------------------------------------------------
 void HandleSCCPlusBankSelect(u16 address, u8 value)
 {
     switch (address & 0xF000)

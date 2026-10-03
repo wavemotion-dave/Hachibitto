@@ -1649,7 +1649,7 @@ void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
 // used to temporarily zoom in to read some bit of text or other hard to see area
 // that might have been difficult with rendering of 512 pixels down to 256 for the DS.
 // -------------------------------------------------------------------------------------
-ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
+void RefreshLine7_Zoomed(u8 uY)
 {
     DEBUG_REFRESH(7);
 
@@ -1676,7 +1676,7 @@ ITCM_CODE void RefreshLine7_Zoomed(u8 uY)
         {
             u8 v = src[i];
 
-            P[i]     = ((v & 0x0F) << 8) | ((v >> 4) & 0x0F);
+            P[i] = ((v & 0x0F) << 8) | ((v >> 4) & 0x0F);
         }
 
         ColorSprites_Zoomed(uY, (u8*)P - 32);

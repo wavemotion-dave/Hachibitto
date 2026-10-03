@@ -1165,6 +1165,8 @@ void SetDefaultGameConfig(void)
 // ----------------------------------------------------------
 void LoadConfig(void)
 {
+    u8 bInitDatabase = 0;
+    
     preserveCompressedMem();
 
     // -----------------------------------------------------------------
@@ -1176,22 +1178,24 @@ void LoadConfig(void)
     if (ReadFileCarefully("/data/Hachibitto.dat", (u8*)&myGlobalConfig, sizeof(myGlobalConfig), 0))  // Read Global Config
     {
         int comp_len = 0;
-        ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig)); // Read the full game array of configs
-        ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len)); // Read the full game array of configs
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig)); // Read the full game array of configs (compressed length)
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len)); // Read the full game array of configs (actual data)
         (void)lzav_decompress( COMPRESS_BUFFER, AllConfigs, comp_len, sizeof(AllConfigs) );
 
+        // If our config version changed... we init the entire database
         if (myGlobalConfig.config_ver != CONFIG_VER)
         {
-            memset(&AllConfigs, 0x00, sizeof(AllConfigs));
-            SetDefaultGameConfig();
-            SetDefaultGlobalConfig();
-            SaveConfig(FALSE);
+            bInitDatabase = 1;
         }
     }
     else    // Not found... init the entire database...
     {
+        bInitDatabase = 1;
+    }
+    
+    if (bInitDatabase)
+    {
         memset(&AllConfigs, 0x00, sizeof(AllConfigs));
-
         SetDefaultGameConfig();
         SetDefaultGlobalConfig();
         SaveConfig(FALSE);
@@ -1250,7 +1254,7 @@ const struct options_t Option_Table[1][20] =
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,           4},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,       3},
-        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC PLUS", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
+        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC+ (SCC-I)", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
         {"BEEPER",         {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.beeper,         2},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},

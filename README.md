@@ -93,6 +93,13 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.1 - 03-Oct-2026 by wavemotion-dave
+* Improved speed across the board.
+* Fixed screen 8 sprite colors.
+* Improved MSX-MUSIC on DSi ... still far from perfect.
+* Screen 7 Zoom-and-Pan mode added (magnifying glass).
+* Other cleanups and improvements as time permitted.
+
 Version 1.0 - 29-Sep-2026 by wavemotion-dave
 * First major version released.
 * Hotfix 1.0a with fix for Save Config on DS-Lite/Phat.
