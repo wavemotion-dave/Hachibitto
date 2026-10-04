@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x000A  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x000B  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -75,6 +75,7 @@ void msxSaveState(void)
 {
     size_t retVal = 0;
     u32 pSvg;
+    u8 spare = 0;
 
     // Put up a cool little saving data icon...
     DSPrint(20,0, 2, "-./");
@@ -271,6 +272,11 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
         if (retVal) retVal = fwrite(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
         if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);        
+        if (retVal) retVal = fwrite(&render_blended,        sizeof(render_blended),         1, handle);
+        if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
+        if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
+        if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
+        if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         
         // -----------------------------------------------------------------------
         // Compress the 128K RAM data using 'high' compression ratio...
@@ -307,7 +313,7 @@ void msxSaveState(void)
     DSPrint(20,0, 0, "   ");
     DSPrint(20,1, 0, "   ");
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
-    DisplayStatusLine(true);
+    DisplayStatusLine();
 }
 
 
@@ -318,6 +324,7 @@ void msxLoadState(void)
 {
     u32 pSvg;
     size_t retVal = 0;
+    u8 spare = 0;
 
     // Put up a cool little restore data icon...
     DSPrint(20,0, 2, "*+,");
@@ -498,6 +505,11 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
             if (retVal) retVal = fread(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
             if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);        
+            if (retVal) retVal = fread(&render_blended,        sizeof(render_blended),         1, handle);
+            if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
+            if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
+            if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
+            if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
 
             // -----------------------------------------------------------------------
             // Restore Main RAM memory which was saved in a compressed format
@@ -534,7 +546,7 @@ void msxLoadState(void)
     DSPrint(20,0, 0, "   ");
     DSPrint(20,1, 0, "   ");
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
-    DisplayStatusLine(true);
+    DisplayStatusLine();
 }
 
 // End of file

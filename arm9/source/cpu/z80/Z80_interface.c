@@ -714,14 +714,14 @@ void HandleSCCPlus(u16 address, u8 value)
 // ------------------------------------------------------------------
 ITCM_CODE void cpu_writemem16(u16 address, u8 value)
 {
-    if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
-    {
-        MemoryMap[address>>13][address]=value;
-    }
-    else if ((special_memory_access & SPEC_MEM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
+    if ((special_memory_access & SPEC_MEM_SUBSLOT_ACTIVE) && (address == 0xFFFF)) // Subslot check... only when page 3 is mapped to an expanded slot
     {
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+    }
+    else if (bRAMInPage[address >> 14]) // RAM Exists in this slot... write it.
+    {
+        MemoryMap[address>>13][address]=value;
     }
     else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF8) && (address <= 0x7FFF)) // Disk controller memory map...
     {

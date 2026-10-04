@@ -144,7 +144,7 @@ alpha_kbd.s alpha_kbd.h : alpha_kbd.png
 msx_kbd.s msx_kbd.h : msx_kbd.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
-msx_kbd_ja.s msx_kbd.h : msx_kbd_ja.png
+msx_kbd_ja.s msx_kbd_ja.h : msx_kbd_ja.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
 debug_ovl.s debug_ovl.h : debug_ovl.png

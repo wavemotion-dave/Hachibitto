@@ -914,13 +914,13 @@ void SetDefaultGameConfig(void)
     myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.yOffset      = 0;                           // Default is no Y offset
-    myConfig.musicExpand  = 0;                           // Default is no expansion. 1=MSX-MUSIC, 2=SCC+
+    myConfig.musicExpand  = MUSIC_PSG;                   // Default is no expansion (normal PSG sound)
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
     myConfig.maskBorders  = 0;                           // No border masking by default
-    myConfig.beeper       = 0;                           // Beeper disabled
     myConfig.frameSkip    = (isDSiMode() ? 0:1);         // Frame Skip is disabled on DSi and above
+    myConfig.reserved1    = 0;
     myConfig.reserved2    = 0;
     myConfig.reserved3    = 0;
     myConfig.reserved4    = 0;
@@ -948,7 +948,7 @@ void SetDefaultGameConfig(void)
     // -------------------------------------------------------------------------------------------------------------
     if (strstr(initial_file_upper, "SNATCHER"))
     {
-        myConfig.musicExpand = 2;   // Enable SCC+
+        myConfig.musicExpand = MUSIC_SCC;   // Enable SCC+
         if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
     }
 
@@ -957,185 +957,190 @@ void SetDefaultGameConfig(void)
         if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
     }
 
+    if (strstr(initial_file_upper, "LUBECK"))
+    {
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
+    }
+
     if (strstr(initial_file_upper, "XAK"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if (strstr(initial_file_upper, "Aleste"))
     {
-        if (!isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (!isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "Monogatari"))
     {
-        if (!isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (!isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
     {
         if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "SLAYER") && strstr(initial_file_upper, "VI"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
     
     if (strstr(initial_file_upper, "GOLVELLIUS 2") || strstr(initial_file_upper, "GOLVELLIUS II"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "ILLUSION") && strstr(initial_file_upper, "CITY"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "SUPER") && strstr(initial_file_upper, "COOKS"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "PSYCH") && strstr(initial_file_upper, "WORLD"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "BLADE") && strstr(initial_file_upper, "LORDS"))
     {
-        myConfig.musicExpand = 0;   // The poor-man msx-music sounds terrible with this one.
+        myConfig.musicExpand = MUSIC_PSG;   // The poor-man msx-music sounds terrible with this one.
     }
 
     if (strstr(initial_file_upper, "MAD") && strstr(initial_file_upper, "HOUSE"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
     
     if (strstr(initial_file_upper, "DAIKOUKAI") && strstr(initial_file_upper, "JIDAI"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "DEAD") && strstr(initial_file_upper, "BRAIN"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "EUROPE") && strstr(initial_file_upper, "WAR"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "FAMILY") && strstr(initial_file_upper, "STADIUM"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "FLEET") && strstr(initial_file_upper, "COMMANDER 2"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "GAMBLER") && strstr(initial_file_upper, "JIKICHUSHINPA"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "MAISON") && strstr(initial_file_upper, "IKKOKU"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "EMERALD") && strstr(initial_file_upper, "DRAGON"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "PENGUIN-KUN") && strstr(initial_file_upper, "WARS"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "BLASTER") && strstr(initial_file_upper, "BURN"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "LAYDOCK") && strstr(initial_file_upper, "LAST"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "BUSHOUHUUNROKU"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "SENKOKUGUNYUDEN"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "FARDRAUT"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "SUIKODEN"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "PAC-MANIA"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "GENCHOHISI"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "QUINPL"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "UNDEADLINE"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "CRIMSON"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "FEEDBACK"))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "FAMICLE"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if ((strstr(initial_file_upper, "MASTER 3")) || (strstr(initial_file_upper, "MASTER3")) || (strstr(initial_file_upper, "MASTER III")))
     {
-        if (isDSiMode()) myConfig.musicExpand = 1;   // Enable MSX MUSIC (only DSi or above)
+        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
     }
 
     if (strstr(initial_file_upper, "SINGULAR") && strstr(initial_file_upper, "STONE"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC
     }
 
     if (strstr(initial_file_upper, "FRAY"))
     {
-        myConfig.musicExpand = 1;   // Enable MSX MUSIC (DS-Lite can handle this one)
+        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
     }
 
     if (strstr(initial_file_upper, "ARKANOID"))
@@ -1247,15 +1252,14 @@ const struct options_t Option_Table[1][20] =
     {
         {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
                             "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                              &myConfig.msxMapper,      19},
-        {"MACHINE TYPE",   {"MSX2 - TYPE A", "MSX2 - TYPE B", "MSX1 - LEGACY"},                                                                                                 &myConfig.machineType,    3},
+        {"MACHINE TYPE",   {"MSX2 - NORMAL", "MSX1 - LEGACY"},                                                                                                                  &myConfig.machineType,    2},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
         {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,     2},
         {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,           4},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,       3},
-        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC+ (SCC-I)", "2x PSG"},                                                                                                         &myConfig.musicExpand,    4},
-        {"BEEPER",         {"DISABLED", "ENABLED"},                                                                                                                             &myConfig.beeper,         2},
+        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC+ (SCC-I)", "2x PSG", "BEEPER"},                                                                                           &myConfig.musicExpand,    5},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},

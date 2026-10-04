@@ -27,9 +27,8 @@
 #include "teenysha1.h"
 
 #define SPEC_NONE           0x00        // No special attributes
-#define SPEC_SLOTB          0x01        // Game requires Slot Type B
-#define SPEC_MSX1           0x02        // Game requires strict MSX1
-#define SPEC_BEEP           0x04        // Game uses the MSX Beeper
+#define SPEC_MSX1           0x01        // Game requires strict MSX1
+#define SPEC_BEEP           0x02        // Game uses the MSX Beeper
 
 typedef struct {
     char *sha1;
@@ -4252,7 +4251,7 @@ const ROM_DB_t ROM_DB[] =
   {"6e15b3d92191bf2c5ff07435c9849e31dad3ed1e", SPEC_NONE,  MIRRORED},
   {"6e17820a4d2a7d3896175559591fb8c922eb457d", SPEC_NONE,  ASC16},
   {"6e17ee44d62f57be20177a692319e4da14be572f", SPEC_NONE,  MIRRORED},
-  {"6e1d2d5b0688860b0a04d53fe9e5e3939dfba547", SPEC_SLOTB, ASC8SRAM8},
+  {"6e1d2d5b0688860b0a04d53fe9e5e3939dfba547", SPEC_NONE,  ASC8SRAM8},
   {"6e1e133d75ad56f1309f5e2b8c31a8e915323b73", SPEC_NONE,  ASC16},
   {"6e2597e3dd2558043550a4307d01426998136722", SPEC_NONE,  SCC8},
   {"6e2e1a28c4647eab94d6ed394e0be82f5f3d3bf6", SPEC_NONE,  SCC8},
@@ -6120,7 +6119,7 @@ const ROM_DB_t ROM_DB[] =
   {"a2494b1ade772fe45779bd500139ff847dfe7afa", SPEC_NONE,  PAGE23},
   {"a25f9b813c4488c73c5f54055748b4dbb057c2e9", SPEC_NONE,  MIRRORED},
   {"a26399c4359e18abaa5b796368a3b18c2ec729c1", SPEC_NONE,  PAGE23},
-  {"a27a0c9b2ddfa1987d51216313c07313741db320", SPEC_SLOTB, SCC8},
+  {"a27a0c9b2ddfa1987d51216313c07313741db320", SPEC_NONE,  SCC8},
   {"a27a19d784aa8e3e121ec28d70479e4825db5b5d", SPEC_NONE,  MIRRORED},
   {"a27eb9cd77837c1e443e275d0e10888e0fd248f4", SPEC_NONE,  MIRRORED},
   {"a2816649eac034d3b068678860ace2b94d4c1def", SPEC_NONE,  SCC8},
@@ -7174,7 +7173,7 @@ const ROM_DB_t ROM_DB[] =
   {"be43910ad763c265bbd363784d1864ed7f0e7c63", SPEC_NONE,  ASC16},
   {"be52f1f90b6d5b4e29a6d95a6a7542818aee8a3c", SPEC_NONE,  MIRRORED},
   {"be56425b2eb0a26edad1b5fd26e876cd726869cf", SPEC_NONE,  SCC8},
-  {"be7183464a0959bc70475571f16bac864723249a", SPEC_NONE,  SCC8},
+  {"be7183464a0959bc70475571f16bac864723249a", SPEC_NONE,  KON8},
   {"be7772caea829a6588e0d8e6506d3978d58b2137", SPEC_NONE,  ASC8},
   {"be7cfd5ca5d78b99c05dbda1e26f4afbddb50c48", SPEC_NONE,  MIRRORED},
   {"be7de8e78774247ba7a57cb39b2253f40bba2ec9", SPEC_NONE,  PAGE23},
@@ -8611,7 +8610,7 @@ const ROM_DB_t ROM_DB[] =
   {"e4f57442dfe29c953dce9ee1d7ce23dc3c34d52a", SPEC_NONE,  Page2},
   {"e4f7a94d0cb43f56f73d54c22364e91434363945", SPEC_NONE,  MIRRORED},
   {"e4faeff6c0b64bc1202698699101e78872a51b06", SPEC_NONE,  MIRRORED},
-  {"e50aa0443cfff32d29c9b756e66af6ddb8d97c70", SPEC_SLOTB, ASC8SRAM8},
+  {"e50aa0443cfff32d29c9b756e66af6ddb8d97c70", SPEC_NONE,  ASC8SRAM8},
   {"e5171c368883de03fc8d75e61bf23d954ec1bba4", SPEC_NONE,  MIRRORED},
   {"e51e047610930f8e44f3788be5a9970a7118d794", SPEC_NONE,  MIRRORED},
   {"e52e8df2d07d3042b60eaf1022ab43c72214ecbc", SPEC_NONE,  MIRRORED},
@@ -8846,7 +8845,7 @@ const ROM_DB_t ROM_DB[] =
   {"eab0cb4c8b2459342d5d3efded14e0f1d2e35145", SPEC_NONE,  PAGE23},
   {"eac552d21d960440a2ce9a01c413d84e624728ed", SPEC_NONE,  PAGE23},
   {"eac922da1de363f6e73e26037ed7ca2053d2c204", SPEC_NONE,  MIRRORED},
-  {"ead699582641d103a94775a08121ecc336b99eae", SPEC_SLOTB, ASC8SRAM8},
+  {"ead699582641d103a94775a08121ecc336b99eae", SPEC_NONE,  ASC8SRAM8},
   {"ead75f59292e72347ca03c906b7f1fa2fcf6e4d8", SPEC_NONE,  MIRRORED},
   {"eade20a0145afd47ec3551825e9994fa29e17e22", SPEC_NONE,  MIRRORED},
   {"eadf124b91b996b890b1ae84b75b21ee6568d1f3", SPEC_NONE,  MIRRORED},
@@ -9655,18 +9654,19 @@ u8 RomDB_Lookup(u32 size)
                 {
                     switch(ROM_DB[idx].special)
                     {
-                        case SPEC_SLOTB:
-                            myConfig.machineType = MACHINE_MSX2_B;
-                            break;
                         case SPEC_MSX1:
                             myConfig.machineType = MACHINE_MSX1;
                             break;
                         case SPEC_BEEP:
-                            myConfig.beeper = 1;
+                            myConfig.musicExpand = MUSIC_BEEPER; // Enable Beeper
                             break;
                     }
                 }
-                return ROM_DB[idx].mapper;
+                
+                if ((ROM_DB[idx].mapper == MIRRORED) && (size == (64*1024)))
+                    return LIN64;
+                else
+                    return ROM_DB[idx].mapper;
             }
         }
         idx++;

@@ -101,7 +101,7 @@ u8 key_graph __attribute__((section(".dtcm"))) = false;
 // ---------------------------------------------------------------------------
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;
-
+u8  render_blended  __attribute__((section(".dtcm"))) = 0;
 u8 soundEmuPause    __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
 
 // -----------------------------------------------------------------------------
@@ -423,7 +423,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         {
             ay38910Mixer(len * 2, dest, &myAY);
             
-            if (myConfig.musicExpand == 3) // 2x PSG enabled? If so... mix it in.
+            if (myConfig.musicExpand == MUSIC_2XPSG) // 2x PSG enabled? If so... mix it in.
             {
                 ay38910Mixer(len * 2, mixbuf1, &myAY2);
                 s16 *p = (s16*)dest;
@@ -436,7 +436,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 }
             }
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
-            else if (myConfig.beeper && beeperFreq)
+            else if (beeperFreq && (myConfig.musicExpand == MUSIC_BEEPER))
             {
                 ProcessBeeper(len, dest);
             }
@@ -600,6 +600,7 @@ void ResetMSX(void)
     skip_render = 0;
     io_show_status = 0;
     sram_show_status = 0;
+    render_blended = 0;
 }
 
 //*********************************************************************************
@@ -683,7 +684,7 @@ void ShowDebugZ80(void)
 // ------------------------------------------------------------------------
 // The status line shows the status of the SCC, MSX-MUSIC, disk icons, etc.
 // ------------------------------------------------------------------------
-void DisplayStatusLine(bool bForce)
+void DisplayStatusLine(void)
 {
     if (myGlobalConfig.debugger) return; // If debugger, skip this
 
@@ -750,7 +751,7 @@ void DisplayStatusLine(bool bForce)
             DSPrint(20, 0, 2, "$%&");
             DSPrint(20, 1, 2, "DEF");
         }
-        else if (myConfig.musicExpand == 3)
+        else if (myConfig.musicExpand == MUSIC_2XPSG)
         {
             // 2X PSG
             DSPrint(20, 0, 0, " ");
@@ -1190,11 +1191,11 @@ void Hachibitto_main(void)
             TIMER2_DATA=0;
             TIMER2_CR=TIMER_ENABLE | TIMER_DIV_1024;
             timingFrames = 0;
-            DisplayStatusLine(false);   // Every half second
+            DisplayStatusLine();        // Every half second
         }
         else if (timingFrames == 30)    // Every half second
         {
-            DisplayStatusLine(false);
+            DisplayStatusLine();
         }
 
         // -----------------------------------------------------
@@ -1219,6 +1220,7 @@ void Hachibitto_main(void)
         if (ScrMode == 7)
         {
             if (!zoom_screen7) zoom_screen7 = 1;
+            render_blended = 1; // We blend the A/B pixels in Screen 7
         }
         else
         {
@@ -1309,14 +1311,14 @@ void Hachibitto_main(void)
                                 return;
                             }
                             BottomScreenKeypad();
-                            DisplayStatusLine(true);
+                            DisplayStatusLine();
                             SoundUnPause();
                           break;
 
                       case MENU_CHOICE_HI_SCORE:
                           SoundPause();
                           highscore_display(file_crc);
-                          DisplayStatusLine(true);
+                          DisplayStatusLine();
                           SoundUnPause();
                           break;
 
@@ -1325,7 +1327,7 @@ void Hachibitto_main(void)
                           BottomScreenOptions();
                           HachibittoGameOptions(false);
                           BottomScreenKeypad();
-                          DisplayStatusLine(true);
+                          DisplayStatusLine();
                           SoundUnPause();
                           break;
 
@@ -1334,7 +1336,7 @@ void Hachibitto_main(void)
                           BottomScreenOptions();
                           HachibittoChangeKeymap();
                           BottomScreenKeypad();
-                          DisplayStatusLine(true);
+                          DisplayStatusLine();
                           SoundUnPause();
                           break;
 
@@ -1843,7 +1845,7 @@ void BottomScreenKeypad(void)
     unsigned  short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1b),32*24*2);
 
-    DisplayStatusLine(true);
+    DisplayStatusLine();
 }
 
 /*********************************************************************************
@@ -2229,7 +2231,7 @@ void msxUpdateScreen(void)
     if (!skip_render)
     {
         // Alternate frame buffers except for aggressive skip (then just render into the A buffer)
-        if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2))
+        if (drawn_frame_number & render_blended)
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
         else 
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);

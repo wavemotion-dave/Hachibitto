@@ -1351,33 +1351,22 @@ ITCM_CODE void RefreshLine6(u8 uY)
         u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
         const u8 * restrict src = &ChrTab[addr & 0x7FFF];
 
-        if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2)) // Render the B pixels
+        // --------------------------------------------------------------------
+        // For Screen 6, we are only rendering the even (A) pixels. 
+        // This decimation is okay as almost nothing uses Screen 6 except
+        //the main MSX logo screen which looks fine drawing every other pixel.
+        // We might alpha-blend someday... but that day is not today.
+        // --------------------------------------------------------------------
+        for (int i = 0; i < 128; i += 2)
         {
-            for (int i = 0; i < 128; i += 2)
-            {
-                u32 b0 = src[i];
-                u32 b1 = src[i+1];
+            u32 b0 = src[i];
+            u32 b1 = src[i+1];
 
-                *dst32++ =
-                    ((b0 >> 4) & 3) |
-                    (((b0     ) & 3) << 8) |
-                    (((b1 >> 4) & 3) << 16) |
-                    (((b1     ) & 3) << 24);
-            }
-        }
-        else // Render the A pixels
-        {
-            for (int i = 0; i < 128; i += 2)
-            {
-                u32 b0 = src[i];
-                u32 b1 = src[i+1];
-
-                *dst32++ =
-                    ((b0 >> 6) & 3) |
-                    (((b0 >> 2) & 3) << 8) |
-                    (((b1 >> 6) & 3) << 16) |
-                    (((b1 >> 2) & 3) << 24);
-            }
+            *dst32++ =
+                ((b0 >> 6) & 3) |
+                (((b0 >> 2) & 3) << 8) |
+                (((b1 >> 6) & 3) << 16) |
+                (((b1 >> 2) & 3) << 24);
         }
 
         ColorSprites(uY, P-32);

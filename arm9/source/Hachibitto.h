@@ -191,7 +191,7 @@ extern void BottomScreenKeypad(void);
 extern void PauseSound(void);
 extern void UnPauseSound(void);
 extern void ReadFileCRCAndConfig(void);
-extern void DisplayStatusLine(bool bForce);
+extern void DisplayStatusLine(void);
 extern void ResetMSX(void);
 extern void SetVDPIRQ(u8 bit, u8 set);
 extern void debug_init();

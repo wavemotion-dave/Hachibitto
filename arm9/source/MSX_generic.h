@@ -25,7 +25,7 @@
 #define MAX_ROM_NAME                160
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0011
+#define CONFIG_VER                  0x0012
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -85,8 +85,8 @@ struct __attribute__((__packed__)) Config_t
     u8  splitRefresh;
     u8  scaleScreen;
     u8  maskBorders;
-    u8  beeper;
     u8  frameSkip;
+    u8  reserved1;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;
@@ -99,9 +99,14 @@ struct __attribute__((__packed__)) Config_t
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
             
-#define MACHINE_MSX2_A              0x00    // Standard MSX2 slot layout (slot 3 expanded)
-#define MACHINE_MSX2_B              0x01    // Alternate MSX2 slot layout (slot 0 expanded)
-#define MACHINE_MSX1                0x02    // Standard MSX1 slot layout (nothing expanded)
+#define MACHINE_MSX2_A              0x00    // Standard MSX2 slot layout (slot 3 expanded with RAM)
+#define MACHINE_MSX1                0x01    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
+
+#define MUSIC_PSG                   0       // Normal AY
+#define MUSIC_MSX                   1       // MSX-MUSIC (YM)
+#define MUSIC_SCC                   2       // SCC / SCC+
+#define MUSIC_2XPSG                 3       // 2x PSG Mode
+#define MUSIC_BEEPER                4       // Beeper Active 
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
@@ -121,6 +126,7 @@ extern u16 msx_basic;
 extern u8 skip_render;
 extern u16 timingFrames;
 extern s8 temp_offset;
+extern u8 render_blended;
 
 extern FI_MSX gpFic[MAX_ROMS];
 extern int ucGameAct;
