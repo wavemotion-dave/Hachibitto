@@ -455,7 +455,7 @@ void fdc_write(u8 addr, u8 data)
                 FDC.wait_for_read = 0;                                                      // Start fetching data
                 FDC.sector_byte_counter = 0;                                                // Reset our fetch counter
                 FDC.busy_countdown = FDC_LOOPS_PER_BYTE;                                    // Pace first byte
-                if (io_show_status == 0) io_show_status = 4;                                // And let the world know we are reading...
+                if (io_show_status == 0) io_show_status = 7;                                // And let the world know we are reading...
             }
             else if (((data&0xF0) == 0xA0) || ((data&0xF0) == 0xB0)) // Write Sector... either single or multiple
             {
@@ -465,7 +465,7 @@ void fdc_write(u8 addr, u8 data)
                 FDC.sector_byte_counter = 0;                                                // Reset our sector byte counter
                 FDC.wait_for_write = 3;                                                     // Start the Write Process... we will allow data shortly
                 FDC.busy_countdown = FDC_LOOPS_PER_BYTE;                                    // Pace first byte
-                io_show_status = 5;                                                         // And let the world know we are writing...
+                io_show_status = 8;                                                         // And let the world know we are writing...
             }
             else if ((data&0xF0) == 0xC0) // Read Address
             {

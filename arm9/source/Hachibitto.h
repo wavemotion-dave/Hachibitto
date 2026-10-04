@@ -86,7 +86,7 @@ extern u32 DX, DY;
 
 #define META_KBD_SHIFT      0xFFFF0025
 #define META_KBD_CTRL       0xFFFF0026
-#define META_KBD_CODE       0xFFFF0027
+#define META_KBD_KANA       0xFFFF0027
 #define META_KBD_GRAPH      0xFFFF0028
 
 #define META_KBD_SPACE      0xFFFF0029

@@ -25,6 +25,7 @@
 #include "MSX_generic.h"
 #include "cpu/vdp9938/vdp9938.h"
 #include "msx_kbd.h"
+#include "msx_kbd_ja.h"
 #include "alpha_kbd.h"
 #include "debug_ovl.h"
 #include "instructions.h"
@@ -180,7 +181,7 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_9,
     META_KBD_SHIFT,
     META_KBD_CTRL,
-    META_KBD_CODE,
+    META_KBD_KANA,
     META_KBD_GRAPH,
     META_KBD_SPACE,
     META_KBD_RETURN,
@@ -527,6 +528,7 @@ void sound_chip_reset()
     ay38910IndexW(0x07, &myAY);      // Register 7 is ENABLE
     ay38910DataW(0x3F, &myAY);       // All OFF (negative logic)
     ay38910Mixer(8, mixbuf2, &myAY); // Do an initial mix conversion to prime the output
+    myAY.ayPortBOut = 0x80;          // Kana Lock off to start
 
     ay38910Reset(&myAY2);             // Reset the 2xPSG "AY" sound chip
     ay38910IndexW(0x07, &myAY2);      // Register 7 is ENABLE
@@ -689,18 +691,18 @@ void DisplayStatusLine(bool bForce)
     {
         if (io_show_status)
         {
-            if (io_show_status == 5)     // Disk Write
+            if (io_show_status == 8)     // Disk Write
             {
                 DSPrint(20,0,2, "678");  // Show Disk icon
                 DSPrint(20,1,2, "VWX");  // Show Disk icon
-                io_show_status = 3;      // Show icon briefly
+                io_show_status = 6;      // Show icon briefly
                 mmEffect(SFX_FLOPPY);    // Short disk sound effect
             }
-            else if (io_show_status == 4) // Disk Read
+            else if (io_show_status == 7) // Disk Read
             {
                 DSPrint(20,0,2, "345");  // Show Disk icon
                 DSPrint(20,1,2, "STU");  // Show Disk icon
-                io_show_status = 3;      // Show icon briefly
+                io_show_status = 6;      // Show icon briefly
                 mmEffect(SFX_FLOPPY);    // Short disk sound effect
             }
             io_show_status--;
@@ -773,8 +775,11 @@ void DisplayStatusLine(bool bForce)
         DSPrint(1,23,0, (msx_caps_lock ? "@":" "));
         DSPrint(2,23,(msx_caps_lock ? 2:0), (msx_caps_lock ? "@":" "));
 
-        msx_kana_lock = (myAY.ayPortBOut & 0x80) ? 0:1;
-        DSPrint(22,23,(msx_kana_lock ? 2:0), (msx_kana_lock ? "^":" "));
+        if (msx_kana_lock != ((myAY.ayPortBOut & 0x80) ? 0:1))
+        {
+            msx_kana_lock = (myAY.ayPortBOut & 0x80) ? 0:1;
+            BottomScreenKeypad();
+        }
 
         DSPrint(1,19,0, (key_shift ? "A":" "));
         DSPrint(2,19,(key_shift ? 2:0), (key_shift ? "A":" "));
@@ -1171,7 +1176,6 @@ void Hachibitto_main(void)
                 }
                 DSPrint_fps(emuFps);
             }
-            DisplayStatusLine(false);
             emuActFrames = 0;
         }
         
@@ -1186,6 +1190,11 @@ void Hachibitto_main(void)
             TIMER2_DATA=0;
             TIMER2_CR=TIMER_ENABLE | TIMER_DIV_1024;
             timingFrames = 0;
+            DisplayStatusLine(false);   // Every half second
+        }
+        else if (timingFrames == 30)    // Every half second
+        {
+            DisplayStatusLine(false);
         }
 
         // -----------------------------------------------------
@@ -1536,7 +1545,7 @@ void Hachibitto_main(void)
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_ESC)       kbd_key = KBD_KEY_ESC;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SHIFT)     key_shift = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CTRL)      key_ctrl  = 1;
-                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_CODE)      key_kana  = 1;
+                      else if (keyCoresp[myConfig.keymap[i]] == META_KBD_KANA)      key_kana  = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_GRAPH)     key_graph = 1;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_HOME)      kbd_key = KBD_KEY_HOME;
                       else if (keyCoresp[myConfig.keymap[i]] == META_KBD_UP)        kbd_key = KBD_KEY_UP;
@@ -1745,6 +1754,14 @@ void BottomScreenOptions(void)
 }
 
 // ---------------------------------------------------------------------------
+// Keyboard decompression buffers in main RAM.
+// Keep these static; do not put them on the stack.
+// ---------------------------------------------------------------------------
+
+// Static buffers in main RAM.
+static u16 kbdMapBuf[32 * 64]       __attribute__((aligned(4)));    // The two maps are 2K in size
+
+// ---------------------------------------------------------------------------
 // Setup the bottom screen with the correct virtual keyboard.
 // ---------------------------------------------------------------------------
 void BottomScreenKeypad(void)
@@ -1767,10 +1784,60 @@ void BottomScreenKeypad(void)
     }
     else // Must be OVL_FULLKBD
     {
-      decompress(msx_kbdTiles, bgGetGfxPtr(bg0b),  LZ77Vram);
-      decompress(msx_kbdMap, (void*) bgGetMapPtr(bg0b),  LZ77Vram);
-      dmaCopy((void*) bgGetMapPtr(bg0b)+32*30*2,(void*) bgGetMapPtr(bg1b),32*24*2);
-      dmaCopy((void*) msx_kbdPal,(void*) BG_PALETTE_SUB,256*2);
+        const void *tiles;
+        const void *map;
+        const u16 *pal;
+
+        if (msx_kana_lock)
+        {
+            tiles = msx_kbd_jaTiles;
+            map   = msx_kbd_jaMap;
+            pal   = msx_kbd_jaPal;
+        }
+        else
+        {
+            tiles = msx_kbdTiles;
+            map   = msx_kbdMap;
+            pal   = msx_kbdPal;
+        }
+
+        // --------------------------------------------------------------
+        // Decompress into RAM and then do the copy... this prevents the
+        // graphics from flashing/garbage while the decompress happens.
+        // --------------------------------------------------------------
+        memcpy((u8*)0x06880000, SRAM_Memory, 0x10000); // Save SRAM so we can reuse the buffer for decompression
+        decompress(tiles, SRAM_Memory, LZ77);
+        decompress(map,   kbdMapBuf,   LZ77);
+
+        // Get uncompressed byte sizes from the LZ77 headers.
+        const u8 *t = (const u8 *)tiles;
+        const u8 *m = (const u8 *)map;
+
+        u32 tileSize = t[1] | ((u32)t[2] << 8) | ((u32)t[3] << 16);
+        u32 mapSize  = m[1] | ((u32)m[2] << 8) | ((u32)m[3] << 16);
+
+        DC_FlushRange(SRAM_Memory, tileSize);
+        DC_FlushRange(kbdMapBuf, mapSize);
+        
+        swiWaitForVBlank(); // Draw during VBLANK to avoid artifacts
+
+        bgHide(bg0b);
+        bgHide(bg1b);
+
+        // Copy only the actual decompressed data.
+        dmaCopy(SRAM_Memory, bgGetGfxPtr(bg0b), tileSize);
+        dmaCopy(kbdMapBuf, bgGetMapPtr(bg0b), mapSize);
+
+        // Preserve the original map offset and copy size.
+        dmaCopy((void *)bgGetMapPtr(bg0b) + 32*30*2,
+                (void *)bgGetMapPtr(bg1b), 32*24*2);
+
+        dmaCopy((void *)pal, (void *)BG_PALETTE_SUB, 256*2);
+
+        bgShow(bg0b);
+        bgShow(bg1b);
+        
+        memcpy(SRAM_Memory, (u8*)0x06880000, 0x10000); // Restore previous SRAM buffer
     }
 
     unsigned  short dmaVal = *(bgGetMapPtr(bg1b)+24*32);

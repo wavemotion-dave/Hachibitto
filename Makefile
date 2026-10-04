@@ -15,7 +15,7 @@ include $(DEVKITARM)/ds_rules
 
 export TARGET		:=	Hachibitto
 export TOPDIR		:=	$(CURDIR)
-export VERSION		:=  1.1a
+export VERSION		:=  1.1b
 
 ICON 		:= -b $(CURDIR)/logo.bmp "Hachibitto $(VERSION);wavemotion-dave;https://github.com/wavemotion-dave/Hachibitto" 
 

@@ -219,7 +219,7 @@ void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
         SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
         SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
         SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
     else if (bCartInPage[2] && ((address & 0xF000) == 0xA000) && sram_write_enabled_b)
     {
@@ -228,7 +228,7 @@ void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
         SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
         SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
         SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
 }
 
@@ -321,12 +321,12 @@ void HandleAscii8_SRAM8(u32* src, u8 block, u16 address, u8 value)
     else if (bCartInPage[2] && ((address & 0xE000) == 0x8000) && sram_write_enabled_a)
     {
         SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
     else if (bCartInPage[2] && ((address & 0xE000) == 0xA000) && sram_write_enabled_b)
     {
         SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
 }
 
@@ -385,7 +385,7 @@ void HandleAscii16_SRAM2(u32* src, u8 block, u16 address, u8 value)
         SRAM_Memory[(address & 0x7FF) + 0x2800] = value;
         SRAM_Memory[(address & 0x7FF) + 0x3000] = value;
         SRAM_Memory[(address & 0x7FF) + 0x3800] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
 }
 
@@ -436,7 +436,7 @@ void HandleAscii16_SRAM8(u32* src, u8 block, u16 address, u8 value)
         // We are writing to SRAM! Write all the mirrors...
         SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
         SRAM_Memory[(address & 0x1FFF) + 0x2000] = value;
-        sram_show_status = 3;
+        sram_show_status = 6;
     }
 }
 
@@ -723,7 +723,7 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
         msx_subslot = value;
         cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
     }
-    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF8) && (address <= 0x7FFF))
+    else if ((special_memory_access & SPEC_MEM_DISK_CONTROLLER) && (address >= 0x7FF8) && (address <= 0x7FFF)) // Disk controller memory map...
     {
         if (address <= 0x7FFB) fdc_write(address & 3, value);
         if (address == 0x7FFC) fdc_setSide((value & 1) ? 1:0);  // Side: [xxxxxxxS]
