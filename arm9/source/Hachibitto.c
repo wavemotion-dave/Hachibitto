@@ -440,24 +440,6 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             {
                 ProcessBeeper(len, dest);
             }
-            else if (isDSiMode()) // DSi gets slight audio filter to remove clicks if AY only
-            {
-                s16 *p = (s16*)dest;
-                int count = len * 2;
-                s32 smoothed = ay_smoothed;
-
-                while (count--) {
-                    s32 diff = (s32)*p - smoothed;
-                    if (diff > MAX_STEP) {
-                        diff = MAX_STEP;
-                    } else if (diff < -MAX_STEP) {
-                        diff = -MAX_STEP;
-                    }
-                    smoothed += diff;
-                    *p++ = (s16)smoothed;
-                }
-                ay_smoothed = smoothed;
-            }
             
             last_sample = ((s16*)dest)[len*2 - 1];
         }
