@@ -61,7 +61,7 @@ s8  temp_offset         __attribute__((section(".dtcm"))) = 0;
 u8  slide_dampen        __attribute__((section(".dtcm"))) = 0;
 u8  bFirstSoundOutput   __attribute__((section(".dtcm"))) = 1;
 u8  skip_render         __attribute__((section(".dtcm"))) = 0;
-u8  zoom_screen7        __attribute__((section(".dtcm"))) = 0;
+u8  zoom_screen        __attribute__((section(".dtcm"))) = 0;
 
 // -------------------------------------------------------------------------------------------
 // The MSX systems have ROM, RAM, BIOS, Music Carts or SRAM. So we create generic buffers
@@ -560,7 +560,7 @@ void ResetMSX(void)
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
     
-    zoom_screen7  = 0;                    // Assume no zoom to start
+    zoom_screen  = 0;                    // Assume no zoom to start
 
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it
@@ -770,11 +770,16 @@ void DisplayStatusLine(void)
         DSPrint(1,15,0, (key_ctrl  ? "@":" "));
         DSPrint(2,15,(key_ctrl  ? 2:0), (key_ctrl  ? "@":" "));
 
-        if (zoom_screen7) // Pan and Scan on Mode 7
+        if (zoom_screen) // Pan and Scan on Mode 7 and Mode 0 with 80 Columns
         {
             key_graph = 0;
             DSPrint(4,21,0, ":;<");
             DSPrint(4,22,0, "Z[\\");
+        }
+        else
+        {
+            DSPrint(4,21,0, "   ");
+            DSPrint(4,22,0, "   ");
         }
         DSPrint(5,23,(key_graph ? 2:0), (key_graph ? "]":" "));
     }
@@ -980,8 +985,8 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy)  // MSX Keyboard
         if      ((iTx >= 1)   && (iTx < 30))   kbd_key = KBD_KEY_CAPS;
         else if ((iTx >= 30)  && (iTx < 53))   // Graph Key... also Zoom for Screen 7
         {
-            if (zoom_screen7 == 1) {if (!dampen_zoom) zoom_screen7 = 2; dampen_zoom=10;}
-            else if (zoom_screen7 == 2) {if (!dampen_zoom) zoom_screen7 = 1; dampen_zoom=10;}
+            if (zoom_screen == 1) {if (!dampen_zoom) zoom_screen = 2; dampen_zoom=10;}
+            else if (zoom_screen == 2) {if (!dampen_zoom) zoom_screen = 1; dampen_zoom=10;}
             else
             {
                 kbd_key = KBD_KEY_GRAPH; last_special_key = KBD_KEY_GRAPH; last_special_key_dampen = 20;
@@ -1201,12 +1206,16 @@ void Hachibitto_main(void)
         // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
         if (ScrMode == 7)
         {
-            if (!zoom_screen7) zoom_screen7 = 1;
-            render_blended = 1; // We blend the A/B pixels in Screen 7
+            if (!zoom_screen) zoom_screen = 1;
+            render_blended = 1; // We Alpha Blend the A/B pixels in Screen 7
+        }
+        else if (ScrMode == 9) // 80 Column Mode (480px)
+        {
+            if (!zoom_screen) zoom_screen = 1;
         }
         else
         {
-            zoom_screen7 = 0;
+            zoom_screen = 0;
         }
         
         // ---------------------------------------------------------------------------------
@@ -1408,10 +1417,10 @@ void Hachibitto_main(void)
       // ----------------------------------------------------------------------
       // If we are in Screen 7 'Zoom' mode, the L/R keys take on new meaning...
       // ----------------------------------------------------------------------
-      if ((zoom_screen7 == 2) && (nds_key & (KEY_L | KEY_R)))
+      if ((zoom_screen == 2) && (nds_key & (KEY_L | KEY_R)))
       {
-            if (nds_key & KEY_R) {if (screen7Pan < 256) screen7Pan+=4;}
-            if (nds_key & KEY_L) {if (screen7Pan > 0) screen7Pan-=4;}
+            if (nds_key & KEY_R) {if (screenPanX < 256) screenPanX+=4;}
+            if (nds_key & KEY_L) {if (screenPanX > 0) screenPanX-=4;}
             nds_key &= ~(KEY_L | KEY_R); // We lose the ability for normal handling of these keys
       }
 

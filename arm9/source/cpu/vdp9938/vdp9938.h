@@ -125,6 +125,6 @@ static inline __attribute__((always_inline)) void WrData9938(byte V)  // This on
 
 extern u32 frame_number;
 extern u32 drawn_frame_number;
-extern u16 screen7Pan;
+extern u16 screenPanX;
 
 #endif

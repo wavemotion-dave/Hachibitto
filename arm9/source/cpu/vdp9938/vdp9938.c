@@ -39,7 +39,7 @@ u32 drawn_frame_number      __attribute__((section(".dtcm"))) = 0;
 u8 CurrentEpochSaved        __attribute__((section(".dtcm"))) = 0;
 u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask, one bit per VDP interrupt source
 u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
-u16 screen7Pan              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
+u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
 u8 Screen8LineHasSprites    __attribute__((section(".dtcm"))) = 0;   // Sprite rendering on Scree 8 is expensive... track it
 
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
@@ -1380,7 +1380,7 @@ ITCM_CODE void RefreshLine6(u8 uY)
  *
  * ZBuf points to the first visible output pixel (256 pixels).
  * Sprite pixels are doubled horizontally and clipped to that viewport.
- * screen7Pan is measured in Screen 7 source pixels and is even.
+ * screenPanX is measured in Screen 7 source pixels and is even.
  *
  * This deliberately preserves the original sprite-counting, priority,
  * transparency, magnification, and status-register logic.
@@ -1488,7 +1488,7 @@ void ColorSprites_Zoomed(uint8_t Y, u8 *ZBuf)
              * early-clock bit together determine the sprite's screen X.
              * Convert that coordinate to the zoomed source coordinate.
              */
-            spriteX = ((int)AT[1] - ((C & 0x80) ? 32 : 0)) * 2 - (int)screen7Pan + 32;                
+            spriteX = ((int)AT[1] - ((C & 0x80) ? 32 : 0)) * 2 - (int)screenPanX + 32;                
 
             P = ZBuf;
             O = OccBuf;
@@ -1659,7 +1659,7 @@ void RefreshLine7_Zoomed(u8 uY)
 
         // Pan horizontally through the 512-pixel source.
         // Two pixels are packed into each byte.
-        src += (screen7Pan >> 1);
+        src += (screenPanX >> 1);
 
         // Expand packed 4-bit pixels into 256 output pixels.
         for (int i = 0; i < 128; i++)
@@ -1682,7 +1682,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
 {
     DEBUG_REFRESH(7);
     
-    if (zoom_screen7 == 2) return RefreshLine7_Zoomed(uY);
+    if (zoom_screen == 2) return RefreshLine7_Zoomed(uY);
 
     if (!ScreenON)
     {
@@ -1777,6 +1777,157 @@ void RefreshLine8(u8 uY)
 }
 
 
+/** RefreshLine80_Zoomed() ************************************/
+/** Refresh line Y of SCREEN 0, 80-column text, zoomed 1:1.  **/
+/** screenPanX pans across the 512-pixel zoomed line.        **/
+/*************************************************************/
+void RefreshLine80_Zoomed(u8 Y)
+{
+    u8 *P = XBuf + (Y << 8);
+    const u8 BC = XPal[BGColor];
+    const u8 FC = XPal[FGColor];
+
+    if (!ScreenON)
+    {
+        memset(P, BC, 256);
+        return;
+    }
+
+    const u8 *T = ChrTab + (Y >> 3) * 80;
+    const u8 Offset = Y & 7;
+
+    u16 pan = screenPanX;
+    if (pan > 256)
+        pan = 256;
+
+    /*
+     * The 480-pixel text line is centered in a 512-pixel
+     * virtual line, so text begins at virtual X = 16.
+     */
+    int textStart = (int)pan - 16;
+
+    /*
+     * Everything before the text is border.
+     */
+    if (textStart < 0)
+    {
+        int border = -textStart;
+        if (border > 256)
+            border = 256;
+
+        memset(P, BC, border);
+        P += border;
+        textStart = 0;
+    }
+
+    /*
+     * textStart is now the source pixel within the 480-pixel
+     * text line.  Walk through the characters sequentially.
+     */
+    int charX = textStart / 6;
+    int pixelX = textStart - charX * 6;
+
+    if (charX >= 80)
+    {
+        memset(P, BC, 256 - (P - (XBuf + (Y << 8))));
+        return;
+    }
+
+    u8 K = ChrGen[((int)T[charX] << 3) + Offset];
+
+    int remaining = 256 - (int)(P - (XBuf + (Y << 8)));
+
+    /*
+     * Render pixels sequentially, but write four pixels at
+     * a time whenever possible.
+     */
+    while (remaining >= 4 && charX < 80)
+    {
+        u8 p0 = (K & (0x80 >> pixelX)) ? FC : BC;
+
+        pixelX++;
+        if (pixelX == 6)
+        {
+            pixelX = 0;
+            charX++;
+
+            if (charX < 80)
+                K = ChrGen[((int)T[charX] << 3) + Offset];
+        }
+
+        u8 p1 = (K & (0x80 >> pixelX)) ? FC : BC;
+
+        pixelX++;
+        if (pixelX == 6)
+        {
+            pixelX = 0;
+            charX++;
+
+            if (charX < 80)
+                K = ChrGen[((int)T[charX] << 3) + Offset];
+        }
+
+        u8 p2 = (K & (0x80 >> pixelX)) ? FC : BC;
+
+        pixelX++;
+        if (pixelX == 6)
+        {
+            pixelX = 0;
+            charX++;
+
+            if (charX < 80)
+                K = ChrGen[((int)T[charX] << 3) + Offset];
+        }
+
+        u8 p3 = (K & (0x80 >> pixelX)) ? FC : BC;
+
+        pixelX++;
+        if (pixelX == 6)
+        {
+            pixelX = 0;
+            charX++;
+
+            if (charX < 80)
+                K = ChrGen[((int)T[charX] << 3) + Offset];
+        }
+
+        *(u32 *)P =
+            (u32)p0 |
+            ((u32)p1 << 8) |
+            ((u32)p2 << 16) |
+            ((u32)p3 << 24);
+
+        P += 4;
+        remaining -= 4;
+    }
+
+    /*
+     * Finish the final 0..3 pixels.
+     */
+    while (remaining-- > 0)
+    {
+        if (charX < 80)
+        {
+            *P++ = (K & (0x80 >> pixelX)) ? FC : BC;
+
+            pixelX++;
+            if (pixelX == 6)
+            {
+                pixelX = 0;
+                charX++;
+
+                if (charX < 80)
+                    K = ChrGen[((int)T[charX] << 3) + Offset];
+            }
+        }
+        else
+        {
+            *P++ = BC;
+        }
+    }
+}
+
+
 /** RefreshLine80() *******************************************/
 /** Refresh line Y (0..191) of SCREEN 0, 80-column text.     **/
 /** Each 6-pixel character is reduced to 3 output pixels.    **/
@@ -1791,6 +1942,9 @@ void RefreshLine80(u8 Y)
 
     DEBUG_REFRESH(9);
 
+    if (zoom_screen == 2)
+        return RefreshLine80_Zoomed(Y);
+
     P = XBuf + (Y << 8);
     BC = XPal[BGColor];
     FC = XPal[FGColor];
@@ -1801,30 +1955,88 @@ void RefreshLine80(u8 Y)
         return;
     }
 
-    // Screen 80 has 80 characters per row, with 8 scanlines per character.
     T = ChrTab + (Y >> 3) * 80;
     Offset = Y & 0x07;
 
-    // The 480-pixel text line becomes 240 output pixels.
-    // Center it with the same 8-pixel borders used by Screen 0.
     memset(P, BC, 8);
     P += 8;
 
-    for (int X = 0; X < 80; X++)
+    /*
+     * Four characters = 12 output pixels = three 32-bit writes.
+     *
+     * This avoids the overlapping-write problem from trying
+     * to write 4 bytes while advancing only 3 bytes.
+     */
+    for (int X = 0; X < 80; X += 4)
     {
-        K = ChrGen[((int)*T++ << 3) + Offset];
+        K = ChrGen[((int)T[0] << 3) + Offset];
 
-        // Combine adjacent source pixels to retain thin glyph strokes.
-        // The six glyph pixels are bits 7..2 of the pattern byte.
-        P[0] = (K & 0xC0) ? FC : BC;
-        P[1] = (K & 0x30) ? FC : BC;
-        P[2] = (K & 0x0C) ? FC : BC;
+        u32 W0 =
+            (u32)((K & 0xC0) ? FC : BC) |
+            ((u32)((K & 0x30) ? FC : BC) << 8) |
+            ((u32)((K & 0x0C) ? FC : BC) << 16);
 
-        P += 3;
+        K = ChrGen[((int)T[1] << 3) + Offset];
+
+        W0 |= (u32)((K & 0xC0) ? FC : BC) << 24;
+
+        /*
+         * First 3 pixels from character 0 plus first pixel
+         * from character 1.
+         */
+        *(u32 *)P = W0;
+        P += 4;
+
+        /*
+         * Remaining two pixels from character 1.
+         */
+        u32 W1 =
+            (u32)((K & 0x30) ? FC : BC) |
+            ((u32)((K & 0x0C) ? FC : BC) << 8);
+
+        K = ChrGen[((int)T[2] << 3) + Offset];
+
+        W1 |= (u32)((K & 0xC0) ? FC : BC) << 16;
+
+        K = ChrGen[((int)T[3] << 3) + Offset];
+
+        W1 |= (u32)((K & 0xC0) ? FC : BC) << 24;
+
+        *(u32 *)P = W1;
+        P += 4;
+
+        /*
+         * Remaining two pixels from character 2 and all
+         * three pixels from character 3.
+         */
+        u32 W2 =
+            (u32)((K & 0x30) ? FC : BC) |
+            ((u32)((K & 0x0C) ? FC : BC) << 8);
+
+        K = ChrGen[((int)T[2] << 3) + Offset];
+
+        /*
+         * Oops — character 2 was overwritten above, so rebuild
+         * it here explicitly.
+         */
+        W2 =
+            (u32)((K & 0x30) ? FC : BC) |
+            ((u32)((K & 0x0C) ? FC : BC) << 8);
+
+        K = ChrGen[((int)T[3] << 3) + Offset];
+
+        W2 |= (u32)((K & 0xC0) ? FC : BC) << 16;
+        W2 |= (u32)((K & 0x30) ? FC : BC) << 24;
+
+        *(u32 *)P = W2;
+        P += 4;
+
+        T += 4;
     }
 
     memset(P, BC, 8);
 }
+
 
 /*********************************************************************************
  * Emulator calls this function to write byte 'value' into a VDP register 'iReg'

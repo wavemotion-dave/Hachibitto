@@ -76,10 +76,18 @@ Options :
 * Border Mask - can be used to hide the left/right 8 pixels so games that scroll "choppy" are a bit less visually bothersome.
 * Frameskip - on the DSi or above, should default to 'None' and you can leave it there... every game locks in at 60Hz. For the older hardware, some light frameskip is required.
 
+Screen Zoom :
+-----------------------
+Screen 7 games and Mode 0 with 80 Columns can be very hard to read text on the poor old DS handheld as those modes require twice the normal DS screen resolution. 
+To that end, when those modes are active, the not-often-needed Graph (GR) button will turn into a Magnifying Glass icon that you can use to toggle the screen zoom.
+When zoomed, use the Left/Right shoulder buttons to pan the screen left and right.
+
+![Screen Zoom](images/zoom.jpeg)
+
+
 Known Issues :
 -----------------------
 * MSX-MUSIC is vastly simplified processing so that it will run on the older DS hardware. Sound is passable but nowhere near authentic.
-* Lubeck with MSX-MUSIC enabled crashes. Reason is unknown.
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------
