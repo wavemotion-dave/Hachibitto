@@ -9643,7 +9643,7 @@ u8 RomDB_Lookup(u32 size)
         ((digest[18]>>4) & 0xF), ((digest[18]>>0) & 0xF),
         ((digest[19]>>4) & 0xF), ((digest[19]>>0) & 0xF));
 
-    int idx = (digest[0] > 0x80) ? 5000:0;
+    int idx = (digest[0] > 0x80) ? 5000:0; // Bisect the list for a bit of speed-up
     while (ROM_DB[idx].sha1[0] <= digest_string[0])
     {
         if (ROM_DB[idx].sha1[0] == digest_string[0])

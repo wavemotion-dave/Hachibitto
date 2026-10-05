@@ -101,6 +101,13 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.2 - 05-Oct-2026 by wavemotion-dave
+* 80 Column mode (with zoom) supported.
+* Fix for PSG sound filter - it was causing some sounds to be too gritty.
+* Japanese Kana keyboard added.
+* New Slot layout - more games play (Lubeck with MSX-MUSIC now runs).
+* More cleanup and accuracy improvements across the board.
+
 Version 1.1 - 03-Oct-2026 by wavemotion-dave
 * Improved speed across the board.
 * Fixed screen 8 sprite colors.
