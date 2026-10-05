@@ -99,7 +99,7 @@ struct __attribute__((__packed__)) Config_t
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
             
-#define MACHINE_MSX2_A              0x00    // Standard MSX2 slot layout (slot 3 expanded with RAM)
+#define MACHINE_MSX2                0x00    // Standard MSX2 slot layout (slot 3 expanded with RAM in slot 3-3)
 #define MACHINE_MSX1                0x01    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
 
 #define MUSIC_PSG                   0       // Normal AY

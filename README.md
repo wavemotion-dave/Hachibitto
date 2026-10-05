@@ -62,7 +62,7 @@ Options :
 ![Hachibitto Options](images/Options.png)
 
 * MSX Mapper - Generally leave as 'GUESS' as it will search the internal database (10,000 games) and if not found will attempt to determine the mapper from the ROM size/contents. 
-* Machine Type - Usually Type 'A' for standard slot layout for a typical MSX2 machine. Type B for some disk conversions that expect RAM/Disk controller to be in a different configuration (usually the result of sloppy programming). MSX1 Legacy if you want to force the MSX1 VDP handling.
+* Machine Type - Usually leave this as the normal MSX2 machine type. Switch to MSX1 Legacy if you want to force the MSX1 VDP handling for a few games that don't play well with MSX2.
 * Keyboard Type - Usually full keyboard layout but you can select the simplified Alpha keyboard which helps when playing text-heavy games that need a lot of key input.
 * Max Sprites - Normally real hardware can only render 4/8 sprites per line (MSX1 legacy vs MSX2) but the emulation allows all 32 to be displayed without flicker.
 * Auto Fire - can be set for Button 1 and/or Button 2.

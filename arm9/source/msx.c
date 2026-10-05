@@ -1061,15 +1061,19 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
     {
-        u8 page = Port-0xFC;
-        u8 bank = Value & 0x7; // 128K is 16K in 8 banks
+        // The MSX1 machine has only 64K emulated... 
+        if (myConfig.machineType != MACHINE_MSX1)
+        {
+            u8 page = Port-0xFC;
+            u8 bank = Value & 0x7; // 128K is 16K in 8 banks
 
-        mirror_ram_bank[page] = bank; // For read-back
+            mirror_ram_bank[page] = bank; // For read-back
 
-        MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
-        MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
+            MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
+            MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
 
-        cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+            cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
+        }
     }
     else if (Port == 0x7C)
     {

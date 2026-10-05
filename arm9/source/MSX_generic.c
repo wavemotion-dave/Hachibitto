@@ -908,7 +908,7 @@ void SetDefaultGameConfig(void)
     MapPlayer1();                // Default to Player 1 mapping
 
     myConfig.msxMapper    = GUESS;                       // MSX mapper takes its best guess
-    myConfig.machineType  = MACHINE_MSX2_A;              // Default machine is MSX2 with Slot 3 Expanded
+    myConfig.machineType  = MACHINE_MSX2;                // Default machine is MSX2 with Slot 3 Expanded
     myConfig.autoFire     = 0;                           // Default to no auto-fire on either button
     myConfig.keyboard     = OVL_FULLKBD;                 // Default to normal full MSX keyboard
     myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
