@@ -82,7 +82,7 @@ Screen 7 games and Mode 0 with 80 Columns can be very hard to read text on the p
 To that end, when those modes are active, the not-often-needed Graph (GR) button will turn into a Magnifying Glass icon that you can use to toggle the screen zoom.
 When zoomed, use the Left/Right shoulder buttons to pan the screen left and right.
 
-![Screen Zoom](images/zoom.jpeg)
+![Screen Zoom](images/zoom.jpg)
 
 
 Known Issues :
