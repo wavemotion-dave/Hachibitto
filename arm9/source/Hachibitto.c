@@ -33,6 +33,7 @@
 #include "loading.h"
 #include "options.h"
 #include "mainmenu.h"
+#include "minimenu.h"
 #include "topscreen.h"
 #include "fdc.h"
 #include "V9938.h"
@@ -770,96 +771,59 @@ void DisplayStatusLine(void)
 }
 
 
-typedef struct
-{
-    char *menu_string;
-    u8    menu_action;
-} MenuItem_t;
-
-// ------------------------------------------------------------------------
-// Show the Mini Menu - highlight the selected row.
-// ------------------------------------------------------------------------
-u8 mini_menu_items = 0;
-void MiniMenuShow(bool bClearScreen, u8 sel)
-{
-    mini_menu_items = 0;
-    if (bClearScreen)
-    {
-      // ---------------------------------------------------
-      // Put up a generic background for this mini-menu...
-      // ---------------------------------------------------
-      BottomScreenOptions();
-    }
-
-    DSPrint(8,7,6,                                           " DS MINI MENU  ");
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " RESET  GAME   ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " QUIT   GAME   ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " HIGH   SCORE  ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " GAME   OPTIONS");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " DEFINE KEYS   ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " SAVE   STATE  ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " LOAD   STATE  ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " SWAP   DISK   ");  mini_menu_items++;
-    DSPrint(8,9+mini_menu_items,(sel==mini_menu_items)?2:0,  " EXIT   MENU   ");  mini_menu_items++;
-}
-
 // ------------------------------------------------------------------------
 // Handle mini-menu interface...
 // ------------------------------------------------------------------------
 u8 MiniMenu(void)
 {
     u8 retVal = MENU_CHOICE_NONE;
-    u8 menuSelection = 0;
 
     SoundPause();
+    
     while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
 
-    MiniMenuShow(true, menuSelection);
+    BottomScreenMiniMenu();
 
     while (true)
     {
       nds_key = keysCurrent();
-      if (nds_key)
+      if (nds_key & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT | KEY_L | KEY_R))
       {
-          if (nds_key & KEY_UP)
+          retVal = MENU_CHOICE_NONE;
+          break;    // We're done...
+      }
+      
+      if (nds_key & KEY_TOUCH)
+      {
+          touchPosition touch;
+          touchRead(&touch);
+          if ((touch.py >= 22) && (touch.py < 98))    // Top row of Icons
           {
-              menuSelection = (menuSelection > 0) ? (menuSelection-1):(mini_menu_items-1);
-              MiniMenuShow(false, menuSelection);
-          }
-          if (nds_key & KEY_DOWN)
-          {
-              menuSelection = (menuSelection+1) % mini_menu_items;
-              MiniMenuShow(false, menuSelection);
-          }
-          if (nds_key & KEY_A)
-          {
-              if      (menuSelection == 0) retVal = MENU_CHOICE_RESET_GAME;
-              else if (menuSelection == 1) retVal = MENU_CHOICE_END_GAME;
-              else if (menuSelection == 2) retVal = MENU_CHOICE_HI_SCORE;
-              else if (menuSelection == 3) retVal = MENU_CHOICE_GAME_OPTIONS;
-              else if (menuSelection == 4) retVal = MENU_CHOICE_DEFINE_KEYS;
-              else if (menuSelection == 5) retVal = MENU_CHOICE_SAVE_GAME;
-              else if (menuSelection == 6) retVal = MENU_CHOICE_LOAD_GAME;
-              else if (menuSelection == 7) retVal = MENU_CHOICE_SWAP_DISK;
-              else if (menuSelection == 8) retVal = MENU_CHOICE_NONE;
-              else retVal = MENU_CHOICE_NONE;
+                   if (touch.px <= 64)  retVal = MENU_CHOICE_SAVE_GAME;
+              else if (touch.px <= 128) retVal = MENU_CHOICE_LOAD_GAME;
+              else if (touch.px <= 192) retVal = MENU_CHOICE_SWAP_DISK;
+              else if (touch.px <= 256) retVal = MENU_CHOICE_END_GAME;
+              
               break;
           }
-          if (nds_key & KEY_B)
+          if ((touch.py >= 98) && (touch.py < 190))   // Bottom row of Icons
           {
-              retVal = MENU_CHOICE_NONE;
+                   if (touch.px <= 64)  retVal = MENU_CHOICE_HI_SCORE;
+              else if (touch.px <= 128) retVal = MENU_CHOICE_GAME_OPTIONS;
+              else if (touch.px <= 192) retVal = MENU_CHOICE_DEFINE_KEYS;
+              else if (touch.px <= 256) retVal = MENU_CHOICE_RESET_GAME;
+              
               break;
           }
-
-          while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
-          WAITVBL;WAITVBL;
       }
     }
 
-    while ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_A ))!=0);
+    while ((keysCurrent() & (KEY_TOUCH | KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT))!=0)
+        ;
+    
     WAITVBL;WAITVBL;
 
-    BottomScreenKeypad();  // Could be generic or overlay...
+    BottomScreenKeypad();
 
     SoundUnPause();
 
@@ -1746,12 +1710,29 @@ void BottomScreenMainMenu(void)
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
+
+
+// -----------------------------------------------------------------------------
+// Setup the bottom screen for the mini MSX menu (with all the in-game options)
+// -----------------------------------------------------------------------------
+void BottomScreenMiniMenu(void)
+{
+    swiWaitForVBlank();
+
+    bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+    bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29,0);
+    bgSetPriority(bg0b,1);bgSetPriority(bg1b,0);
+    decompress(minimenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+    decompress(minimenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+    dmaCopy((void*) minimenuPal,(void*) BG_PALETTE_SUB,256*2);
+    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
+}
+
 // ---------------------------------------------------------------------------
 // Keyboard decompression buffers in main RAM.
 // Keep these static; do not put them on the stack.
 // ---------------------------------------------------------------------------
-
-// Static buffers in main RAM.
 static u16 kbdMapBuf[32 * 64]       __attribute__((aligned(4)));    // The two maps are 2K in size
 
 // ---------------------------------------------------------------------------

@@ -203,6 +203,7 @@ extern u8 io_show_status;
 extern u8 sram_show_status;
 
 extern void BottomScreenOptions(void);
+extern void BottomScreenMiniMenu(void);
 extern void BottomScreenMainMenu(void);
 extern void BottomScreenKeypad(void);
 extern void PauseSound(void);
