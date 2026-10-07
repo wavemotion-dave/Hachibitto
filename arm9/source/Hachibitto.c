@@ -1690,6 +1690,7 @@ void BottomScreenOptions(void)
     decompress(optionsTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(optionsMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) optionsPal,(void*) BG_PALETTE_SUB,256*2);
+    
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1707,6 +1708,7 @@ void BottomScreenMainMenu(void)
     decompress(mainmenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(mainmenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) mainmenuPal,(void*) BG_PALETTE_SUB,256*2);
+    
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1725,6 +1727,7 @@ void BottomScreenMiniMenu(void)
     decompress(minimenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(minimenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) minimenuPal,(void*) BG_PALETTE_SUB,256*2);
+    
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1927,11 +1930,13 @@ int main(int argc, char **argv)
         MAX_CART_SIZE_KB = 4096; // 4MB is the max MSX cart size without tom-foolery
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
-    else // For older DS units... 1.25MB max
+    else // For older DS units... 1MB max
     {
         MAX_CART_SIZE_KB = 1024;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
+    
+    // Clear out the ROM memory with all 0xFF values...
     memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
 
     // ------------------------------------------------------
@@ -1939,8 +1944,11 @@ int main(int argc, char **argv)
     // ------------------------------------------------------
     DISK_Memory = malloc(MAX_DISK_SIZE_KB * 1024);
     memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
+
+    // Make sure the DISK memory is reset...
+    memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
     
-    // Make sure the SRAM is reset...
+    // Make sure the SRAM is reset... This small buffer is pre-allocated.
     memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
     
     // ------------------------------------------
@@ -2027,9 +2035,9 @@ int main(int argc, char **argv)
 // -----------------------------------------------------------------------------------------------------------
 u8 *MemoryMap[8]    __attribute__((section(".dtcm"))) = {0,0,0,0,0,0,0,0};
 
-// -------------------------------------
-// Some IO Port and Memory Map vars...
-// -------------------------------------
+// ---------------------------------------
+// The main Peripheral Interface IO Ports
+// ---------------------------------------
 u8 Port_PPI_A       __attribute__((section(".dtcm"))) = 0x00;
 u8 Port_PPI_B       __attribute__((section(".dtcm"))) = 0x00;
 u8 Port_PPI_C       __attribute__((section(".dtcm"))) = 0x00;
@@ -2165,11 +2173,15 @@ void msxUpdateScreen(void)
 {
     if (!skip_render)
     {
-        // Alternate frame buffers except for aggressive skip (then just render into the A buffer)
+        // Alternate frame buffers except for aggressive skip (then just render from the A buffer)
         if (drawn_frame_number & render_blended)
+        {
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
+        }
         else
+        {
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);
+        }
     }
 
     skip_render=0;

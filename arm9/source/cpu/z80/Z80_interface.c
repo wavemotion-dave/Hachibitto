@@ -148,6 +148,34 @@ void HandleZemina16K(u32* src, u8 block, u16 address)
     }
 }
 
+// -------------------------------------------------------------------------
+// The ASCII 16K Mapper:
+// 4000h~7FFFh  via writes to 6000h to 67FFh
+// 8000h~BFFFh  via writes to 7000h to 77FFh
+// -------------------------------------------------------------------------
+void HandleAscii16(u32* src, u8 block, u16 address)
+{
+    u8 media_id = bCartInPage[address>>14] - 1;
+    
+    if ((address & 0xF800) == 0x6000)
+    {
+        MSXCartPtr[media_id][2] = (u8*)src;
+        MSXCartPtr[media_id][3] = (u8*)src+0x2000;
+        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
+        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
+    }
+    else if ((address & 0xF800) == 0x7000)
+    {
+        MSXCartPtr[media_id][4] = (u8*)src;
+        MSXCartPtr[media_id][5] = (u8*)src+0x2000;
+        if (bCartInPage[2] == (media_id+1))
+        {
+            MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
+            MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
+        }
+    }
+}
+
 #define SRAM_ENABLE_BIT     (MyMedia[media_id].mapperMask+1)      // SRAM Enable is the bit right after the rom selection bits...
 
 void HandleAscii8_SRAM2(u32* src, u8 block, u16 address, u8 value)
@@ -928,28 +956,7 @@ ITCM_CODE void cpu_writemem16(u16 address, u8 value)
         }
         else if (MyMedia[media_id].mapperType == ASC16)
         {
-            // -------------------------------------------------------------------------
-            // The ASCII 16K Mapper:
-            // 4000h~7FFFh  via writes to 6000h to 67FFh
-            // 8000h~BFFFh  via writes to 7000h to 77FFh
-            // -------------------------------------------------------------------------
-            if ((address & 0xF800) == 0x6000)
-            {
-                MSXCartPtr[media_id][2] = (u8*)src;
-                MSXCartPtr[media_id][3] = (u8*)src+0x2000;
-                MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
-                MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
-            }
-            else if ((address & 0xF800) == 0x7000)
-            {
-                MSXCartPtr[media_id][4] = (u8*)src;
-                MSXCartPtr[media_id][5] = (u8*)src+0x2000;
-                if (bCartInPage[2] == (media_id+1))
-                {
-                    MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
-                    MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
-                }
-            }
+            HandleAscii16(src, block, address);
         }
         else if (MyMedia[media_id].mapperType == ZEN8)
         {

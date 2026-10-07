@@ -26,9 +26,6 @@ volatile u8 bufferZone1[32] = {0};  // In case we ever index out of bounds (we r
 u8 XBuf[256*212] ALIGN(32) = {0};   // VDP9938 screen is 256x212
 volatile u8 bufferZone2[32] = {0};  // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
-// Look up table for colors - pre-generated and in VRAM for maximum speed!
-u32 (*lutTablehh)[16][16] __attribute__((section(".dtcm"))) = (void*)0x068A0000;    // this is actually 16x16x16x4 = 16K
-
 u8 XPal[256]                __attribute__((section(".dtcm"))) = {0};
 u8 XPalReal0                __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 u8 ALatch                   __attribute__((section(".dtcm"))) = 0;
@@ -71,8 +68,9 @@ u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
-uint8_t OccBuf[320]      __attribute__((section(".dtcm")));
-u16 nibbleLUT16[256]     __attribute__((section(".dtcm")));
+u8  OccBuf[320]         __attribute__((section(".dtcm")));
+u16 nibbleLUT16[256]    __attribute__((section(".dtcm")));
+u32 Screen2NibbleMask[16] __attribute__((section(".dtcm")));
 
 inline void handle_transparency(void)
 {
@@ -147,29 +145,24 @@ void BuildNibbleLUT(void)
 
 void RebuildLutTablehh(void)
 {
-    for (int colfg=0; colfg<16; colfg++)
+    /*
+     * Screen 1/2 nibble masks.
+     *
+     * These correspond to the byte positions used by the
+     * old 16K lutTablehh[]:
+     *
+     * bit 3 -> byte 0
+     * bit 2 -> byte 1
+     * bit 1 -> byte 2
+     * bit 0 -> byte 3
+     */
+    for (int i=0; i<16; i++)
     {
-        u32 fg = XPal[colfg];
-        for (int colbg=0; colbg<16; colbg++)
-        {
-            u32 bg = XPal[colbg];
-            lutTablehh[colfg][colbg][ 0] = (bg<<0)|(bg<<8)|(bg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][ 1] = (bg<<0)|(bg<<8)|(bg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][ 2] = (bg<<0)|(bg<<8)|(fg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][ 3] = (bg<<0)|(bg<<8)|(fg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][ 4] = (bg<<0)|(fg<<8)|(bg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][ 5] = (bg<<0)|(fg<<8)|(bg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][ 6] = (bg<<0)|(fg<<8)|(fg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][ 7] = (bg<<0)|(fg<<8)|(fg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][ 8] = (fg<<0)|(bg<<8)|(bg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][ 9] = (fg<<0)|(bg<<8)|(bg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][10] = (fg<<0)|(bg<<8)|(fg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][11] = (fg<<0)|(bg<<8)|(fg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][12] = (fg<<0)|(fg<<8)|(bg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][13] = (fg<<0)|(fg<<8)|(bg<<16)|(fg<<24);
-            lutTablehh[colfg][colbg][14] = (fg<<0)|(fg<<8)|(fg<<16)|(bg<<24);
-            lutTablehh[colfg][colbg][15] = (fg<<0)|(fg<<8)|(fg<<16)|(fg<<24);
-        }
+        Screen2NibbleMask[i] =
+            ((i & 0x08) ? 0x000000FF : 0) |
+            ((i & 0x04) ? 0x0000FF00 : 0) |
+            ((i & 0x02) ? 0x00FF0000 : 0) |
+            ((i & 0x01) ? 0xFF000000 : 0);
     }
 }
 
@@ -916,6 +909,7 @@ void RefreshLine0(u8 Y)
   }
 }
 
+
 /** RefreshLine1() *******************************************/
 /** Refresh line Y (0..191) of SCREEN1, including sprites   **/
 /** in this line.                                           **/
@@ -930,7 +924,8 @@ void RefreshLine1(u8 uY)
   DEBUG_REFRESH(1);
 
   P=(u32*) (XBuf+(uY<<8));
-  u32 ptLow = 0; u32 ptHigh = 0;
+  u32 ptLow = 0;
+  u32 ptHigh = 0;
 
   if(!ScreenON)
     memset(P,XPal[BGColor],256);
@@ -946,21 +941,42 @@ void RefreshLine1(u8 uY)
       if (lastT != *T)
       {
           lastT=*T;
+
           BC=ColTab[lastT>>3];
           K=ChrGen[((int)lastT<<3)+Offset];
+
           FC=BC>>4;
           BC=BC&0x0F;
-          u32* ptLut = (u32*) (lutTablehh[FC][BC]);
-          ptLow = *(ptLut + ((K>>4)));
-          ptHigh= *(ptLut + ((K & 0xF)));
+
+          /*
+           * Expand the actual DS palette values into four
+           * identical bytes, then use the 4-bit character
+           * pattern as a byte-selection mask.
+           */
+          u32 fgWord = XPal[FC];
+          u32 bgWord = XPal[BC];
+
+          fgWord |= fgWord << 8;
+          fgWord |= fgWord << 16;
+
+          bgWord |= bgWord << 8;
+          bgWord |= bgWord << 16;
+
+          u32 diff = fgWord ^ bgWord;
+
+          ptLow  = bgWord ^ (diff & Screen2NibbleMask[K >> 4]);
+          ptHigh = bgWord ^ (diff & Screen2NibbleMask[K & 0x0F]);
       }
+
       *P++ = ptLow;
       *P++ = ptHigh;
       T++;
     }
+
     RefreshSprites(uY);
   }
 }
+
 
 /** RefreshLine2() *******************************************/
 /** Refresh line Y (0..191) of SCREEN2, including sprites   **/
@@ -971,20 +987,11 @@ ITCM_CODE void RefreshLine2(u8 uY)
   u32 *P;
   register byte FC,BC;
   register byte K,*T;
-  u16 J,I;
+  u16 J;
 
   DEBUG_REFRESH(2);
 
-  /*
-   * R18 vertical display adjustment.
-   * VAdjust is already defined as:
-   *
-   *   -((signed char)(VDP[18]) >> 4)
-   *
-   * Use it only for the physical destination row.
-   */
   int dstY = (int)uY + VAdjust;
-
   if ((dstY < 0) || (dstY >= 192))
     return;
 
@@ -999,10 +1006,6 @@ ITCM_CODE void RefreshLine2(u8 uY)
     u32 ptLow = 0;
     u32 ptHigh = 0;
 
-    /*
-     * R23 / VScroll selects the source line of the
-     * 256-line virtual Screen 2 display.
-     */
     u8 srcY = uY + VScroll;
 
     J = ((u16)((u16)srcY&0xC0)<<5) + (srcY&0x07);
@@ -1012,19 +1015,41 @@ ITCM_CODE void RefreshLine2(u8 uY)
 
     for(int X=0;X<32;X++)
     {
-      if (lastT != *T)
+      u8 newT = *T;
+
+      if (lastT != newT)
       {
-          lastT = *T;
-          I    = (u16)lastT<<3;
-          K    = ColTab[(J+I)&ColTabM];
-          FC   = (K>>4);
-          BC   = K & 0x0F;
-          K    = ChrGen[(J+I)&ChrGenM];
+          lastT = newT;
 
-          u32* ptLut = (u32*)(lutTablehh[FC][BC]);
+          u16 addr = J + ((u16)lastT << 3);
 
-          ptLow  = *(ptLut + ((K>>4)));
-          ptHigh = *(ptLut + ((K & 0xF)));
+          K  = ColTab[addr & ColTabM];
+
+          FC = K >> 4;
+          BC = K & 0x0F;
+
+          K = ChrGen[addr & ChrGenM];
+
+          /*
+           * XPal[] contains the actual DS palette indices.
+           * Expand each to four identical pixel bytes.
+           */
+          u32 fg = XPal[FC];
+          u32 bg = XPal[BC];
+
+          fg |= fg << 8;
+          fg |= fg << 16;
+
+          bg |= bg << 8;
+          bg |= bg << 16;
+
+          u32 diff = fg ^ bg;
+
+          ptLow =
+              bg ^ (diff & Screen2NibbleMask[K >> 4]);
+
+          ptHigh =
+              bg ^ (diff & Screen2NibbleMask[K & 0x0F]);
       }
 
       *P++ = ptLow;
