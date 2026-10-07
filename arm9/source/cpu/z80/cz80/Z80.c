@@ -341,8 +341,6 @@ static void CodesDDCB(void)
   switch(I)
   {
 #include "CodesXCB.h"
-    default:
-      if(CPU.TrapBadOps)  Trap_Bad_Ops("DDCB", I, CPU.PC.W-4);
   }
 #undef XX
 }
@@ -361,8 +359,6 @@ static void CodesFDCB(void)
   switch(I)
   {
 #include "CodesXCB.h"
-    default:
-      if(CPU.TrapBadOps)  Trap_Bad_Ops("FDCB", I, CPU.PC.W-4);
   }
 #undef XX
 }

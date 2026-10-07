@@ -21,11 +21,8 @@
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#define MAX_ROMS                    1024
-#define MAX_ROM_NAME                160
-
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0012
+#define CONFIG_VER                  0x0013
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -43,7 +40,7 @@
 #define OVL_ALPHAKBD                1
 
 typedef struct {
-  char szName[MAX_ROM_NAME+1];
+  char szName[MAX_FILE_NAME_LEN+1];
   u8 uType;
   u32 uCrc;
 } FI_MSX;
@@ -52,13 +49,13 @@ struct __attribute__((__packed__)) GlobalConfig_t
 {
     u16 config_ver;
     u32 bios_checksums;
-    char szLastRom[MAX_ROM_NAME+1];
-    char szLastPath[MAX_ROM_NAME+1];
-    char reserved1[MAX_ROM_NAME+1];
-    char reserved2[MAX_ROM_NAME+1];
+    char szLastRom[MAX_FILE_NAME_LEN+1];
+    char szLastPath[MAX_FILE_NAME_LEN+1];
+    char reserved1[MAX_FILE_NAME_LEN+1];
+    char reserved2[MAX_FILE_NAME_LEN+1];
     u8  showFPS;
-    u8  global_0;
-    u8  global_1;
+    u8  bShowInstructions;
+    u8  bDiskSounds;
     u8  global_2;
     u8  global_3;
     u8  global_4;
@@ -79,7 +76,7 @@ struct __attribute__((__packed__)) Config_t
     u8  keyboard;
     u8  maxSprites;
     u8  dpad;
-    u8  musicExpand;
+    u8  expansion;
     u8  yOffset;
     u8  cpuBoost;
     u8  splitRefresh;
@@ -98,7 +95,7 @@ struct __attribute__((__packed__)) Config_t
 #define COMPRESS_BUFFER ((u8 *)(ROM_Memory + (MAX_CART_SIZE_KB * 1024) - (300 * 1024)))   // We use the back-end 256K of the ROM buffer for compression
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
-            
+
 #define MACHINE_MSX2                0x00    // Standard MSX2 slot layout (slot 3 expanded with RAM in slot 3-3)
 #define MACHINE_MSX1                0x01    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
 
@@ -106,7 +103,11 @@ struct __attribute__((__packed__)) Config_t
 #define MUSIC_MSX                   1       // MSX-MUSIC (YM)
 #define MUSIC_SCC                   2       // SCC / SCC+
 #define MUSIC_2XPSG                 3       // 2x PSG Mode
-#define MUSIC_BEEPER                4       // Beeper Active 
+#define MUSIC_BEEPER                4       // Beeper Active
+
+#define FS_NONE                     0       // No Frame Skip
+#define FS_LIGHT                    1       // Light Frame Skip
+#define FS_AGGRESSIVE               2       // Aggressive Frame Skip
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
@@ -128,15 +129,10 @@ extern u16 timingFrames;
 extern s8 temp_offset;
 extern u8 render_blended;
 
-extern FI_MSX gpFic[MAX_ROMS];
+extern FI_MSX gpFic[MAX_FILES];
 extern int ucGameAct;
 extern int ucGameChoice;
 
-#define MSX_MODE_CART   1
-#define MSX_MODE_DISK   2
-
-extern u8 mapperType;
-extern u8 mapperMask;
 extern u8 msx_caps_lock;
 extern u8 msx_kana_lock;
 extern u8 mirror_ram_bank[4];
@@ -163,16 +159,20 @@ extern u8 mirror_ram_bank[4];
 
 #define MAJUT           70  // Not one of the general mappers a user can pick
 
+#define FMPAC_SRAM      87  // For our special FM-PAC Cart
 #define SCCPLUS_RAM     88  // For our special SCC+ "Cart"
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
-extern u32 MAX_CART_SIZE_KB;
+extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
+#define    MAX_DISK_SIZE_KB 720     // This one is fixed in size
 
 extern u8 *ROM_Memory;
+extern u8 *DISK_Memory;
 extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
-extern u8 SRAM_Memory[0x10000];
+extern u8 SRAM_Memory[0x2000];
+extern u8 SCC_Memory[0x10000];
 
 extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_MSX2[0x8000];
@@ -195,7 +195,7 @@ extern ArkanoidPaddle myPaddle;
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
-extern u8 *MSXCartPtr[8];
+extern u8 *MSXCartPtr[2][8];
 extern u8 *MSXRamPtr[8];
 extern u8 *MemoryMap[8];
 extern u8  sccplus_page[4];
@@ -207,8 +207,6 @@ extern YM      myYM;
 extern u8 msx_scc_enable;
 extern u8 JoyMode;
 extern u32 JoyState;
-extern u16 msx_block_size;
-extern u32 file_crc;
 extern u8 Port_PPI_A;
 extern u8 Port_PPI_B;
 extern u8 Port_PPI_C;
@@ -220,7 +218,6 @@ extern u8 key_shift;
 extern u8 key_ctrl;
 extern u8 key_kana;
 extern u8 key_graph;
-extern u32 msx_last_file_size;
 extern u8 msx_scc_capable_game;
 extern u8 msx_music_capable_game;
 extern u8 msx_subslot;
@@ -233,13 +230,14 @@ extern u8 palette_latch;
 extern uint8_t OccBuf[320];
 extern u16 beeperFreq;
 extern u8 zoom_screen;
+extern u8 keyMapType;
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need
 // --------------------------------------------------
 extern void Loop9938(void);
 extern void msxUpdateScreen(void);
-extern void getfile_crc(const char *path);
+extern void LoadFileAndComputeCRC(u8 media_id);
 extern void msxLoadState();
 extern void msxSaveState();
 extern void msxWipeRAM(void);
@@ -247,9 +245,9 @@ extern void msx_reset(void);
 extern void msx_restore_bios(void);
 extern void BufferKey(u8 key);
 extern void BufferKeys(char *str);
-extern void MSX_InitialMemoryLayout(u32 romSize);
-extern void msxSaveEEPROM(void);
-extern void msxLoadEEPROM(void);
+extern void MSX_InitialMemoryLayout(void);
+extern void msxSaveSRAM(void);
+extern void msxLoadSRAM(void);
 extern void Z80_Interface_Reset(void);
 extern void LoadFavorites(void);
 extern void preserveCompressedMem(void);
@@ -259,22 +257,21 @@ extern void SCC_LegacyWrite(u8 value, u16 address);
 extern void BuildScreen8ColorMap(void);
 extern void allocateCompressedMem(void);
 extern void restoreCompressedMem(void);
-extern void LoadConfig(void);
-extern void HachibittoFindFiles(void);
-extern void HachibittoChangeOptions(void);
+extern void LoadConfigDatabase(void);
+extern void HachibittoFindFiles(u8 media_id);
+extern void HachibittoMainMenu(void);
 extern void DSPrint(int iX,int iY,int iScr,char *szMessage);
 extern void DSPrint_fps(u16 fps);
 extern void HachibittoChangeKeymap(void);
 extern void HachibittoGameOptions(bool);
 extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
-extern void DisplayFileName(void);
-extern u32  ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset);
-extern u8   HachibittoChooseFile(void);
+extern void DisplayFileNames(void);
+extern u32  ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset, u32 *crc);
+extern u8   HachibittoChooseFile(u8 media_id);
 extern u8   showMessage(char *szCh1, char *szCh2);
-extern u8   msxInit(char *szGame);
-extern u8   LoadGameRom(const char *path);
 extern u32  LoopZ80(void);
-extern u8   RomDB_Lookup(u32 size);extern void HachibittoModeNormal(void);
+extern u8   RomDB_Lookup(u8 media_id);
+extern void msxInit(void);
 extern void SaveConfig(bool bShow);
 extern void ShowRandomPreviewSnaps(void);
 extern void IndirectRegWrite9938(u8 Value);

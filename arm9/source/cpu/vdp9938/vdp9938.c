@@ -1131,107 +1131,178 @@ ITCM_CODE void CommitLine(u8 Y)
         src += 32;
     }
 }
-
 ITCM_CODE void RefreshLine4(uint8_t Y)
 {
     DEBUG_REFRESH(4);
 
     if (!ScreenON)
     {
-      memset(XBuf + (Y<<8), XPal[BGColor], 256);
+        memset(XBuf + (Y<<8), XPal[BGColor], 256);
+        DC_FlushRange(XBuf + (Y<<8), 256);
     }
     else
     {
-      uint32_t K, *T;
-      int I, J;
-      uint8_t *P = RefreshBorder(Y);
-      uint32_t srcY = Y + VScroll;
-      T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
-      I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
+        uint32_t K, *T;
+        int I, J;
 
-      // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
-      // doesn't change mid-line), so check it once rather than per-pixel.
-      int misaligned = ((uintptr_t)P & 3) != 0;
+        uint8_t *P = RefreshBorder(Y);
 
-      uint32_t *P32 = (uint32_t*)P;
-      uint16_t *P16 = (uint16_t*)P;
+        uint32_t srcY = Y + VScroll;
 
-      uint32_t lastT = 0xFFFFFFFF;   // impossible initial value forces first-iteration compute
-      uint32_t p0 = 0, p1 = 0;
+        T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
+        I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
-      int X = 32;
+        int misaligned = ((uintptr_t)P & 3) != 0;
 
-      if (!misaligned)
-      {
-          do
-          {
-            uint32_t t_val = *(uint8_t*)T;
-            T = (uint32_t*)((uint8_t*)T + 1);
+        uint32_t *P32 = (uint32_t*)P;
+        uint16_t *P16 = (uint16_t*)P;
 
-            if (t_val != lastT)
+        uint32_t lastT = 0xFFFFFFFF;
+        uint32_t p0 = 0;
+        uint32_t p1 = 0;
+
+        int X = 16;
+
+        if (!misaligned)
+        {
+            do
             {
-                lastT = t_val;
-                J = (int)t_val << 3;
-                uint32_t idx = (I + J);
+                uint32_t chars = *T;
+                T = (uint32_t*)((uint8_t*)T + 2);
 
-                uint32_t K_col = ColTab[idx & ColTabM];
-                uint32_t FC    = K_col >> 4;
-                uint32_t BC    = K_col & 0x0F;
+                /* Character 0 */
+                uint32_t t_val = chars & 0xFF;
 
-                K = ChrGen[idx & ChrGenM];
+                if (t_val != lastT)
+                {
+                    lastT = t_val;
 
-                p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-                p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
+                    J = (int)t_val << 3;
+                    uint32_t idx = I + J;
+
+                    uint8_t K_col = ColTab[idx & ColTabM];
+                    uint32_t FC = K_col >> 4;
+                    uint32_t BC = K_col & 0x0F;
+
+                    K = ChrGen[idx & ChrGenM];
+
+                    p0 = ((K & 0x80) ? FC : BC) |
+                         (((K & 0x40) ? FC : BC) << 8) |
+                         (((K & 0x20) ? FC : BC) << 16) |
+                         (((K & 0x10) ? FC : BC) << 24);
+
+                    p1 = ((K & 0x08) ? FC : BC) |
+                         (((K & 0x04) ? FC : BC) << 8) |
+                         (((K & 0x02) ? FC : BC) << 16) |
+                         (((K & 0x01) ? FC : BC) << 24);
+                }
+
+                P32[0] = p0;
+                P32[1] = p1;
+                P32 += 2;
+
+
+                /* Character 1 */
+                t_val = (chars >> 8) & 0xFF;
+
+                if (t_val != lastT)
+                {
+                    lastT = t_val;
+
+                    J = (int)t_val << 3;
+                    uint32_t idx = I + J;
+
+                    uint8_t K_col = ColTab[idx & ColTabM];
+                    uint32_t FC = K_col >> 4;
+                    uint32_t BC = K_col & 0x0F;
+
+                    K = ChrGen[idx & ChrGenM];
+
+                    p0 = ((K & 0x80) ? FC : BC) |
+                         (((K & 0x40) ? FC : BC) << 8) |
+                         (((K & 0x20) ? FC : BC) << 16) |
+                         (((K & 0x10) ? FC : BC) << 24);
+
+                    p1 = ((K & 0x08) ? FC : BC) |
+                         (((K & 0x04) ? FC : BC) << 8) |
+                         (((K & 0x02) ? FC : BC) << 16) |
+                         (((K & 0x01) ? FC : BC) << 24);
+                }
+
+                P32[0] = p0;
+                P32[1] = p1;
+                P32 += 2;
+
+            } while (--X);
+        }
+        else
+        {
+            /*
+             * Keep the original byte-at-a-time path for unaligned output.
+             * This avoids spending ITCM on another large unrolled loop for
+             * a path that is much less important.
+             */
+            X = 32;
+
+            do
+            {
+                uint32_t t_val = *(uint8_t*)T;
+                T = (uint32_t*)((uint8_t*)T + 1);
+
+                if (t_val != lastT)
+                {
+                    lastT = t_val;
+
+                    J = (int)t_val << 3;
+                    uint32_t idx = I + J;
+
+                    uint8_t K_col = ColTab[idx & ColTabM];
+                    uint32_t FC = K_col >> 4;
+                    uint32_t BC = K_col & 0x0F;
+
+                    K = ChrGen[idx & ChrGenM];
+
+                    p0 = ((K & 0x80) ? FC : BC) |
+                         (((K & 0x40) ? FC : BC) << 8) |
+                         (((K & 0x20) ? FC : BC) << 16) |
+                         (((K & 0x10) ? FC : BC) << 24);
+
+                    p1 = ((K & 0x08) ? FC : BC) |
+                         (((K & 0x04) ? FC : BC) << 8) |
+                         (((K & 0x02) ? FC : BC) << 16) |
+                         (((K & 0x01) ? FC : BC) << 24);
+                }
+
+                P16[0] = (uint16_t)p0;
+                P16[1] = (uint16_t)(p0 >> 16);
+                P16[2] = (uint16_t)p1;
+                P16[3] = (uint16_t)(p1 >> 16);
+                P16 += 4;
+
+            } while (--X);
+        }
+
+        ColorSprites(Y, P-32);
+
+        if (myConfig.maskBorders)
+        {
+            u32 *src32 = (u32*)(LineScratch + LS_BASE);
+
+            // We mask with index color 16 which is as close as we can get to black in the fixed part of the palette.
+            if (myConfig.maskBorders & 1)
+            {
+                src32[0] = 0x10101010; 
+                src32[1] = 0x10101010;
             }
 
-            P32[0] = p0;
-            P32[1] = p1;
-            P32 += 2;
+            if (myConfig.maskBorders & 2)
+            {
+                src32[62] = 0x10101010;
+                src32[63] = 0x10101010;
+            }
+        }
 
-          } while (--X);
-      }
-      else
-      {
-          do
-          {
-              uint32_t t_val = *(uint8_t*)T;
-              T = (uint32_t*)((uint8_t*)T + 1);
-
-              if (t_val != lastT)
-              {
-                  lastT = t_val;
-                  J = (int)t_val << 3;
-                  uint32_t idx = (I + J);
-
-                  uint32_t K_col = ColTab[idx & ColTabM];
-                  uint32_t FC    = K_col >> 4;
-                  uint32_t BC    = K_col & 0x0F;
-
-                  K = ChrGen[idx & ChrGenM];
-
-                  p0 = ((K & 0x80) ? FC : BC) | (((K & 0x40) ? FC : BC) << 8) | (((K & 0x20) ? FC : BC) << 16) | (((K & 0x10) ? FC : BC) << 24);
-                  p1 = ((K & 0x08) ? FC : BC) | (((K & 0x04) ? FC : BC) << 8) | (((K & 0x02) ? FC : BC) << 16) | (((K & 0x01) ? FC : BC) << 24);
-              }
-
-              P16[0] = (uint16_t)p0;
-              P16[1] = (uint16_t)(p0 >> 16);
-              P16[2] = (uint16_t)p1;
-              P16[3] = (uint16_t)(p1 >> 16);
-              P16 += 4;
-          } while (--X);
-      }
-
-      ColorSprites(Y, P-32);
-
-      // See if user wants us to mask off 8 pixels on left/right to help mask scrolling issues
-      if (myConfig.maskBorders)
-      {
-          u32 *src32 = (u32*)(LineScratch + LS_BASE);
-          if (myConfig.maskBorders & 1) {src32[0] = 0; src32[1] = 0;}
-          if (myConfig.maskBorders & 2) {src32[62] = 0; src32[63] = 0;}
-      }
-
-      CommitLine(Y);
+        CommitLine(Y);
     }
 }
 
@@ -1242,6 +1313,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
     if (!ScreenON)
     {
       memset(XBuf + (uY<<8), XPal[BGColor], 256);
+      DC_FlushRange(XBuf + (uY<<8), 256);
     }
     else
     {
@@ -1323,9 +1395,10 @@ ITCM_CODE void RefreshLine5(u8 uY)
         // See if user wants us to mask off 8 pixels on left/right to help mask scrolling issues
         if (myConfig.maskBorders)
         {
+            // We mask with index color 16 which is as close as we can get to black in the fixed part of the palette.
             u32 *src32 = (u32*)(LineScratch + LS_BASE);
-            if (myConfig.maskBorders & 1) {src32[0] = 0; src32[1] = 0;}
-            if (myConfig.maskBorders & 2) {src32[62] = 0; src32[63] = 0;}
+            if (myConfig.maskBorders & 1) {src32[0] = 0x10101010; src32[1] = 0x10101010;}
+            if (myConfig.maskBorders & 2) {src32[62] = 0x10101010; src32[63] = 0x10101010;}
         }
 
         CommitLine(uY);
@@ -1342,6 +1415,7 @@ ITCM_CODE void RefreshLine6(u8 uY)
     if (!ScreenON)
     {
         memset(XBuf + (uY<<8), XPal[BGColor], 256);
+        DC_FlushRange(XBuf + (uY<<8), 256);
     }
     else
     {
@@ -1687,6 +1761,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
     if (!ScreenON)
     {
        memset(XBuf + (uY<<8), XPal[BGColor], 256);
+       DC_FlushRange(XBuf + (uY<<8), 256);
     }
     else
     {
@@ -1701,7 +1776,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
         {
             u32 chunk0 = *s32++;
             u32 chunk1 = *s32++;
-            if ((drawn_frame_number & 1) && (myConfig.frameSkip != 2)) // Render the B pixels
+            if ((drawn_frame_number & 1) && (myConfig.frameSkip != FS_AGGRESSIVE)) // Render the B pixels
             {
                 *dst32++ = (chunk0 & 0x0F0F0F0F);
                 *dst32++ = (chunk1 & 0x0F0F0F0F);
@@ -1729,6 +1804,7 @@ void RefreshLine8(u8 uY)
     if (!ScreenON)
     {
       memset(XBuf + (uY<<8), XPal[BGColor], 256);
+      DC_FlushRange(XBuf + (uY<<8), 256);
     }
     else
     {

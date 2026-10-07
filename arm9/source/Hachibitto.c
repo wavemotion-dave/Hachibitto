@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <fat.h>
 #include <maxmod9.h>
@@ -31,6 +32,7 @@
 #include "instructions.h"
 #include "loading.h"
 #include "options.h"
+#include "mainmenu.h"
 #include "topscreen.h"
 #include "fdc.h"
 #include "V9938.h"
@@ -47,7 +49,7 @@
 // ------------------------------------------------------------------
 // These 16 debug registers plus indexes DX/DY are the lifeline for
 // development of this emulator. We can use these to track all sorts
-// of things going on and help to isolate and fix problems. The 
+// of things going on and help to isolate and fix problems. The
 // debugger can be turned on in options to see these values.
 // ------------------------------------------------------------------
 u32 debug[0x10]={0};
@@ -72,20 +74,19 @@ u8  zoom_screen        __attribute__((section(".dtcm"))) = 0;
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE_KB = 1250;                            // 1.25MB of ROM Cart... for DSi we will bump this up to 4MB
-                                
+u32 MAX_CART_SIZE_KB = 1024;                            // 1MB of ROM Cart... for DSi we will bump this up to 4MB
+
 u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
+u8 *DISK_Memory;                                        // Disk Memory will be 720K to support DSDD disks
 u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]          ALIGN(32) = {0};        // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
-u8 SRAM_Memory[0x10000]         ALIGN(32) = {0};        // 'Special RAM' - SRAM is not just for 'SRAM' enabled carts but also for SCC+ cart with built-in 64K RAM
+u8 SRAM_Memory[0x2000]          ALIGN(32) = {0};        // To hold up to 8K of SRAM (FM-PAC or special SRAM capable carts)
+u8 SCC_Memory[0x10000]          ALIGN(32) = {0};        // To hold the 64K of SCC-backed RAM
 
 u8 io_show_status = 0;      // Used to indicate a disk activity icons
-u8 sram_show_status = 0;    // Used to show SRAM icon
+u8 sram_show_status = 0;    // Used to show SRAM icon for SRAM-based carts
 
-static char cmd_line_file[256];
-char initial_file[MAX_ROM_NAME] = "";
-char initial_file_upper[MAX_ROM_NAME] = "";
-char initial_path[MAX_ROM_NAME] = "";
+Media_t MyMedia[3];         // Covering CART1, CART2 and DISK
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -102,12 +103,11 @@ u8 key_graph __attribute__((section(".dtcm"))) = false;
 u16 emuActFrames    __attribute__((section(".dtcm"))) = 0;
 u16 timingFrames    __attribute__((section(".dtcm"))) = 0;
 u8  render_blended  __attribute__((section(".dtcm"))) = 0;
-u8 soundEmuPause    __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
+u8  soundEmuPause   __attribute__((section(".dtcm"))) = 1;       // Set to 1 to pause (mute) sound, 0 is sound unmuted (sound channels active)
 
 // -----------------------------------------------------------------------------
 // This set of critical vars is what determines the game type is... ROM vs DSK
 // -----------------------------------------------------------------------------
-u8 msx_mode          __attribute__((section(".dtcm"))) = 0;       // Set to 1 when a Cartridge is loaded and 2 when a Disk is loaded.
 u8 kbd_key           __attribute__((section(".dtcm"))) = 0;       // 0 if no key pressed, othewise the ASCII key (e.g. 'A', 'B', '3', etc)
 u16 nds_key          __attribute__((section(".dtcm"))) = 0;       // 0 if no key pressed, othewise the NDS keys from keysCurrent() or similar
 u8 last_mapped_key   __attribute__((section(".dtcm"))) = 0;       // The last mapped key which has been pressed - used for key click feedback
@@ -378,7 +378,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 
             ay38910Mixer(len * 2, mixbuf1, &myAY);  // Get AY samples
             SCCMixer(len * 2, mixbuf2, &mySCC);     // Get SCC samples
-            
+
             // ------------------------------------------------------------------------
             // And now we need to mix them... with a bit of audio filtering on the DSi
             // ------------------------------------------------------------------------
@@ -422,8 +422,8 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         else  // Pretty simple... just AY (and maybe beeper)
         {
             ay38910Mixer(len * 2, dest, &myAY);
-            
-            if (myConfig.musicExpand == MUSIC_2XPSG) // 2x PSG enabled? If so... mix it in.
+
+            if (myConfig.expansion == MUSIC_2XPSG) // 2x PSG enabled? If so... mix it in.
             {
                 ay38910Mixer(len * 2, mixbuf1, &myAY2);
                 s16 *p = (s16*)dest;
@@ -436,11 +436,11 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 }
             }
             // Did the beeper get hit at any point? If so, we need to mix it in... but it's rare so we do it on an external function.
-            else if (beeperFreq && (myConfig.musicExpand == MUSIC_BEEPER))
+            else if (beeperFreq && (myConfig.expansion == MUSIC_BEEPER))
             {
                 ProcessBeeper(len, dest);
             }
-            
+
             last_sample = ((s16*)dest)[len*2 - 1];
         }
     }
@@ -559,11 +559,13 @@ void ResetMSX(void)
 
     msx_caps_lock = 0;                    // MSX CAPS lock off
     msx_kana_lock = 0;                    // MSX KANA lock off
-    
-    zoom_screen  = 0;                    // Assume no zoom to start
+
+    zoom_screen  = 0;                     // Assume no zoom to start
 
     msxWipeRAM();                         // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios();                   // Put the BIOS back in place and point to it
+
+    keyMapType = 0;                       // If we go back into options
 
     // -----------------------------------------------------------
     // Timer 1 is used to time frame-to-frame of actual emulation
@@ -610,7 +612,7 @@ int getMemFree() { // returns the amount of free memory in bytes
 void ShowDebugZ80(void)
 {
     u8 idx=1;
-    
+
     sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[0],VDP[1],VDP[2],VDP[3], VDP[4],VDP[5],VDP[6],VDP[7]);
     DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[8],VDP[9],VDP[10],VDP[11], VDP[12],VDP[13],VDP[14],VDP[15]);
@@ -650,7 +652,7 @@ void ShowDebugZ80(void)
     idx++;
     sprintf(tmp, "S%d  A8=%02X %02X", ScrMode, Port_PPI_A, msx_subslot); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "FD.ST=%02X CM=%02X", FDC.status, FDC.command); DSPrint(0,idx++,7, tmp);
-    sprintf(tmp, "Mapper %d [%02X]", mapperType, mapperMask); DSPrint(0,idx++,7, tmp);
+    sprintf(tmp, "Mapper %d [%02X]", MyMedia[MEDIA_CART1].mapperType, MyMedia[MEDIA_CART1].mapperMask); DSPrint(0,idx++,7, tmp);
     extern u32 halt_counter;
     sprintf(tmp, "Halt C %d", halt_counter & 0x1FFFF); DSPrint(0,idx++,7, tmp);
     sprintf(tmp, "%d Free", getMemFree()); DSPrint(0,idx++,7, tmp);
@@ -670,56 +672,38 @@ void DisplayStatusLine(void)
 {
     if (myGlobalConfig.debugger) return; // If debugger, skip this
 
-    if (msx_mode == MSX_MODE_DISK)
+    if (sram_show_status)
     {
-        if (io_show_status)
+        DSPrint(20,0,2, "'()");  // Show SRAM icon
+        DSPrint(20,1,2, "GHI");  // Show SRAM icon
+        if (--sram_show_status == 0)
         {
-            if (io_show_status == 8)     // Disk Write
-            {
-                DSPrint(20,0,2, "678");  // Show Disk icon
-                DSPrint(20,1,2, "VWX");  // Show Disk icon
-                io_show_status = 6;      // Show icon briefly
-                mmEffect(SFX_FLOPPY);    // Short disk sound effect
-            }
-            else if (io_show_status == 7) // Disk Read
-            {
-                DSPrint(20,0,2, "345");  // Show Disk icon
-                DSPrint(20,1,2, "STU");  // Show Disk icon
-                io_show_status = 6;      // Show icon briefly
-                mmEffect(SFX_FLOPPY);    // Short disk sound effect
-            }
-            io_show_status--;
-        }
-        else
-        {
-            DSPrint(20,0,6, "   "); // Clear Disk icon
-            DSPrint(20,1,6, "   "); // Clear Disk icon
+            msxSaveSRAM();
         }
     }
+    else if (io_show_status)
+    {
+        if (io_show_status == 8)     // Disk Write
+        {
+            DSPrint(20,0,2, "678");  // Show Disk icon
+            DSPrint(20,1,2, "VWX");  // Show Disk icon
+            io_show_status = 6;      // Show icon briefly
+            if (myGlobalConfig.bDiskSounds) mmEffect(SFX_FLOPPY);    // Short disk sound effect
+        }
+        else if (io_show_status == 7) // Disk Read
+        {
+            DSPrint(20,0,2, "345");  // Show Disk icon
+            DSPrint(20,1,2, "STU");  // Show Disk icon
+            io_show_status = 6;      // Show icon briefly
+            if (myGlobalConfig.bDiskSounds) mmEffect(SFX_FLOPPY);    // Short disk sound effect
+        }
+        io_show_status--;
+    }
+    // ------------------------------------------------------------
+    // If we aren't showing the disk icon or SRAM above, we can
+    // show one of the various music symbols for SCC or MSX-MUSIC.
+    // ------------------------------------------------------------
     else
-    {
-        if (sram_show_status)
-        {
-            DSPrint(20,0,2, "'()");  // Show SRAM icon
-            DSPrint(20,1,2, "GHI");  // Show SRAM icon
-            if (--sram_show_status == 0)
-            {
-                // Save EE now!
-                msxSaveEEPROM();
-            }
-        }
-        else
-        {
-            DSPrint(20,0,6, "   "); // Clear SRAM icon
-            DSPrint(20,1,6, "   "); // Clear SRAM icon
-        }
-    }
-
-    // ------------------------------------------------------
-    // If we aren't showing the disk icon above, we can show
-    // one of the various music symbols for SCC or MSX-MUSIC.
-    // ------------------------------------------------------
-    if ((io_show_status == 0) && (sram_show_status == 0))
     {
         if (msx_scc_capable_game)
         {
@@ -733,7 +717,7 @@ void DisplayStatusLine(void)
             DSPrint(20, 0, 2, "$%&");
             DSPrint(20, 1, 2, "DEF");
         }
-        else if (myConfig.musicExpand == MUSIC_2XPSG)
+        else if (myConfig.expansion == MUSIC_2XPSG)
         {
             // 2X PSG
             DSPrint(20, 0, 0, " ");
@@ -741,7 +725,7 @@ void DisplayStatusLine(void)
             DSPrint(21, 0, 2, "\"#");
             DSPrint(21, 1, 2, "BC");
         }
-        else // Clear the display area...
+        else // Clear the icon display area...
         {
             DSPrint(20, 0, 0, "   ");
             DSPrint(20, 1, 0, "   ");
@@ -1089,7 +1073,7 @@ u8 slide_n_glide_key_right = 0;
 // ------------------------------------------------------------------------
 // The main emulation loop is here... call into the Z80, VDP and PSG
 // ------------------------------------------------------------------------
-void Hachibitto_main(void)
+void HachibittoRunEmu(void)
 {
   u16 iTx,  iTy;
   u16 SaveNow = 0, LoadNow = 0;
@@ -1111,7 +1095,7 @@ void Hachibitto_main(void)
   memset((u8*)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)
 
   // Get the MSX Machine Emulator ready
-  msxInit(gpFic[ucGameAct].szName);
+  msxInit();
 
   Z80_Interface_Reset();                // Reset the Z80 Interface module
   ResetZ80(&CPU);                       // Reset the CZ80 core CPU
@@ -1166,7 +1150,7 @@ void Hachibitto_main(void)
             }
             emuActFrames = 0;
         }
-        
+
         emuActFrames++; // This one can go above or below 60... used for FPS calculation
 
         // ---------------------------------------------
@@ -1202,7 +1186,7 @@ void Hachibitto_main(void)
         {
             ShowDebugZ80();
         }
-        
+
         // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
         if (ScrMode == 7)
         {
@@ -1217,7 +1201,7 @@ void Hachibitto_main(void)
         {
             zoom_screen = 0;
         }
-        
+
         // ---------------------------------------------------------------------------------
         // Hold the key press for a brief instant... some machines take longer than others
         // (eg MSX needs to see the keypress for many tens of milliseconds)... This allows
@@ -1308,7 +1292,7 @@ void Hachibitto_main(void)
 
                       case MENU_CHOICE_HI_SCORE:
                           SoundPause();
-                          highscore_display(file_crc);
+                          highscore_display(GetMasterCRC());
                           DisplayStatusLine();
                           SoundUnPause();
                           break;
@@ -1360,22 +1344,20 @@ void Hachibitto_main(void)
                           break;
 
                       case MENU_CHOICE_SWAP_DISK:
-                          if (msx_mode == MSX_MODE_DISK) // Only makes sense for .dsk based MSX
+                          SoundPause();
+                          BottomScreenOptions();
+                          HachibittoChooseFile(MEDIA_DISK);
+                          if (ucGameChoice >= 0) // Did the user select a game?
                           {
-                              SoundPause();
                               BottomScreenOptions();
-                              HachibittoChooseFile();
-                              if (ucGameChoice >= 0) // Did the user select a game?
-                              {
-                                  BottomScreenOptions();
-                                  DSPrint(11,13,6, "LOADING...");
-                                  msx_last_file_size = ReadFileCarefully(gpFic[ucGameChoice].szName, ROM_Memory, (MAX_CART_SIZE_KB * 1024), 0);
-                                  fdc_init(1, (msx_last_file_size/1024 == 360) ? 1:2, 80, 9, 512, 1, ROM_Memory, NULL);
-                                  fdc_reset(false);
-                              }
-                              BottomScreenKeypad();
-                              SoundUnPause();
+                              DSPrint(11,13,6, "LOADING...");
+                              // Do NOT save this new disk/filename into MyMedia[].filename as it would overwrite the master. Same for filecrc.
+                              MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(gpFic[ucGameChoice].szName, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
+                              fdc_init(1, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, NULL);
+                              fdc_reset(false);
                           }
+                          BottomScreenKeypad();
+                          SoundUnPause();
                           break;
 
                       default:
@@ -1668,7 +1650,7 @@ void ShowInstructions(void)
     dmaCopy((void*) instructionsPal,(void*) BG_PALETTE_SUB,256*2);
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
-    
+
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
 
     while ((keysCurrent() & (KEY_START | KEY_A | KEY_B)) == 0)
@@ -1719,13 +1701,15 @@ void HachibittoInit(void)
     unsigned  short dmaVal =*(bgGetMapPtr(bg0)+51*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*)  bgGetMapPtr(bg1),32*24*2);
 
-    ShowInstructions();
+    // Clear out media bays
+    memset(MyMedia, 0x00, sizeof(MyMedia));
 
-    // Put up the options screen
-    BottomScreenOptions();
-
-    //  Find the files
-    HachibittoFindFiles();
+    // Show brief instructions to the user
+    if (myGlobalConfig.bShowInstructions)
+    {
+        ShowInstructions();
+        myGlobalConfig.bShowInstructions = 0;
+    }
 }
 
 
@@ -1746,6 +1730,22 @@ void BottomScreenOptions(void)
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
 
+// ---------------------------------------------------------------------------
+// Setup the bottom screen for the main menu icons (carts, disk, play button)
+// ---------------------------------------------------------------------------
+void BottomScreenMainMenu(void)
+{
+    swiWaitForVBlank();
+
+    bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+    bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29,0);
+    bgSetPriority(bg0b,1);bgSetPriority(bg1b,0);
+    decompress(mainmenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+    decompress(mainmenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+    dmaCopy((void*) mainmenuPal,(void*) BG_PALETTE_SUB,256*2);
+    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
+}
 // ---------------------------------------------------------------------------
 // Keyboard decompression buffers in main RAM.
 // Keep these static; do not put them on the stack.
@@ -1798,8 +1798,8 @@ void BottomScreenKeypad(void)
         // Decompress into RAM and then do the copy... this prevents the
         // graphics from flashing/garbage while the decompress happens.
         // --------------------------------------------------------------
-        memcpy((u8*)0x06880000, SRAM_Memory, 0x10000); // Save SRAM so we can reuse the buffer for decompression
-        decompress(tiles, SRAM_Memory, LZ77);
+        memcpy((u8*)0x06880000, SCC_Memory, 0x10000); // Save RAM so we can reuse the buffer for decompression
+        decompress(tiles, SCC_Memory, LZ77);
         decompress(map,   kbdMapBuf,   LZ77);
 
         // Get uncompressed byte sizes from the LZ77 headers.
@@ -1809,16 +1809,16 @@ void BottomScreenKeypad(void)
         u32 tileSize = t[1] | ((u32)t[2] << 8) | ((u32)t[3] << 16);
         u32 mapSize  = m[1] | ((u32)m[2] << 8) | ((u32)m[3] << 16);
 
-        DC_FlushRange(SRAM_Memory, tileSize);
+        DC_FlushRange(SCC_Memory, tileSize);
         DC_FlushRange(kbdMapBuf, mapSize);
-        
+
         swiWaitForVBlank(); // Draw during VBLANK to avoid artifacts
 
         bgHide(bg0b);
         bgHide(bg1b);
 
         // Copy only the actual decompressed data.
-        dmaCopy(SRAM_Memory, bgGetGfxPtr(bg0b), tileSize);
+        dmaCopy(SCC_Memory, bgGetGfxPtr(bg0b), tileSize);
         dmaCopy(kbdMapBuf, bgGetMapPtr(bg0b), mapSize);
 
         // Preserve the original map offset and copy size.
@@ -1829,8 +1829,8 @@ void BottomScreenKeypad(void)
 
         bgShow(bg0b);
         bgShow(bg1b);
-        
-        memcpy(SRAM_Memory, (u8*)0x06880000, 0x10000); // Restore previous SRAM buffer
+
+        memcpy(SCC_Memory, (u8*)0x06880000, 0x10000); // Restore previous RAM buffer
     }
 
     unsigned  short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
@@ -1948,14 +1948,24 @@ int main(int argc, char **argv)
     }
     else // For older DS units... 1.25MB max
     {
-        MAX_CART_SIZE_KB = 1250;
+        MAX_CART_SIZE_KB = 1024;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
+    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
 
+    // ------------------------------------------------------
+    // Both DS-Lite and DSi get a single Disk buffer of 720K
+    // ------------------------------------------------------
+    DISK_Memory = malloc(MAX_DISK_SIZE_KB * 1024);
+    memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
+    
+    // Make sure the SRAM is reset...
+    memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
+    
     // ------------------------------------------
     // Load the High Score table into memory...
-    highscore_init();
     // ------------------------------------------
+    highscore_init();
 
     // ---------------------------------------------------------------
     // The main game action is on the top screen, keyboard on bottom
@@ -1987,41 +1997,18 @@ int main(int argc, char **argv)
     // And do an initial load of configuration... We'll match it up
     // with the game that was selected later... Mostly need globals.
     // -----------------------------------------------------------------
-    LoadConfig();
+    LoadConfigDatabase();
 
     // -----------------------------------------
     // Do an initial load of the Favorites file
     // -----------------------------------------
     LoadFavorites();
 
-    // --------------------------------------------------
-    //  Handle command line argument... mostly for TWL++
-    // --------------------------------------------------
-    if  (argc > 1)
-    {
-        //  We want to start in the directory where the file is being launched...
-        if  (strchr(argv[1], '/') != NULL)
-        {
-            static char  path[128];
-            strcpy(path,  argv[1]);
-            char  *ptr = &path[strlen(path)-1];
-            while (*ptr !=  '/') ptr--;
-            ptr++;
-            strcpy(cmd_line_file,  ptr);
-            *ptr=0;
-            chdir(path);
-        }
-        else
-        {
-            strcpy(cmd_line_file,  argv[1]);
-        }
-    }
-    else
-    {
-        cmd_line_file[0]=0; // No file passed on command line...
-        chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
-        chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
-    }
+    // ----------------------------------------
+    // Get into the best directory possible...
+    // ----------------------------------------
+    chdir("/roms");     // Try to start in roms area... doesn't matter if it fails
+    chdir("msx");       // And try to start in the subdir /msx... doesn't matter if it fails.
 
     // -----------------------------------------------------
     // Make sure we have true-ish random number generation
@@ -2038,23 +2025,13 @@ int main(int argc, char **argv)
         while(1)
         {
             SoundPause();
-            //  Choose option
-            if  (cmd_line_file[0] != 0)
-            {
-                ucGameChoice=0;
-                ucGameAct=0;
-                strcpy(gpFic[ucGameAct].szName, cmd_line_file);
-                cmd_line_file[0] = 0;    // No more initial file...
-                ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys
-            }
-            else
-            {
-                HachibittoChangeOptions();
-            }
+
+            //  Choose carts and disks and options
+            HachibittoMainMenu();
 
             //  Run Machine
             HachibittoInitCPU();
-            Hachibitto_main();
+            HachibittoRunEmu();
         }
     }
     return(0);
@@ -2063,7 +2040,7 @@ int main(int argc, char **argv)
 // -----------------------------------------------------------------------------------------------------------
 // Used by the MSX handler to point to different 8K segments of memory as RAM and Carts are swapped in/out.
 // This is one of the most important data structures in our system as it universally maps what to read/write.
-// Please note: to gain an almost 5% speed-up, wherever these are written, we offset them by the appropriate 
+// Please note: to gain an almost 5% speed-up, wherever these are written, we offset them by the appropriate
 // amount. So MemoryMap[0] is offset by -0x0000 and MemoryMap[3] is offset by -0x6000, etc. This way we don't
 // need to do any masking when we fetch bytes in the Z80 and those fetches happen a million times per second.
 // -----------------------------------------------------------------------------------------------------------
@@ -2086,11 +2063,6 @@ Z80 CPU             __attribute__((section(".dtcm")));          // Put the entir
 // -----------------------------------------
 u8  JoyMode        __attribute__((section(".dtcm"))) = 0;       // Joystick Mode (1=Keypad, 0=Joystick)
 u32 JoyState       __attribute__((section(".dtcm"))) = 0;       // Joystick State for P1 and P2
-
-// ------------------------------------------------------------
-// The CRC32 of the currently loaded game - useful for configs.
-// ------------------------------------------------------------
-u32 file_crc __attribute__((section(".dtcm")))  = 0x00000000;   // Our global file CRC32 to uniquely identify this game
 
 /*********************************************************************************
  * Keyboard Key Buffering Engine...
@@ -2143,9 +2115,9 @@ void ProcessBufferedKeys(void)
 /*********************************************************************************
  * Init MSX Emulation Engine for that game
  ********************************************************************************/
-u8 msxInit(char *szGame)
+void msxInit(void)
 {
-    u8 RetFct,uBcl;
+    u8 uBcl;
     u16 uVide;
 
     // We've got some debug data we can use for development... reset these.
@@ -2195,20 +2167,11 @@ u8 msxInit(char *szGame)
         dmaFillWords(uVide | (uVide<<16),DS_LCD_VRAM_2+uBcl*128,256);
     }
 
-    // LoadGameRom() will figure out how big and where to load it...
-    RetFct = LoadGameRom(szGame);
-
     // Wipe RAM area for the MSX
     msxWipeRAM();
 
-    if (RetFct)
-    {
-        // Perform a standard system RESET
-        ResetMSX();
-    }
-
-    // Return with result
-    return (RetFct);
+    // Perform a standard system RESET
+    ResetMSX();
 }
 
 /*********************************************************************************
@@ -2224,74 +2187,101 @@ void msxUpdateScreen(void)
         // Alternate frame buffers except for aggressive skip (then just render into the A buffer)
         if (drawn_frame_number & render_blended)
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_2, 256*212);
-        else 
+        else
             dmaCopyWordsAsynch(2, (u32*)XBuf, (u32*)DS_LCD_VRAM_1, 256*212);
     }
 
     skip_render=0;
 }
 
-
-/*******************************************************************************
- * Compute the file CRC - this will be our unique identifier for the game
- * for saving HI SCORES and Configuration / Key Mapping data.
- *******************************************************************************/
-void getfile_crc(const char *filename)
+// -------------------------------------------------------------------------
+// Return the master CRC32 used for high scores and Configuration. This is
+// always the Cart 1 unless that's not loaded in which case it's the Disk.
+// We never use Cart 2 as the master slot (only used for cart-combos).
+// -------------------------------------------------------------------------
+u32 GetMasterCRC(void)
 {
-    ShowLoading();
+    if (MyMedia[MEDIA_CART1].filecrc) return MyMedia[MEDIA_CART1].filecrc;
+    else if (MyMedia[MEDIA_DISK].filecrc) return MyMedia[MEDIA_DISK].filecrc;
+    
+    return 0x00000000;
+}
 
-    // -------------------------------------------------------------------
-    // This reads the file into ROM_Memory[] and computes the CRC32 which
-    // is used for favorites, high score saves and configuration data.
-    // For large files (> 1MB), this can take several seconds.
-    // -------------------------------------------------------------------
-    file_crc = getFileCrc(filename);
+// -------------------------------------------------------------------------
+// Return the master filename needed as the base filename for .sav and .srm
+// Always the Cart 1 unless that's not loaded in which case it's the Disk.
+// We never use Cart 2 as the master slot (only used for cart-combos).
+// -------------------------------------------------------------------------
+char *GetMasterFilename(void)
+{
+    if (MyMedia[MEDIA_CART1].filecrc) return MyMedia[MEDIA_CART1].filename;
+    else if (MyMedia[MEDIA_DISK].filecrc) return MyMedia[MEDIA_DISK].filename;
 
-    extern u32 file_size;
-    if (file_size <= (256 * 1024))  // Smaller files... add some wait on the Loading Screen
+    return "No File";
+}
+
+// -------------------------------------------------------------------------
+// Return the master path needed as the directory needed for .sav and .srm
+// Always the Cart 1 unless that's not loaded in which case it's the Disk.
+// We never use Cart 2 as the master slot (only used for cart-combos).
+// -------------------------------------------------------------------------
+char *GetMasterPath(void)
+{
+    if (MyMedia[MEDIA_CART1].filecrc) return MyMedia[MEDIA_CART1].filepath;
+    else if (MyMedia[MEDIA_DISK].filecrc) return MyMedia[MEDIA_DISK].filepath;
+
+    return "";
+}
+
+/** LoadGameIntoMedia() **************************************************************/
+/** Open a rom file from file system and load it into the appropriate buffer...     **/
+/** After this call, the filename, file size and CRC32 are set for this media slot. **/
+/*************************************************************************************/
+void LoadGameIntoMedia(u8 media_id, char *filename)
+{
+    ShowLoading();  // Put up a loading screen so user is aware...
+
+    // Save the directory in which this file was found...
+    getcwd(MyMedia[media_id].filepath, MAX_PATH_NAME_LEN);
+
+    // Save the current game filename. We uppercase it so it's easier to search the title...
+    strcpy(MyMedia[media_id].filename, filename);
+    for (int i=0; i<strlen(MyMedia[media_id].filename); i++)
+    {
+        MyMedia[media_id].filename[i] = toupper(MyMedia[media_id].filename[i]);     // Uppercase string
+    }
+
+    // Now open and read the file... grab file size and CRC32 as well...
+    if (media_id == MEDIA_CART1)
+    {
+        MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, ROM_Memory, (MAX_CART_SIZE_KB * 1024), 0, &MyMedia[media_id].filecrc);
+    }
+    else if (media_id == MEDIA_CART2)
+    {
+        MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, ROM_Memory + ((MAX_CART_SIZE_KB * 1024)/2), (MAX_CART_SIZE_KB * 1024)/2, 0, &MyMedia[media_id].filecrc);
+    }
+    else // Must be MEDIA_DISK
+    {
+        MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, &MyMedia[media_id].filecrc);
+    }
+
+    // --------------------------------------------------------
+    // Load the Configuration for this new cart/disk layout...
+    // --------------------------------------------------------
+    FindConfig();
+
+    // ----------------------------------------------------------------------
+    // Let the Loading Screen sit for a second or two so the user sees it...
+    // ----------------------------------------------------------------------
+    if (MyMedia[media_id].filesize <= (256 * 1024))  // Smaller files... add some wait on the Loading Screen
     {
         WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
     }
-    else if (file_size <= (512 * 1024)) // Slightly larger files... add less wait
+    else if (MyMedia[media_id].filesize <= (512 * 1024)) // Slightly larger files... add less wait
     {
         WAITVBL;WAITVBL;WAITVBL;WAITVBL;
     }
-}
-
-
-/** LoadGameRom() **************************************************************/
-/* Open a rom file from file system and load it into the ROM_Memory[] buffer   */
-/*******************************************************************************/
-u8 LoadGameRom(const char *filename)
-{
-    u8 bOK = 0;
-    int romSize = 0;
-
-    FILE* handle = fopen(filename, "rb");
-    if (handle != NULL)
-    {
-        getcwd(initial_path, MAX_ROM_NAME);
-
-        // Get file size the 'fast' way - use fstat() instead of fseek() or ftell()
-        struct stat stbuf;
-        (void)fstat(fileno(handle), &stbuf);
-        romSize = stbuf.st_size;
-
-        // Save the last file size...
-        msx_last_file_size = romSize;
-
-        if (romSize <= (MAX_CART_SIZE_KB * 1024))  // Max size cart is 1MB/4MB - that's pretty huge...
-        {
-            fclose(handle);     // We only need to close the file - the game ROM is now sitting in ROM_Memory[] from the getFileCrc() handler
-
-            mapperMask = 0x00;  // No MSX mapper mask until we detect it
-
-            bOK = 1;
-        }
-        else fclose(handle);
-    }
-
-    return bOK;
+    // And for even bigger files, add no artificial delay (the file load above was long enough!)
 }
 
 // -------------------------------------------------------------------------

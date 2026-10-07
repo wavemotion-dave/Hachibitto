@@ -28,9 +28,8 @@
 int countMSX     =  0;
 int ucGameAct    =  0;
 int ucGameChoice = -1;
-u32 file_size    =  0;
 
-FI_MSX gpFic[MAX_ROMS];
+FI_MSX gpFic[MAX_FILES];
 char szName[256];
 char szFile[256];
 char strBuf[40];
@@ -48,7 +47,8 @@ typedef struct
 
 Favorites_t myFavs[MAX_FAVS]; // Total of 4K of space with 32 bit hash
 
-u8 option_table_idx=0;
+u8 option_table_idx = 0;
+u8 last_media_id    = 99;
 
 const char szKeyName[MAX_KEY_OPTIONS][18] = {
   "P1 JOY UP",
@@ -258,17 +258,6 @@ u8 showMessage(char *szCh1, char *szCh2)
     return uRet;
 }
 
-void HachibittoModeNormal(void)
-{
-    REG_BG3CNT = BG_BMP8_256x256;
-    REG_BG3PA = (1<<8);
-    REG_BG3PB = 0;
-    REG_BG3PC = 0;
-    REG_BG3PD = (1<<8);
-    REG_BG3X = 0;
-    REG_BG3Y = 0;
-}
-
 // ----------------------------------------------------------------------------
 // This stuff handles the 'random' screen snapshot at the top screen...
 // ----------------------------------------------------------------------------
@@ -458,7 +447,7 @@ int msxFilescmp (const void *c1, const void *c2)
 /*********************************************************************************
  * Find files (COL / ROM) available - sort them for display.
  ********************************************************************************/
-void HachibittoFindFiles(void)
+void HachibittoFindFiles(u8 media_id)
 {
     u32 uNbFile;
     DIR *dir;
@@ -468,7 +457,7 @@ void HachibittoFindFiles(void)
     countMSX=0;
 
     dir = opendir(".");
-    while (((pent=readdir(dir))!=NULL) && (uNbFile<MAX_ROMS))
+    while (((pent=readdir(dir))!=NULL) && (uNbFile<MAX_FILES))
     {
       strcpy(szFile,pent->d_name);
 
@@ -487,21 +476,21 @@ void HachibittoFindFiles(void)
         }
       }
       else {
-        if ((strlen(szFile)>4) && (strlen(szFile)<(MAX_ROM_NAME-4)) && (szFile[0] != '.') && (szFile[0] != '_'))  // For MAC don't allow underscore files
+        if ((strlen(szFile)>4) && (strlen(szFile)<(MAX_FILE_NAME_LEN-4)) && (szFile[0] != '.') && (szFile[0] != '_'))  // For MAC don't allow underscore files
         {
-          if ( (strcasecmp(strrchr(szFile, '.'), ".rom") == 0) )  {
+          if ( (strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK) )  {
             strcpy(gpFic[uNbFile].szName,szFile);
             gpFic[uNbFile].uType = MSXROM;
             uNbFile++;
             countMSX++;
           }
-          if ( (strcasecmp(strrchr(szFile, '.'), ".bin") == 0) )  {
+          if ( (strcasecmp(strrchr(szFile, '.'), ".bin") == 0) && (media_id != MEDIA_DISK) )  {
             strcpy(gpFic[uNbFile].szName,szFile);
             gpFic[uNbFile].uType = MSXROM;
             uNbFile++;
             countMSX++;
           }
-          if ( (strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) )  {
+          if ( (strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) && (media_id == MEDIA_DISK) )  {
             strcpy(gpFic[uNbFile].szName,szFile);
             gpFic[uNbFile].uType = MSXROM;
             uNbFile++;
@@ -525,7 +514,7 @@ void HachibittoFindFiles(void)
 // ----------------------------------------------------------------
 // Let the user select a new game (rom) file and load it up!
 // ----------------------------------------------------------------
-u8 HachibittoChooseFile(void)
+u8 HachibittoChooseFile(u8 media_id)
 {
     bool bDone=false;
     u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
@@ -538,7 +527,15 @@ u8 HachibittoChooseFile(void)
 
     DSPrint(3,23,0,"A=LOAD, SELECT=FAV, B=EXIT");
 
-    HachibittoFindFiles();
+    chdir(MyMedia[media_id].filepath);  // Get into the right directory
+    HachibittoFindFiles(media_id);      // And get all files of the appropriate type (Cart vs Disk)
+
+    // If we are selecting a different media type (CART vs DISK), start at the top
+    if (media_id != last_media_id)
+    {
+        ucGameAct = 0;
+        last_media_id = media_id;
+    }
 
     ucGameChoice = -1;
 
@@ -710,7 +707,7 @@ u8 HachibittoChooseFile(void)
         else
         {
           chdir(gpFic[ucGameAct].szName);
-          HachibittoFindFiles();
+          HachibittoFindFiles(media_id);
           ucGameAct = 0;
           nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
           uNbRSPage = (countMSX>=5 ? 5 : countMSX);
@@ -783,7 +780,7 @@ void SaveConfig(bool bShow)
     myGlobalConfig.config_ver = CONFIG_VER;
 
     // If there is a game loaded, save that into a slot... re-use the same slot if it exists
-    myConfig.game_crc = file_crc;
+    myConfig.game_crc = GetMasterCRC();
 
     // Find the slot we should save into...
     for (slot=0; slot<MAX_CONFIGS; slot++)
@@ -844,6 +841,146 @@ void SaveConfig(bool bShow)
     restoreCompressedMem();
 }
 
+
+#define TWEAK_NONE 0xFF
+
+typedef struct
+{
+    const char *match1;
+    const char *match2;
+
+    u8 expansion;
+    u8 frameSkip;
+    u8 maxSprites;
+    u8 machineType;
+    u8 dpad;
+
+    u8 dsiOnly;
+} GameTweak;
+
+
+// -------------------------------------------------------------------------------------------------------------
+// Game tweaks for some games based on filenames loaded.
+// e.g. Snatcher gets SCC+, Q-Bert gets diagonals, etc.
+// -------------------------------------------------------------------------------------------------------------
+static const GameTweak gameTweaks[] =
+{
+    // match1,           match2,              expansion,       frameSkip,   maxSprites,  machineType,   dpad,             dsiOnly
+
+    // Sprite limit
+    { "QBIQS",           NULL,                TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "URIDIUM",         NULL,                TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "ANTARCTIC",       "ADVENTURE",         TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "ADVENTURES",      "PARK",              TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // SCC+                                                                                                                 
+    { "SNATCHER",        NULL,                MUSIC_SCC,    FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // Aggressive frame skip on DS-Lite                                                                                     
+    { "MANBOW",          NULL,                TWEAK_NONE,   FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // MSX-MUSIC - works on DS-Lite                                                                                         
+    { "LUBECK",          NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "XAK",             NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "FAMICLE",         NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "FRAY",            NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "SINGULAR",        "STONE",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // MSX-MUSIC + aggressive frame skip on DS-Lite                                                                         
+    { "LILLY",           "SAGA",              MUSIC_MSX,    FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // MSX-MUSIC - DSi only                                                                                                 
+    { "ALESTE",          NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "MONOGATARI",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "SLAYER",          "VI",                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "GOLVELLIUS 2",    NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "GOLVELLIUS II",   NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "ILLUSION",        "CITY",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "SUPER",           "COOKS",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "PSYCH",           "WORLD",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "MAD",             "HOUSE",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "DAIKOUKAI",       "JIDAI",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "DEAD",            "BRAIN",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "EUROPE",          "WAR",               MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "FAMILY",          "STADIUM",           MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "FLEET",           "COMMANDER 2",       MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "GAMBLER",         "JIKICHUSHINPA",     MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "MAISON",          "IKKOKU",            MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "EMERALD",         "DRAGON",            MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "PENGUIN",         "WARS",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "BLASTER",         "BURN",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "LAYDOCK",         "LAST",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "BUSHOUHUUNROKU",  NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "SENKOKUGUNYUDEN", NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "FARDRAUT",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "SUIKODEN",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "PAC-MANIA",       NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "GENCHOHISI",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "QUINPL",          NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "UNDEADLINE",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "CRIMSON",         NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "FEEDBACK",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "MASTER 3",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "MASTER III",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+                                                                                                                            
+    // PSG                                                                                                                  
+    { "BLADE",           "LORDS",             MUSIC_PSG,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+                                                                                                                            
+    // D-Pad                                                                                                                
+    { "ARKANOID",        NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_ARKANOID,      0 },
+    { "CHUCKIE",         NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_SLIDE_N_GLIDE, 0 },
+    { "QBERT",           NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_DIAGONALS,     0 },
+    { "Q-BERT",          NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_DIAGONALS,     0 },
+                                                                                                                            
+    // Machine type                                                                                                         
+    { "KING",            "BALLOON",           TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  MACHINE_MSX1,  TWEAK_NONE,         0 },
+                                                                                                                            
+    // Beeper                                                                                                               
+    { "WAY",             "TIGER",             MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "JACK",            "NIPPER",            MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "MASTER",          "LAMPS",             MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "FUTURE",          "KNIGHT",            MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "AVENGER",         NULL,                MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+    { "BOUNDER",         NULL,                MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
+};
+
+
+void ApplyDatabaseTweaks(void)
+{
+    const char *filename = GetMasterFilename();
+
+    for (unsigned int i = 0; i < sizeof(gameTweaks) / sizeof(gameTweaks[0]); i++)
+    {
+        const GameTweak *t = &gameTweaks[i];
+
+        if (!strstr(filename, t->match1))
+            continue;
+
+        if (t->match2 && !strstr(filename, t->match2))
+            continue;
+
+        // DSi-only expansion
+        if (t->dsiOnly && !isDSiMode())
+            continue;
+
+        if (t->expansion != TWEAK_NONE)
+            myConfig.expansion = t->expansion;
+
+        // Frame skip is ALWAYS DS-Lite only.
+        if (t->frameSkip != TWEAK_NONE && !isDSiMode())
+            myConfig.frameSkip = t->frameSkip;
+
+        if (t->maxSprites != TWEAK_NONE)
+            myConfig.maxSprites = t->maxSprites;
+
+        if (t->machineType != TWEAK_NONE)
+            myConfig.machineType = t->machineType;
+
+        if (t->dpad != TWEAK_NONE)
+            myConfig.dpad = t->dpad;
+    }
+}
+
 void MapPlayer1(void)
 {
     myConfig.keymap[0]   = 0;    // NDS D-Pad mapped to MSX Joystick UP
@@ -897,8 +1034,10 @@ void SetDefaultGlobalConfig(void)
 {
     // A few global defaults...
     memset(&myGlobalConfig, 0x00, sizeof(myGlobalConfig));
-    myGlobalConfig.showFPS = 0;     // Don't show FPS counter by default
-    myGlobalConfig.debugger = 0;    // No debugger by default.
+    myGlobalConfig.showFPS = 0;             // Don't show FPS counter by default
+    myGlobalConfig.debugger = 0;            // No debugger by default.
+    myGlobalConfig.bShowInstructions = 1;   // Always show instructions until config saved
+    myGlobalConfig.bDiskSounds = 1;         // Default is to have disk sounds
 }
 
 void SetDefaultGameConfig(void)
@@ -914,7 +1053,7 @@ void SetDefaultGameConfig(void)
     myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.yOffset      = 0;                           // Default is no Y offset
-    myConfig.musicExpand  = MUSIC_PSG;                   // Default is no expansion (normal PSG sound)
+    myConfig.expansion  = MUSIC_PSG;                   // Default is no expansion (normal PSG sound)
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
@@ -927,251 +1066,28 @@ void SetDefaultGameConfig(void)
     myConfig.reserved5    = 0;
     myConfig.reserved6    = 0;
     myConfig.reserved7    = 0xA5;    // So it's easy to spot on an "upgrade" and we can re-default it
-    
+
     // For smaller games, even on the DS-Lite we can generally get away with no frameskip
     if (!isDSiMode())
     {
-        if (file_size <= (48*1024)) myConfig.frameSkip = 0;
+        // If there is no disk... and the Cart is small, we can avoid frameskip even on the older DS-Lite/Phat
+        if (MyMedia[MEDIA_DISK].filecrc == 0)
+        {
+            if (MyMedia[MEDIA_CART1].filesize <= (48*1024)) myConfig.frameSkip = 0;
+        }
     }
 
-    // ----------------------------------------------------------------------------------
-    // A few games don't want more than 4 max sprites (they pull tricks that rely on it)
-    // ----------------------------------------------------------------------------------
-    if (file_crc == 0xee530ad2) myConfig.maxSprites  = 0;  // QBiqs
-    if (file_crc == 0x275c800e) myConfig.maxSprites  = 0;  // Antarctic Adventure
-    if (file_crc == 0xa66e5ed1) myConfig.maxSprites  = 0;  // Antarctic Adventure Prototype
-    if (file_crc == 0x6af19e75) myConfig.maxSprites  = 0;  // Adventures in the Park
-    if (file_crc == 0xbc8320a0) myConfig.maxSprites  = 0;  // Uridium
-
-    // -------------------------------------------------------------------------------------------------------------
-    // Game tweaks for some games based on filenames loaded... e.g. Snatcher gets SCC+, Q-Bert gets diagonals, etc.
-    // -------------------------------------------------------------------------------------------------------------
-    if (strstr(initial_file_upper, "SNATCHER"))
-    {
-        myConfig.musicExpand = MUSIC_SCC;   // Enable SCC+
-        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
-    }
-
-    if (strstr(initial_file_upper, "MANBOW"))
-    {
-        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
-    }
-
-    if (strstr(initial_file_upper, "LUBECK"))
-    {
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
-    }
-
-    if (strstr(initial_file_upper, "XAK"))
-    {
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
-    }
-
-    if (strstr(initial_file_upper, "Aleste"))
-    {
-        if (!isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "Monogatari"))
-    {
-        if (!isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "LILLY") && strstr(initial_file_upper, "SAGA"))
-    {
-        if (!isDSiMode()) myConfig.frameSkip = 2; // On DS-Lite, we have no choice but aggressive frame skip here
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC
-    }
-
-    if (strstr(initial_file_upper, "SLAYER") && strstr(initial_file_upper, "VI"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-    
-    if (strstr(initial_file_upper, "GOLVELLIUS 2") || strstr(initial_file_upper, "GOLVELLIUS II"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "ILLUSION") && strstr(initial_file_upper, "CITY"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "SUPER") && strstr(initial_file_upper, "COOKS"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "PSYCH") && strstr(initial_file_upper, "WORLD"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "BLADE") && strstr(initial_file_upper, "LORDS"))
-    {
-        myConfig.musicExpand = MUSIC_PSG;   // The poor-man msx-music sounds terrible with this one.
-    }
-
-    if (strstr(initial_file_upper, "MAD") && strstr(initial_file_upper, "HOUSE"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-    
-    if (strstr(initial_file_upper, "DAIKOUKAI") && strstr(initial_file_upper, "JIDAI"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "DEAD") && strstr(initial_file_upper, "BRAIN"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "EUROPE") && strstr(initial_file_upper, "WAR"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "FAMILY") && strstr(initial_file_upper, "STADIUM"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "FLEET") && strstr(initial_file_upper, "COMMANDER 2"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "GAMBLER") && strstr(initial_file_upper, "JIKICHUSHINPA"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "MAISON") && strstr(initial_file_upper, "IKKOKU"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "EMERALD") && strstr(initial_file_upper, "DRAGON"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "PENGUIN-KUN") && strstr(initial_file_upper, "WARS"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "BLASTER") && strstr(initial_file_upper, "BURN"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "LAYDOCK") && strstr(initial_file_upper, "LAST"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "BUSHOUHUUNROKU"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "SENKOKUGUNYUDEN"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "FARDRAUT"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "SUIKODEN"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "PAC-MANIA"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "GENCHOHISI"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "QUINPL"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "UNDEADLINE"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "CRIMSON"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "FEEDBACK"))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "FAMICLE"))
-    {
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
-    }
-
-    if ((strstr(initial_file_upper, "MASTER 3")) || (strstr(initial_file_upper, "MASTER3")) || (strstr(initial_file_upper, "MASTER III")))
-    {
-        if (isDSiMode()) myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (only DSi or above)
-    }
-
-    if (strstr(initial_file_upper, "SINGULAR") && strstr(initial_file_upper, "STONE"))
-    {
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC
-    }
-
-    if (strstr(initial_file_upper, "FRAY"))
-    {
-        myConfig.musicExpand = MUSIC_MSX;   // Enable MSX MUSIC (DS-Lite can handle this one)
-    }
-
-    if (strstr(initial_file_upper, "ARKANOID"))
-    {
-        myConfig.dpad = DPAD_ARKANOID;
-    }
-
-    if (strstr(initial_file_upper, "CHUCKIE"))
-    {
-        myConfig.dpad = DPAD_SLIDE_N_GLIDE;
-    }
-
-    if (strstr(initial_file_upper, "QBERT"))
-    {
-        myConfig.dpad = DPAD_DIAGONALS;
-    }
-
-    if (strstr(initial_file_upper, "Q-BERT"))
-    {
-        myConfig.dpad = DPAD_DIAGONALS;
-    }
+    ApplyDatabaseTweaks(); // Some games need tweaks to default settings... do this now
 }
 
 // ----------------------------------------------------------
 // Load configuration into memory where we can use it.
 // The configuration is stored in Hachibitto.dat
 // ----------------------------------------------------------
-void LoadConfig(void)
+void LoadConfigDatabase(void)
 {
     u8 bInitDatabase = 0;
-    
+
     preserveCompressedMem();
 
     // -----------------------------------------------------------------
@@ -1180,11 +1096,11 @@ void LoadConfig(void)
     // -----------------------------------------------------------------
     SetDefaultGameConfig();
 
-    if (ReadFileCarefully("/data/Hachibitto.dat", (u8*)&myGlobalConfig, sizeof(myGlobalConfig), 0))  // Read Global Config
+    if (ReadFileCarefully("/data/Hachibitto.dat", (u8*)&myGlobalConfig, sizeof(myGlobalConfig), 0, NULL))  // Read Global Config
     {
         int comp_len = 0;
-        ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig)); // Read the full game array of configs (compressed length)
-        ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len)); // Read the full game array of configs (actual data)
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)&comp_len, sizeof(comp_len), sizeof(myGlobalConfig), NULL); // Read the full game array of configs (compressed length)
+        ReadFileCarefully("/data/Hachibitto.dat", (u8*)COMPRESS_BUFFER, comp_len, sizeof(myGlobalConfig) + sizeof(comp_len), NULL); // Read the full game array of configs (actual data)
         (void)lzav_decompress( COMPRESS_BUFFER, AllConfigs, comp_len, sizeof(AllConfigs) );
 
         // If our config version changed... we init the entire database
@@ -1197,7 +1113,7 @@ void LoadConfig(void)
     {
         bInitDatabase = 1;
     }
-    
+
     if (bInitDatabase)
     {
         memset(&AllConfigs, 0x00, sizeof(AllConfigs));
@@ -1222,7 +1138,7 @@ void FindConfig(void)
 
     for (u16 slot=0; slot<MAX_CONFIGS; slot++)
     {
-        if (AllConfigs[slot].game_crc == file_crc)  // Got a match?!
+        if (AllConfigs[slot].game_crc == GetMasterCRC())  // Got a match?!
         {
             memcpy(&myConfig, &AllConfigs[slot], sizeof(struct Config_t));
             break;
@@ -1251,22 +1167,23 @@ const struct options_t Option_Table[1][20] =
     // Page 1
     {
         {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
-                            "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                              &myConfig.msxMapper,      19},
-        {"MACHINE TYPE",   {"MSX2 - NORMAL", "MSX1 - LEGACY"},                                                                                                                  &myConfig.machineType,    2},
-        {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,       2},
-        {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,     2},
-        {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,       4},
-        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,           4},
-        {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,   3},
-        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,       3},
-        {"MUSIC EXPAND",   {"NONE", "MSX-MUSIC", "SCC+ (SCC-I)", "2x PSG", "BEEPER"},                                                                                           &myConfig.musicExpand,    5},
-        {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,        21},
-        {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,    2},
-        {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,    4},
-        {"FRAMESKIP",      {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                                     &myConfig.frameSkip,      3},
-        {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,  3},
-        {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger, 2},
-        {NULL,             {"",      ""},                                                                                                                                       NULL,                     1},
+                            "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                              &myConfig.msxMapper,        19},
+        {"MACHINE TYPE",   {"MSX2 - NORMAL", "MSX1 - LEGACY"},                                                                                                                  &myConfig.machineType,      2},
+        {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,         2},
+        {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,       2},
+        {"AUTO FIRE",      {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                               &myConfig.autoFire,         4},
+        {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,             4},
+        {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,     3},
+        {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,         3},
+        {"EXPANSION",      {"NONE", "FM-PAC", "SCC+ (SCC-I)", "2x PSG", "BEEPER"},                                                                                              &myConfig.expansion,      5},
+        {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,          21},
+        {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,      2},
+        {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,      4},
+        {"FRAMESKIP",      {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                                     &myConfig.frameSkip,        3},
+        {"DISK SOUND",     {"OFF", "ON"},                                                                                                                                       &myGlobalConfig.bDiskSounds,2},
+        {"FPS",            {"OFF", "ON", "ON FULLSPEED"},                                                                                                                       &myGlobalConfig.showFPS,    3},
+        {"DEBUGGER",       {"OFF", "FULL DEBUG"},                                                                                                                               &myGlobalConfig.debugger,   2},
+        {NULL,             {"",      ""},                                                                                                                                       NULL,                       1},
     }
 };
 
@@ -1558,96 +1475,47 @@ void HachibittoChangeKeymap(void)
 }
 
 
-// -----------------------------------------------------------------------------------------
-// At the bottom of the main screen we show the currently selected filename, size and CRC32
-// -----------------------------------------------------------------------------------------
-void DisplayFileName(void)
+// ----------------------------------------------------------------
+// We show the CART1, CART2 and DISK filenames in the main menu...
+// ----------------------------------------------------------------
+void DisplayFileNames(void)
 {
-    sprintf(szName, "[%d K] [CRC: %08X]", file_size/1024, file_crc);
-    DSPrint((16 - (strlen(szName)/2)),19,0,szName);
-
-    sprintf(szName,"%s",gpFic[ucGameChoice].szName);
-    for (u8 i=strlen(szName)-1; i>0; i--) if (szName[i] == '.') {szName[i]=0;break;}
-    if (strlen(szName)>30) szName[30]='\0';
-    DSPrint((16 - (strlen(szName)/2)),21,0,szName);
-    if (strlen(gpFic[ucGameChoice].szName) >= 35)   // If there is more than a few characters left, show it on the 2nd line
+    for (int id=0; id < (MEDIA_DISK+1); id++)
     {
-        sprintf(szName,"%s",gpFic[ucGameChoice].szName+30);
+        sprintf(szName, "[%d K] [CRC %08X]", MyMedia[id].filesize/1024, MyMedia[id].filecrc);
+        DSPrint(5, 4+(5*id)+0,0,szName);
+
+        sprintf(szName,"%s",MyMedia[id].filename);
         for (u8 i=strlen(szName)-1; i>0; i--) if (szName[i] == '.') {szName[i]=0;break;}
-        if (strlen(szName)>30) szName[30]='\0';
-        DSPrint((16 - (strlen(szName)/2)),22,0,szName);
+        if (strlen(szName)>24) szName[24]='\0';
+        DSPrint(5, 4+(5*id)+1,0,szName);
+        if (strlen(MyMedia[id].filename) >= 29)   // If there is more than a few characters left, show it on the 2nd line
+        {
+            sprintf(szName,"%s",MyMedia[id].filename+24);
+            for (u8 i=strlen(szName)-1; i>0; i--) if (szName[i] == '.') {szName[i]=0;break;}
+            if (strlen(szName)>24) szName[24]='\0';
+            DSPrint(5, 4+(5*id)+2,0,szName);
+        }
+
+        // If a game is loaded into a slot, we show a red X icon so the user can remove it...
+        if ((MyMedia[id].filecrc != 0) && (MyMedia[id].filecrc != 0xFFFFFFFF))  // 0xFFFFFFFF is for SCC+ cart
+        {
+            DSPrint(30,4+(5*id)+0,2, "!\"");
+            DSPrint(30,4+(5*id)+1,2, "AB");
+        }
+        else
+        {
+            DSPrint(30,4+(5*id)+0,0, "  ");
+            DSPrint(30,4+(5*id)+1,0, "  ");
+        }
     }
 }
-
-//*****************************************************************************
-// Display Hachibitto info screen and change options "main menu"
-//*****************************************************************************
-void dispInfoOptions(u32 uY)
-{
-    DSPrint(2, 7,(uY== 7 ? 2 : 0),("         LOAD  GAME         "));
-    DSPrint(2, 9,(uY== 9 ? 2 : 0),("         PLAY  GAME         "));
-    DSPrint(2,11,(uY==11 ? 2 : 0),("     REDEFINE  KEYS         "));
-    DSPrint(2,13,(uY==13 ? 2 : 0),("         GAME  OPTIONS      "));
-    DSPrint(2,15,(uY==15 ? 2 : 0),("         QUIT  EMULATOR     "));
-}
-
-// --------------------------------------------------------------------
-// Some main menu selections don't make sense without a game loaded.
-// --------------------------------------------------------------------
-void NoGameSelected(u32 ucY)
-{
-    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
-    while (keysCurrent()  & (KEY_START | KEY_A));
-    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
-    DSPrint(5,10,0,("   NO GAME SELECTED   "));
-    DSPrint(5,12,0,("  PLEASE, USE OPTION  "));
-    DSPrint(5,14,0,("      LOAD  GAME      "));
-    WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
-    while (!(keysCurrent()  & (KEY_START | KEY_A)));
-    while (keysCurrent()  & (KEY_START | KEY_A));
-    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
-    dispInfoOptions(ucY);
-}
-
-
-void ReadFileCRCAndConfig(void)
-{
-    // Reset the mode related vars...
-    msx_mode = 0;
-    keyMapType = 0;
-
-    // ----------------------------------------------------------------------------------
-    // Clear the entire ROM buffer[] - fill with 0xFF to emulate non-responsive memory
-    // ----------------------------------------------------------------------------------
-    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
-
-    // Grab the all-important file CRC - this also loads the file into ROM_Memory[]
-    getfile_crc(gpFic[ucGameChoice].szName);
-
-    if (strstr(gpFic[ucGameChoice].szName, ".msx") != 0) msx_mode = MSX_MODE_CART;
-    if (strstr(gpFic[ucGameChoice].szName, ".MSX") != 0) msx_mode = MSX_MODE_CART;
-    if (strstr(gpFic[ucGameChoice].szName, ".rom") != 0) msx_mode = MSX_MODE_CART;
-    if (strstr(gpFic[ucGameChoice].szName, ".ROM") != 0) msx_mode = MSX_MODE_CART;
-    if (strstr(gpFic[ucGameChoice].szName, ".dsk") != 0) msx_mode = MSX_MODE_DISK;
-    if (strstr(gpFic[ucGameChoice].szName, ".DSK") != 0) msx_mode = MSX_MODE_DISK;
-
-    // Save the initial filename and file - we need it for save/restore of state
-    strcpy(initial_file, gpFic[ucGameChoice].szName);
-    strcpy(initial_file_upper, gpFic[ucGameChoice].szName);
-    for (int i=0; i<strlen(initial_file_upper); i++)
-    {
-        initial_file_upper[i] = toupper(initial_file_upper[i]);     // Uppercase string
-    }
-
-    FindConfig();    // Try to find keymap and config for this file...
-}
-
 
 // ----------------------------------------------------------------------
 // Read file twice and ensure we get the same CRC... if not, do it again
 // until we get a clean read. Return the filesize to the caller...
 // ----------------------------------------------------------------------
-u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset)
+u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset, u32 *crc)
 {
     u32 crc1 = 0;
     u32 crc2 = 1;
@@ -1666,7 +1534,7 @@ u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset)
         {
             if (buf_offset) fseek(file, buf_offset, SEEK_SET);
             fileSize = fread(buf, 1, buf_size, file);
-            crc1 = getCRC32(buf, buf_size);
+            crc1 = getCRC32(buf, fileSize);
             fclose(file);
         }
 
@@ -1676,155 +1544,236 @@ u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset)
         if (file2)
         {
             if (buf_offset) fseek(file2, buf_offset, SEEK_SET);
-            fread(buf, 1, buf_size, file2);
-            crc2 = getCRC32(buf, buf_size);
+            fileSize = fread(buf, 1, buf_size, file2);
+            crc2 = getCRC32(buf, fileSize);
             fclose(file2);
         }
 
         // TODO add a trap for infinite loop - exit with error.
    } while (crc1 != crc2); // If the file couldn't be read, file_size will be 0 and the CRCs will both be 0xFFFFFFFF
 
+   if (crc) *crc=crc1;
+
    return fileSize;
 }
+
+void NoGameSelected(void)
+{
+    unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
+    while (keysCurrent()  & (KEY_START | KEY_A));
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
+    DSPrint(1,10,0,("    NO MASTER GAME SELECTED   "));
+    DSPrint(1,12,0,("    USE CART1 OR DISK ICON    "));
+    DSPrint(1,14,0,("  TO LOAD AND CONFIGURE GAME  "));
+    WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
+    while (!(keysCurrent()  & (KEY_START | KEY_A | KEY_B | KEY_X)));
+    while (keysCurrent()  & (KEY_START | KEY_A | KEY_B | KEY_X));
+}
+
+void CheckIfGameHasMusicMapper(void)
+{
+    if (myConfig.expansion == MUSIC_SCC)
+    {
+        // If the new Config tells us this is an SCC+ game, that slides into CART2
+        memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+        strcpy(MyMedia[MEDIA_CART2].filename, "SCC-I CARTRIDGE");
+        MyMedia[MEDIA_CART2].filecrc = 0xFFFFFFFF;
+    }
+    else if (myConfig.expansion == MUSIC_MSX)
+    {
+        // If the new Config tells us this is an MSX-MUSIC game, that slides into CART2
+        memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+        strcpy(MyMedia[MEDIA_CART2].filename, "FM-PAC CARTRIDGE");
+        MyMedia[MEDIA_CART2].filecrc = 0xFFFFFFFF;
+    }
+    else if (MyMedia[MEDIA_CART2].filecrc == 0xFFFFFFFF) // Was music mapped in?
+    {
+        memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+    }
+}
+
 
 // --------------------------------------------------------------------
 // Let the user select new options for the currently loaded game...
 // --------------------------------------------------------------------
-void HachibittoChangeOptions(void)
+void HachibittoMainMenu(void)
 {
-  u16 ucHaut=0x00, ucBas=0x00,ucA=0x00,ucY= 7, bOK=0;
+    u8 bPlayGame=0;
+    u8 screenTouched = 1;
 
-  // Upper Screen Background
-  videoSetMode(MODE_0_2D | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
-  vramSetBankA(VRAM_A_MAIN_BG);
-  vramSetBankB(VRAM_B_MAIN_SPRITE_0x06400000);
-  bg0 = bgInit(0, BgType_Text8bpp, BgSize_T_256x512, 31,0);
-  bg1 = bgInit(1, BgType_Text8bpp, BgSize_T_256x512, 29,0);
-  bgSetPriority(bg0,1);bgSetPriority(bg1,0);
-  decompress(topscreenTiles, bgGetGfxPtr(bg0), LZ77Vram);
-  decompress(topscreenMap, (void*) bgGetMapPtr(bg0), LZ77Vram);
-  dmaCopy((void*) topscreenPal,(void*) BG_PALETTE,256*2);
-  unsigned short dmaVal =  *(bgGetMapPtr(bg0) + 51*32);
-  dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1),32*24*2);
+    // Upper Screen Background
+    videoSetMode(MODE_0_2D | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
+    vramSetBankA(VRAM_A_MAIN_BG);
+    vramSetBankB(VRAM_B_MAIN_SPRITE_0x06400000);
+    bg0 = bgInit(0, BgType_Text8bpp, BgSize_T_256x512, 31,0);
+    bg1 = bgInit(1, BgType_Text8bpp, BgSize_T_256x512, 29,0);
+    bgSetPriority(bg0,1);bgSetPriority(bg1,0);
+    decompress(topscreenTiles, bgGetGfxPtr(bg0), LZ77Vram);
+    decompress(topscreenMap, (void*) bgGetMapPtr(bg0), LZ77Vram);
+    dmaCopy((void*) topscreenPal,(void*) BG_PALETTE,256*2);
+    unsigned short dmaVal =  *(bgGetMapPtr(bg0) + 51*32);
+    dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1),32*24*2);
 
-  // Lower Screen Background
-  BottomScreenOptions();
+    // Lower Screen Background
+    BottomScreenMainMenu();
 
-  dispInfoOptions(ucY);
+    // Display games as we have them
+    DisplayFileNames();
 
-  if (ucGameChoice != -1)
-  {
-      DisplayFileName();
-  }
-
-  while (!bOK) {
-    if (keysCurrent()  & KEY_UP) {
-      if (!ucHaut) {
-        dispInfoOptions(32);
-        ucY = (ucY == 7 ? 15 : ucY -2);
-        ucHaut=0x01;
-        dispInfoOptions(ucY);
-      }
-      else {
-        ucHaut++;
-        if (ucHaut>10) ucHaut=0;
-      }
-    }
-    else {
-      ucHaut = 0;
-    }
-    if (keysCurrent()  & KEY_DOWN) {
-      if (!ucBas) {
-        dispInfoOptions(32);
-        ucY = (ucY == 15 ? 7 : ucY +2);
-        ucBas=0x01;
-        dispInfoOptions(ucY);
-      }
-      else {
-        ucBas++;
-        if (ucBas>10) ucBas=0;
-      }
-    }
-    else {
-      ucBas = 0;
-    }
-    if (keysCurrent()  & KEY_A) {
-      if (!ucA) {
-        ucA = 0x01;
-        switch (ucY) {
-          case 7 :      // LOAD GAME
-            HachibittoChooseFile();
-            dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*19*2);
-            DSPrint(0,4,0, "                               "); // Clear "XXX/XXX Games Available"
-            if (ucGameChoice != -1)
-            {
-                ReadFileCRCAndConfig(); // Get CRC32 of the file and read the config/keys
-                BottomScreenOptions();
-                dispInfoOptions(ucY);
-                DisplayFileName();      // And put up the filename on the bottom screen
-            }
-            ucY = 9;
-            dispInfoOptions(ucY);
-            break;
-          case 9 :     // PLAY GAME
-            if (ucGameChoice != -1)
-            {
-                bOK = 1;
-            }
-            else
-            {
-                NoGameSelected(ucY);
-            }
-            break;
-          case 11 :     // REDEFINE KEYS
-            if (ucGameChoice != -1)
-            {
-                HachibittoChangeKeymap();
-                dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
-                dispInfoOptions(ucY);
-                DisplayFileName();
-            }
-            else
-            {
-                NoGameSelected(ucY);
-            }
-            break;
-          case 13 :     // GAME OPTIONS
-            if (ucGameChoice != -1)
-            {
-                HachibittoGameOptions(false);
-                dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b)+5*32*2,32*18*2);
-                dispInfoOptions(ucY);
-                DisplayFileName();
-            }
-            else
-            {
-               NoGameSelected(ucY);
-            }
-            break;
-
-          case 15 :     // QUIT EMULATOR
-            exit(1);
-            break;
+    while (!bPlayGame)
+    {
+        if (keysCurrent() & KEY_START)
+        {
+            while (keysCurrent()) swiWaitForVBlank();
+            bPlayGame = 1;
         }
-      }
+
+        // If the touch-screen is pressed... react to it
+        if  ((keysCurrent() & KEY_TOUCH) && !screenTouched)
+        {
+            screenTouched = 5;
+            touchPosition touch;
+            touchRead(&touch);
+
+            if ((touch.py >= 22) && (touch.py < 60)) // CART 1
+            {
+                if ((touch.px >= 220) && MyMedia[MEDIA_CART1].filecrc) // Delete existing mount?
+                {
+                    memset(&MyMedia[MEDIA_CART1], 0x00, sizeof(MyMedia[MEDIA_CART1]));
+                    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB/2) * 1024);
+                    if (MyMedia[MEDIA_CART2].filecrc == 0xFFFFFFFF) // Was Music Mapper mapped in?
+                    {
+                        memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+                    }
+                    // If disk is still mapped in, find the Config for that now as the master
+                    if (MyMedia[MEDIA_DISK].filecrc != 0)
+                    {
+                        FindConfig();
+                    }
+                }
+                else if (touch.px < 220)
+                {
+                    BottomScreenOptions();
+                    HachibittoChooseFile(MEDIA_CART1);
+                    if (ucGameChoice != -1)
+                    {
+                        LoadGameIntoMedia(MEDIA_CART1, gpFic[ucGameChoice].szName);
+                        CheckIfGameHasMusicMapper();
+                    }
+                }
+                BottomScreenMainMenu();
+                DisplayFileNames();
+            }
+            else if ((touch.py >= 60) && (touch.py < 98)) // CART 2
+            {
+                if ((myConfig.expansion != MUSIC_SCC) && (myConfig.expansion != MUSIC_MSX)) // Expanded Music mapper has to be booted out by Options...
+                {
+                    if ((touch.px >= 220) && MyMedia[MEDIA_CART2].filecrc) // Delete existing mount?
+                    {
+                        memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+                        memset(ROM_Memory + (MAX_CART_SIZE_KB/2) * 1024, 0xFF, (MAX_CART_SIZE_KB/2) * 1024);
+                    }
+                    else if (touch.px < 220)
+                    {
+                        BottomScreenOptions();
+                        HachibittoChooseFile(MEDIA_CART2);
+                        if (ucGameChoice != -1)
+                        {
+                            LoadGameIntoMedia(MEDIA_CART2, gpFic[ucGameChoice].szName);
+                        }
+                    }
+                    BottomScreenMainMenu();
+                    DisplayFileNames();
+                }
+            }
+            else if ((touch.py >= 98) && (touch.py < 145)) // DISK
+            {
+                if ((touch.px >= 220) && MyMedia[MEDIA_DISK].filecrc) // Delete existing mount?
+                {
+                    memset(&MyMedia[MEDIA_DISK], 0x00, sizeof(MyMedia[MEDIA_DISK]));
+                    memset(DISK_Memory, 0xFF, MAX_DISK_SIZE_KB * 1024);
+                    if (MyMedia[MEDIA_CART2].filecrc == 0xFFFFFFFF) // Was Music Mapper mapped in?
+                    {
+                        if (MyMedia[MEDIA_CART1].filecrc == 0) // If no Master CART1
+                        {
+                            memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+                        }
+                    }
+                }
+                else if (touch.px < 220)
+                {
+                    BottomScreenOptions();
+                    HachibittoChooseFile(MEDIA_DISK);
+                    if (ucGameChoice != -1)
+                    {
+                        LoadGameIntoMedia(MEDIA_DISK, gpFic[ucGameChoice].szName);
+                        CheckIfGameHasMusicMapper();
+                    }
+                }
+                BottomScreenMainMenu();
+                DisplayFileNames();
+            }
+            else if ((touch.py >= 145) && (touch.py < 192)) // Main Menu Icons
+            {
+              if ((touch.px >= 20) && (touch.px < 92)) // Options
+              {
+                  if (GetMasterCRC())
+                  {
+                      BottomScreenOptions();
+                      HachibittoGameOptions(false);
+                      CheckIfGameHasMusicMapper();
+                      BottomScreenMainMenu();
+                      DisplayFileNames();
+                  }
+                  else
+                  {
+                      BottomScreenOptions();
+                      NoGameSelected();
+                      BottomScreenMainMenu();
+                      DisplayFileNames();
+                  }
+              }
+              else if ((touch.px >= 92) && (touch.px < 167)) // Play Game
+              {
+                  if (GetMasterCRC())
+                  {
+                      bPlayGame = 1;
+                  }
+                  else
+                  {
+                      BottomScreenOptions();
+                      NoGameSelected();
+                      BottomScreenMainMenu();
+                      DisplayFileNames();
+                  }
+              }
+              else if ((touch.px >= 167) && (touch.px < 245)) // Controller Map
+              {
+                  if (GetMasterCRC())
+                  {
+                      BottomScreenOptions();
+                      HachibittoChangeKeymap();
+                      BottomScreenMainMenu();
+                      DisplayFileNames();
+                  }
+                  else
+                  {
+                      BottomScreenOptions();
+                      NoGameSelected();
+                      BottomScreenMainMenu();
+                      DisplayFileNames();
+                  }
+              }
+            }
+        }
+        else
+        {
+            if (screenTouched) screenTouched--;
+        }
+
+        ShowRandomPreviewSnaps();
+        swiWaitForVBlank();
     }
-    else
-      ucA = 0x00;
-    if (keysCurrent()  & KEY_START) {
-      if (ucGameChoice != -1)
-      {
-        bOK = 1;
-      }
-      else
-      {
-        NoGameSelected(ucY);
-      }
-    }
-    ShowRandomPreviewSnaps();
-    swiWaitForVBlank();
-  }
-  while (keysCurrent()  & (KEY_START | KEY_A));
 }
 
 //*****************************************************************************

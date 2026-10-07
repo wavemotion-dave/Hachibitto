@@ -160,8 +160,8 @@ extern u32 DX, DY;
 #define KBD_KEY_DEAD        26
 #define KBD_KEY_YEN         27
 
-#define VDP_IRQ_VBLANK  0x01
-#define VDP_IRQ_LINE    0x02
+#define VDP_IRQ_VBLANK      0x01
+#define VDP_IRQ_LINE        0x02
 
 #define WAITVBL swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank(); swiWaitForVBlank();
 
@@ -169,13 +169,29 @@ extern u16 emuFps;
 extern u16 emuActFrames;
 extern u16 timingFrames;
 
-extern char initial_file[];
-extern char initial_file_upper[];
-extern char initial_path[];
+#define MAX_FILES                   1024    // Max files per directory (.ROM and .DSK)
+#define MAX_FILE_NAME_LEN           160     // Max size of any single filename
+#define MAX_PATH_NAME_LEN           200     // Max path size to drill down into
+
+typedef struct
+{
+    char    filename[MAX_FILE_NAME_LEN];    // Always uppercase to help strstr()
+    char    filepath[MAX_PATH_NAME_LEN];    // Where the file was found on the SD card
+    u32     filesize;                       // How big this file was (0 if no file in this slot)
+    u32     filecrc;                        // The CRC32 of the file (0 if no file in this slot)
+    u8      mapperType;                     // Mapper type for the CARTs (Disk will always be 0x00)
+    u8      mapperMask;                     // Mapper mask for the CARTs (Disk will always be 0x00)
+    u16     blockSize;                      // Mapper block size... 0x2000 (8K) or 0x4000 (16K)
+} Media_t;
+
+#define MEDIA_CART1     0
+#define MEDIA_CART2     1
+#define MEDIA_DISK      2
+
+extern Media_t MyMedia[3]; // Cart1, Cart2 and Disk possibilities
 
 extern u16 nds_key;
 extern u8  kbd_key;
-extern u8 msx_mode;
 extern u8 kbd_keys_pressed;
 extern u8 kbd_keys[12];
 extern volatile u16 vusCptVBL;
@@ -187,13 +203,19 @@ extern u8 io_show_status;
 extern u8 sram_show_status;
 
 extern void BottomScreenOptions(void);
+extern void BottomScreenMainMenu(void);
 extern void BottomScreenKeypad(void);
 extern void PauseSound(void);
 extern void UnPauseSound(void);
-extern void ReadFileCRCAndConfig(void);
+extern void ReadFileAndLoadConfig(u8 media_id);
 extern void DisplayStatusLine(void);
 extern void ResetMSX(void);
+extern void FindConfig(void);
 extern void SetVDPIRQ(u8 bit, u8 set);
+extern u32  GetMasterCRC(void);
+extern char *GetMasterFilename(void);
+extern char *GetMasterPath(void);
+extern void LoadGameIntoMedia(u8 media_id, char *filename);
 extern void debug_init();
 extern void debug_save();
 extern void debug_printf(const char * str, ...);

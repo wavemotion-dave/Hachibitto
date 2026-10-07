@@ -96,7 +96,7 @@ void fdc_flush_track(void)
             // ------------------------------------------------------------------------------------------------
             // And here we actually write the disk back to the file storage... we only re-write the one track.
             // ------------------------------------------------------------------------------------------------
-            FILE *fp = fopen(initial_file, "rb+"); // Open file for read/write
+            FILE *fp = fopen(MyMedia[MEDIA_DISK].filename, "rb+"); // Open file for read/write
             if (fp)
             {
                 fseek(fp, file_offset, SEEK_SET);           // Seek to the right spot

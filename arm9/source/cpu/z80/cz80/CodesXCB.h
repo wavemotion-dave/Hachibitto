@@ -71,4 +71,55 @@ case SET3_xHL: I=RdZ80(J.W);M_SET(3,I);WrZ80(J.W,I);break;
 case SET4_xHL: I=RdZ80(J.W);M_SET(4,I);WrZ80(J.W,I);break; 
 case SET5_xHL: I=RdZ80(J.W);M_SET(5,I);WrZ80(J.W,I);break; 
 case SET6_xHL: I=RdZ80(J.W);M_SET(6,I);WrZ80(J.W,I);break; 
-case SET7_xHL: I=RdZ80(J.W);M_SET(7,I);WrZ80(J.W,I);break; 
+case SET7_xHL: I=RdZ80(J.W);M_SET(7,I);WrZ80(J.W,I);break;
+
+// Handle the "illegal" but sometimes used register forms...
+default:
+{
+  byte op = I;
+
+  I = RdZ80(J.W);
+
+  if ((op & 0xC0) == 0x00)
+  {
+    switch (op & 0x38)
+    {
+      case 0x00: M_RLC(I); break;
+      case 0x08: M_RRC(I); break;
+      case 0x10: M_RL(I);  break;
+      case 0x18: M_RR(I);  break;
+      case 0x20: M_SLA(I); break;
+      case 0x28: M_SRA(I); break;
+      case 0x30: M_SLL(I); break;
+      case 0x38: M_SRL(I); break;
+    }
+  }
+  else if ((op & 0xC0) == 0x80)
+  {
+    M_RES((op >> 3) & 7, I);
+  }
+  else if ((op & 0xC0) == 0xC0)
+  {
+    M_SET((op >> 3) & 7, I);
+  }
+  else
+  {
+    if (CPU.TrapBadOps)
+      Trap_Bad_Ops("DDCB", op, CPU.PC.W-4);
+    break;
+  }
+
+  WrZ80(J.W,I);
+
+  switch (op & 7)
+  {
+    case 0: CPU.BC.B.h = I; break;
+    case 1: CPU.BC.B.l = I; break;
+    case 2: CPU.DE.B.h = I; break;
+    case 3: CPU.DE.B.l = I; break;
+    case 4: CPU.HL.B.h = I; break;
+    case 5: CPU.HL.B.l = I; break;
+    case 7: CPU.AF.B.h = I; break;
+  }
+  break;
+}

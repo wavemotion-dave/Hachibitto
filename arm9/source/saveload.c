@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x000B  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x000C  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -85,13 +85,13 @@ void msxSaveState(void)
     preserveCompressedMem();
 
     // Return to the original path
-    chdir(initial_path);
+    chdir(GetMasterPath());
 
     // Ensure 'sav' directory exists
     EnsureSaveDirectory();
 
     // Init filename = romname and SAV in place of ROM
-    sprintf(szLoadFile,"sav/%s", initial_file);
+    sprintf(szLoadFile,"sav/%s", GetMasterFilename());
 
     // Replace the original filename extension with .sav
     int len = strlen(szLoadFile);
@@ -114,7 +114,7 @@ void msxSaveState(void)
         for (u8 i=0; i<8; i++)
         {
             u8 *shifted_offset = MemoryMap[i] + (0x2000 * i);   // Shift the MemoryMap[] back up to non-offset range for the save/restore
-            
+
             if ((shifted_offset >= ROM_Memory) && (shifted_offset < ROM_Memory+MAX_CART_SIZE_KB))
             {
                 Offsets[i].type = TYPE_ROM;
@@ -134,6 +134,11 @@ void msxSaveState(void)
             {
                 Offsets[i].type = TYPE_SRAM;
                 Offsets[i].offset = shifted_offset - SRAM_Memory;
+            }
+            else if ((shifted_offset >= SCC_Memory) && (shifted_offset < SCC_Memory+(sizeof(SCC_Memory))))
+            {
+                Offsets[i].type = TYPE_SCC;
+                Offsets[i].offset = shifted_offset - SCC_Memory;
             }
             else if ((shifted_offset >= BIOS_Memory) && (shifted_offset < BIOS_Memory+(sizeof(BIOS_Memory))))
             {
@@ -161,20 +166,47 @@ void msxSaveState(void)
         // We need to save off the MSX Cart offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
         {
-            if ((MSXCartPtr[i] >= ROM_Memory) && (MSXCartPtr[i] < ROM_Memory+(sizeof(ROM_Memory))))
+            if ((MSXCartPtr[MEDIA_CART1][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < ROM_Memory+(sizeof(ROM_Memory))))
             {
                 Offsets[i].type = TYPE_ROM;
-                Offsets[i].offset = MSXCartPtr[i] - ROM_Memory;
+                Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - ROM_Memory;
             }
-            else if ((MSXCartPtr[i] >= SRAM_Memory) && (MSXCartPtr[i] < SRAM_Memory+(sizeof(SRAM_Memory))))
+            else if ((MSXCartPtr[MEDIA_CART1][i] >= SRAM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < SRAM_Memory+(sizeof(SRAM_Memory))))
             {
                 Offsets[i].type = TYPE_SRAM;
-                Offsets[i].offset = MSXCartPtr[i] - SRAM_Memory;
+                Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - SRAM_Memory;
+            }
+            else if ((MSXCartPtr[MEDIA_CART1][i] >= SCC_Memory) && (MSXCartPtr[MEDIA_CART1][i] < SCC_Memory+(sizeof(SCC_Memory))))
+            {
+                Offsets[i].type = TYPE_SCC;
+                Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - SCC_Memory;
             }
             else
             {
                 Offsets[i].type = TYPE_OTHER;
-                Offsets[i].offset = (u32)MSXCartPtr[i];
+                Offsets[i].offset = (u32)MSXCartPtr[MEDIA_CART1][i];
+            }
+        }
+        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
+
+
+        // We need to save off the MSX Cart2 offsets so we can restore them properly...
+        for (u8 i=0; i<8; i++)
+        {
+            if ((MSXCartPtr[MEDIA_CART2][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < ROM_Memory+(sizeof(ROM_Memory))))
+            {
+                Offsets[i].type = TYPE_ROM;
+                Offsets[i].offset = MSXCartPtr[MEDIA_CART2][i] - ROM_Memory;
+            }
+            else if ((MSXCartPtr[MEDIA_CART2][i] >= SRAM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < SRAM_Memory+(sizeof(SRAM_Memory))))
+            {
+                Offsets[i].type = TYPE_SRAM;
+                Offsets[i].offset = MSXCartPtr[MEDIA_CART2][i] - SRAM_Memory;
+            }
+            else
+            {
+                Offsets[i].type = TYPE_OTHER;
+                Offsets[i].offset = (u32)MSXCartPtr[MEDIA_CART2][i];
             }
         }
         if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
@@ -215,6 +247,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&ChrGenM,               sizeof(ChrGenM),                1, handle);
         if (retVal) retVal = fwrite(&SprTabM,               sizeof(SprTabM),                1, handle);
         if (retVal) retVal = fwrite(XPal,                   sizeof(XPal),                   1, handle);
+        if (retVal) retVal = fwrite(&MyMedia,               sizeof(MyMedia),                1, handle);
 
         // These are pointers into VDP Memory... save them as offsets...
         pSvg = ChrGen-VDP_Memory;
@@ -226,7 +259,7 @@ void msxSaveState(void)
         pSvg = SprGen-VDP_Memory;
         if (retVal) retVal = fwrite(&pSvg, sizeof(pSvg),1, handle);
         pSvg = SprTab-VDP_Memory;
-        if (retVal) retVal = fwrite(&pSvg, sizeof(pSvg),1, handle);        
+        if (retVal) retVal = fwrite(&pSvg, sizeof(pSvg),1, handle);
 
         // Write sound chip data
         if (retVal) retVal = fwrite(&myAY,                  sizeof(myAY),                   1, handle);
@@ -245,12 +278,9 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&Port_PPI_A,            sizeof(Port_PPI_A),             1, handle);
         if (retVal) retVal = fwrite(&Port_PPI_B,            sizeof(Port_PPI_B),             1, handle);
         if (retVal) retVal = fwrite(&Port_PPI_C,            sizeof(Port_PPI_C),             1, handle);
-        if (retVal) retVal = fwrite(&mapperType,            sizeof(mapperType),             1, handle);
-        if (retVal) retVal = fwrite(&mapperMask,            sizeof(mapperMask),             1, handle);
         if (retVal) retVal = fwrite(&msx_subslot,           sizeof(msx_subslot),            1, handle);
         if (retVal) retVal = fwrite(bCartInPage,            sizeof(bCartInPage),            1, handle);
         if (retVal) retVal = fwrite(bRAMInPage,             sizeof(bRAMInPage),             1, handle);
-        if (retVal) retVal = fwrite(&msx_last_file_size,    sizeof(msx_last_file_size),     1, handle);
         if (retVal) retVal = fwrite(&special_memory_access, sizeof(special_memory_access),  1, handle);
         if (retVal) retVal = fwrite(&msx_scc_capable_game,  sizeof(msx_scc_capable_game),   1, handle);
         if (retVal) retVal = fwrite(&sccplus_mode,          sizeof(sccplus_mode),           1, handle);
@@ -258,7 +288,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&XPalReal0,             sizeof(XPalReal0),              1, handle);
         if (retVal) retVal = fwrite(&ALatch,                sizeof(ALatch),                 1, handle);
         if (retVal) retVal = fwrite(&frame_number,          sizeof(frame_number),           1, handle);
-        if (retVal) retVal = fwrite(&drawn_frame_number,    sizeof(drawn_frame_number),     1, handle);        
+        if (retVal) retVal = fwrite(&drawn_frame_number,    sizeof(drawn_frame_number),     1, handle);
         if (retVal) retVal = fwrite(&CurrentEpochSaved,     sizeof(CurrentEpochSaved),      1, handle);
         if (retVal) retVal = fwrite(&msx_irq_pending,       sizeof(msx_irq_pending),        1, handle);
         if (retVal) retVal = fwrite(&palette_latch,         sizeof(palette_latch),          1, handle);
@@ -267,17 +297,18 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(OccBuf,                 sizeof(OccBuf),                 1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
+        if (retVal) retVal = fwrite(&FMPAC_SRAM_in_view,    sizeof(FMPAC_SRAM_in_view),     1, handle);        
         if (retVal) retVal = fwrite(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
         if (retVal) retVal = fwrite(mirror_ram_bank,        sizeof(mirror_ram_bank),        1, handle);
         if (retVal) retVal = fwrite(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
         if (retVal) retVal = fwrite(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
-        if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);        
+        if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);
         if (retVal) retVal = fwrite(&render_blended,        sizeof(render_blended),         1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
-        
+
         // -----------------------------------------------------------------------
         // Compress the 128K RAM data using 'high' compression ratio...
         // -----------------------------------------------------------------------
@@ -299,17 +330,17 @@ void msxSaveState(void)
         // -----------------------------------------------------------------------
         // Compress the 64K SRAM data using 'high' compression ratio...
         // -----------------------------------------------------------------------
-        max_len = lzav_compress_bound_hi( sizeof(SRAM_Memory) );
-        comp_len = lzav_compress_hi( SRAM_Memory, COMPRESS_BUFFER, sizeof(SRAM_Memory), max_len );
+        max_len = lzav_compress_bound_hi( sizeof(SCC_Memory) );
+        comp_len = lzav_compress_hi( SCC_Memory, COMPRESS_BUFFER, sizeof(SCC_Memory), max_len );
 
         if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
         if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,          1, handle);
 
         fclose(handle);
     }
-    
+
     restoreCompressedMem();
-    
+
     DSPrint(20,0, 0, "   ");
     DSPrint(20,1, 0, "   ");
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
@@ -334,13 +365,13 @@ void msxLoadState(void)
     preserveCompressedMem();
 
     // Return to the original path
-    chdir(initial_path);
+    chdir(GetMasterPath());
 
     // Ensure 'sav' directory exists
     EnsureSaveDirectory();
 
     // Init filename = romname and SAV in place of ROM
-    sprintf(szLoadFile,"sav/%s", initial_file);
+    sprintf(szLoadFile,"sav/%s", GetMasterFilename());
 
     // Replace the original filename extension with .sav
     int len = strlen(szLoadFile);
@@ -397,24 +428,41 @@ void msxLoadState(void)
                     MemoryMap[i] = (u8 *) (Offsets[i].offset) - (0x2000 * i);
                 }
             }
-            
+
             if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
             for (u8 i=0; i<8; i++)
             {
                 if (Offsets[i].type == TYPE_ROM)
                 {
-                    MSXCartPtr[i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (ROM_Memory + Offsets[i].offset);
                 }
                 else if (Offsets[i].type == TYPE_SRAM)
                 {
-                    MSXCartPtr[i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
                 }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {
-                    MSXCartPtr[i] = (u8 *) (Offsets[i].offset);
+                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (Offsets[i].offset);
                 }
             }
-            
+
+            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
+            for (u8 i=0; i<8; i++)
+            {
+                if (Offsets[i].type == TYPE_ROM)
+                {
+                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_SRAM)
+                {
+                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                }
+                else // TYPE_OTHER - this is just a pointer to memory
+                {
+                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (Offsets[i].offset);
+                }
+            }
+
             if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
             for (u8 i=0; i<8; i++)
             {
@@ -427,7 +475,7 @@ void msxLoadState(void)
                     MSXRamPtr[i] = (u8 *) (Offsets[i].offset);
                 }
             }
-            
+
             // Write VDP
             if (retVal) retVal = fread(VDP,                    sizeof(VDP),                    1, handle);
             if (retVal) retVal = fread(VDPStatus,              sizeof(VDPStatus),              1, handle);
@@ -448,6 +496,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&ChrGenM,               sizeof(ChrGenM),                1, handle);
             if (retVal) retVal = fread(&SprTabM,               sizeof(SprTabM),                1, handle);
             if (retVal) retVal = fread(XPal,                   sizeof(XPal),                   1, handle);
+            if (retVal) retVal = fread(&MyMedia,               sizeof(MyMedia),                1, handle);
 
             // These are pointers into VDP Memory... save them as offsets...
             if (retVal) retVal = fread(&pSvg, sizeof(pSvg),1, handle);
@@ -478,12 +527,9 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&Port_PPI_A,            sizeof(Port_PPI_A),             1, handle);
             if (retVal) retVal = fread(&Port_PPI_B,            sizeof(Port_PPI_B),             1, handle);
             if (retVal) retVal = fread(&Port_PPI_C,            sizeof(Port_PPI_C),             1, handle);
-            if (retVal) retVal = fread(&mapperType,            sizeof(mapperType),             1, handle);
-            if (retVal) retVal = fread(&mapperMask,            sizeof(mapperMask),             1, handle);
             if (retVal) retVal = fread(&msx_subslot,           sizeof(msx_subslot),            1, handle);
             if (retVal) retVal = fread(bCartInPage,            sizeof(bCartInPage),            1, handle);
             if (retVal) retVal = fread(bRAMInPage,             sizeof(bRAMInPage),             1, handle);
-            if (retVal) retVal = fread(&msx_last_file_size,    sizeof(msx_last_file_size),     1, handle);
             if (retVal) retVal = fread(&special_memory_access, sizeof(special_memory_access),  1, handle);
             if (retVal) retVal = fread(&msx_scc_capable_game,  sizeof(msx_scc_capable_game),   1, handle);
             if (retVal) retVal = fread(&sccplus_mode,          sizeof(sccplus_mode),           1, handle);
@@ -500,11 +546,12 @@ void msxLoadState(void)
             if (retVal) retVal = fread(OccBuf,                 sizeof(OccBuf),                 1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
             if (retVal) retVal = fread(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
+            if (retVal) retVal = fread(&FMPAC_SRAM_in_view,    sizeof(FMPAC_SRAM_in_view),     1, handle);
             if (retVal) retVal = fread(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
             if (retVal) retVal = fread(mirror_ram_bank,        sizeof(mirror_ram_bank),        1, handle);
             if (retVal) retVal = fread(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
             if (retVal) retVal = fread(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
-            if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);        
+            if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);
             if (retVal) retVal = fread(&render_blended,        sizeof(render_blended),         1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
@@ -531,7 +578,7 @@ void msxLoadState(void)
             // -----------------------------------------------------------------------
             if (retVal) retVal = fread(&comp_len,                sizeof(comp_len), 1, handle);
             if (retVal) retVal = fread(COMPRESS_BUFFER,          comp_len,         1, handle);
-            (void)lzav_decompress( COMPRESS_BUFFER, SRAM_Memory, comp_len, sizeof(SRAM_Memory));
+            (void)lzav_decompress( COMPRESS_BUFFER, SCC_Memory,  comp_len, sizeof(SCC_Memory));
         }
 
         fclose(handle);

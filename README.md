@@ -13,12 +13,13 @@ These hobby emulators have been a labor of love. An embarassing amount of develo
 Features :
 -----------------------
 * Rock-solid 60Hz sync to the DSi/XL/LL for a tear-free experience (DS-Lite/Phat supported with light frameskip).
-* Loads .ROM cartridge files up to 1.25MB (DS-Lite/Phat) or 4MB (DSi).
+* Loads .ROM cartridge files up to 1MB (DS-Lite/Phat) or 4MB (DSi). 
+* Two cart slots supported (if a 2nd cart is utilized, it cuts the max .ROM filesizes above in half).
 * Loads .DSK disk files that are single side (360K) or double sided (720K) with in-game disk swap.
 * Emulated machine is 128K of User RAM and 128K of VRAM.
 * Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard.
 * Save and Restore states so you can pick up where you left off on a per-game basis.
-* Standard PSG, 2x PSG, SCC, SCC+ and MSX-MUSIC available.
+* Standard PSG, 2x PSG, SCC, SCC+ and FM-PAC (MSX-MUSIC + SRAM) available.
 * SRAM carts backed to SD card automatically.
 * Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!).
 * Arkanoid paddle controllers supported (only 2 games known to make use of it - hold B button to speed up paddle movement).
