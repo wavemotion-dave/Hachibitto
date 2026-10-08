@@ -102,6 +102,12 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.3 - 08-Oct-2026 by wavemotion-dave
+* Revamped UI with an icon-driven approach.
+* Fix for MSX1 sprite rendering - no more black shadow / glitches.
+* Two full cart slots + disk supported.
+* Lots of other minor fixes and improvements under the hood.
+
 Version 1.2 - 05-Oct-2026 by wavemotion-dave
 * 80 Column mode (with zoom) supported.
 * Fix for PSG sound filter - it was causing some sounds to be too gritty.

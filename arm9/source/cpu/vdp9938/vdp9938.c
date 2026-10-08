@@ -72,7 +72,6 @@ u8  OccBuf[320]             __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]        __attribute__((section(".dtcm")));
 u32 Screen2NibbleMask[16]   __attribute__((section(".dtcm")));
 
-#define DS_BLACK RGB15(0,0,0)
 inline void handle_transparency(void)
 {
     if (ScrMode < 4)
@@ -93,7 +92,7 @@ inline void handle_transparency(void)
     }
     else // Non-Legacy modes require that palette entry 0 is BLACK
     {
-        BG_PALETTE[0] = DS_BLACK;
+        BG_PALETTE[0] = RGB15(0,0,0);
 
         u8 new_bg_color = (!BGColor || (VDP[8] & 0x20)) ? XPalReal0 : XPal[BGColor];
         XPal[0] = new_bg_color;
@@ -110,13 +109,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     else
     {
         u8 new_color = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
-
-        // Only update the table if the XPal[] palette table is changing...
-        if (XPal[index] != new_color)
-        {
-            XPal[index] = new_color;
-            if (ScrMode < 4) RebuildLutTablehh();
-        }
+        XPal[index] = new_color;
     }
 }
 
@@ -159,7 +152,7 @@ void BuildNibbleLUT(void)
     }
 }
 
-void RebuildLutTablehh(void)
+void BuildLutTablehh(void)
 {
     /*
      * Screen 1/2 nibble masks.
@@ -2193,12 +2186,6 @@ void CheckNewMode(void)
     default:   newMode=ScrMode;break;
   }
 
-  // If we just switched into a legacy mode, rebuild the table
-  if ((ScrMode != newMode) && (newMode < 4))
-  {
-      RebuildLutTablehh();
-  }
-
   ScrMode=newMode;
 
   RefreshLine = SCR[ScrMode].Refresh;
@@ -2661,7 +2648,7 @@ void Reset9938(void)
     // ---------------------------------------------------------------
     // Our background/foreground color table makes computations FAST!
     // ---------------------------------------------------------------
-    RebuildLutTablehh();
+    BuildLutTablehh();
     BuildNibbleLUT();
 }
 
