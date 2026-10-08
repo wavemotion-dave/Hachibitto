@@ -12,58 +12,35 @@
 //
 //  ACCURACY LEVEL - deliberately simplified OPLL emulation.
 //
-//  This is NOT a cycle-accurate or full YM2413/OPLL implementation.
-//  The mixer is designed around the CPU budget of the target hardware,
-//  trading synthesis accuracy for a substantial reduction in per-sample
-//  computation.
+//  This is not a cycle-accurate or complete YM2413/OPLL implementation.
+//  The normal/DSi mixer uses a simplified two-operator FM path with separate
+//  modulator and carrier envelope states. The DS-Lite fast mixer retains a
+//  cheaper single-oscillator model. Both trade chip accuracy for performance.
 //
-//  A full 2-operator FM implementation with a more complete ADSR model was
-//  measured to be far too expensive on this hardware.  In particular,
-//  moving lookup tables to faster memory produced only a small improvement,
-//  indicating that the dominant cost was the per-sample synthesis work.
-// 
-//  We use a simplified 2-op FM phase modulation using the instrument's modulator MUL/TL,
-//  improving instrument character while keeping the DSi mixer performance-friendly.
+//  Current normal/DSi melodic synthesis:
+//    - Two operators are synthesized per channel: the modulator changes the
+//      carrier's phase, with simplified feedback and TL-derived modulation.
+//    - MUL, TL, FB and AR/DR/SL/RR contribute to the model; block/KSR affect
+//      the approximate envelope-rate calculation. KSL, AM, VIB and EG-TYP are
+//      decoded but are not currently fully modeled.
+//    - The envelope generators are simplified approximations, not the OPLL's
+//      hardware rate tables or exact logarithmic envelope behavior.
 //
-//  Current melodic synthesis:
-//    - Each channel uses a single oscillator rather than the OPLL's
-//      modulator + carrier FM pair.  There is no carrier phase modulation,
-//      operator feedback, or full FM timbre synthesis.
-//    - The oscillator waveform is intentionally inexpensive.
-//    - Instrument selection and the custom/ROM instrument registers are
-//      still decoded and retained.  The carrier MUL value contributes to
-//      the oscillator frequency.
-//    - Carrier SL (sustain level) is approximated by making a held note's
-//      gain settle toward an instrument-dependent sustain level.  SL=15 is
-//      treated as full level; this is important for software that changes
-//      channel volume while leaving a key held.
-//    - Carrier RR (release rate) is approximated by making the key-off
-//      release rate instrument-dependent.  The RR mapping is normalized to
-//      this simplified gain model rather than attempting to reproduce the
-//      OPLL envelope generator exactly.
-//    - Attack/decay behavior remains deliberately simple.  This avoids the
-//      cost and complexity of a full OPLL envelope generator while retaining
-//      some of the per-instrument character that is audible in real music.
+//  Current DS-Lite fast-mixer synthesis:
+//    - Melodic channels use a single oscillator and a gain ramp, without the
+//      normal mixer's two-operator FM timbre generation. Carrier MUL affects
+//      pitch; the legacy gain model approximates sustain and release.
+//    - This lower-cost path intentionally sacrifices timbral fidelity for speed.
 //
-//  Current rhythm synthesis:
+//  Current rhythm synthesis (shared in concept, with separate mixer code):
 //    - Bass Drum and Tom-Tom use tonal oscillators.
-//    - Hi-Hat, Snare Drum, and Top Cymbal use inexpensive noise-based
-//      approximations.
-//    - Rhythm voices use simplified gain/release behavior rather than the
-//      complete OPLL rhythm envelope.
+//    - Hi-Hat, Snare Drum and Top Cymbal use inexpensive phase/noise-based
+//      approximations and simplified gain/release behavior.
 //
-//  The result intentionally omits several pieces of the YM2413 synthesis
-//  model, including full 2-operator FM, operator feedback, KSL, AM, VIB,
-//  KSR, and the complete per-operator ADSR behavior.
+//  The implementation omits cycle-accurate timing and several parts of the
+//  YM2413 model. Comments describe the current approximation, not a claim of
+//  equivalence with a hardware OPLL. Performance measurements belong in notes.
 //
-//  These omissions are deliberate.  The goal is to obtain convincing
-//  musical behavior at a frame rate suitable for the target hardware,
-//  rather than to reproduce every detail of the original chip.
-//
-//  Performance history is intentionally kept out of this header; measured
-//  FPS and experiment results change as the emulator evolves.  The source
-//  implementation and comments should describe the current model, while
-//  benchmark results belong in development notes.
 //
 //  Register map (verified against the Yamaha OPLL Application Manual,
 //  not reconstructed from memory - see chat for the source):
@@ -83,8 +60,8 @@
 //    ch7 = Hi-Hat (noise, key-on = D0/$0E) + Snare Drum (noise, D3/$0E)
 //    ch8 = Tom-Tom (tonal oscillator, key-on = D2/$0E) + Top Cymbal (noise, D1/$0E)
 //
-//  Setup values ($16-$18/$26-$28) and rhythm volumes ($36-$38) are still
-//  decoded the same as before - only the synthesis method changed.
+//  F-number/block registers for channels 6-8 are still decoded while rhythm
+//  mode is active; $36-$38 supply the individual rhythm-voice volume fields.
 //
 
 #ifndef YM_H
@@ -95,25 +72,23 @@
 #define YM_NUM_CHANNELS      9
 
 //@----------------------------------------------------------------------------
-//@ Register-level instrument parameters. Fully decoded and stored (both the
-//@ mutable custom instrument and the 15 ROM presets) even though the mixer
-//@ currently only reads mulCar - kept complete so richer synthesis can be
-//@ dialed back in later without redoing the register decode.
+//@ Register-level instrument parameters. Both custom-instrument registers and
+//@ ROM presets are decoded and stored. The normal/DSi mixer uses a subset of
+//@ these fields; unsupported parameters remain available but are not all modeled.
 //@----------------------------------------------------------------------------
 typedef struct
 {
-    u8 mulMod, mulCar;              // $00/$01 D3-0  - frequency multiplier, 0-15 (see MUL table). Only
-                                    // mulCar is currently read by the mixer (free per-instrument pitch variety).
-    u8 amMod,  amCar;               // $00/$01 D7    - unused by the mixer currently
-    u8 vibMod, vibCar;              // $00/$01 D6    - unused by the mixer currently
-    u8 egTypeMod, egTypeCar;        // $00/$01 D5    - unused (no ADSR right now)
-    u8 ksrMod, ksrCar;              // $00/$01 D4    - unused by the mixer currently
-    u8 kslMod, kslCar;              // $02/$03 D7-6  - unused by the mixer currently
-    u8 tl;                          // $02     D5-0  - unused by the mixer currently (no FM = no modulator level)
-    u8 dm, dc;                      // $03     D3,D4 - unused by the mixer currently
-    u8 fb;                          // $03     D2-0  - unused (no feedback without a modulator)
-    u8 arMod, drMod, slMod, rrMod;  // $04/$06 - unused (no ADSR right now)
-    u8 arCar, drCar, slCar, rrCar;  // $05/$07 - unused (no ADSR right now)
+    u8 mulMod, mulCar;              // $00/$01 D3-0 - operator multipliers (normal FM path)
+    u8 amMod,  amCar;              // $00/$01 D7 - decoded; AM not currently modeled
+    u8 vibMod, vibCar;             // $00/$01 D6 - decoded; VIB not currently modeled
+    u8 egTypeMod, egTypeCar;       // $00/$01 D5 - decoded; EG-TYP behavior not modeled
+    u8 ksrMod, ksrCar;             // $00/$01 D4 - used by approximate normal-FM rate calculation
+    u8 kslMod, kslCar;             // $02/$03 D7-6 - decoded; KSL not currently applied
+    u8 tl;                         // $02 D5-0 - modulator total level, used by normal FM path
+    u8 dm, dc;                     // $03 D3,D4 - decoded rhythm-related bits; not fully modeled
+    u8 fb;                         // $03 D2-0 - feedback amount used by normal FM path
+    u8 arMod, drMod, slMod, rrMod; // $04/$06 - modulator envelope parameters (approximate)
+    u8 arCar, drCar, slCar, rrCar; // $05/$07 - carrier envelope parameters (approximate)
 } YM_Instrument;
 
 //@----------------------------------------------------------------------------
@@ -124,15 +99,22 @@ typedef struct
     u32 phase;
     u32 phaseIncrement;
     u32 modPhase;
-    u32 modPhaseIncrement;    
+    u32 modPhaseIncrement;
     u32 releaseAccum;
-    u32 envelopeLevel;
+    u32 envelopeLevel;       // legacy envelope fields; not used by current renderers
     u32 envelopeAccum;
     u8  envelopeState;
     u8  previousKeyOn;
     u8  sustainCounter;
     u8  sustainGain;
     u8  gain;
+
+    /* Normal/DSi mixer: true two-operator FM runtime state. */
+    u8  modEnv;
+    u8  carEnv;
+    u8  modState;
+    u8  carState;
+    s16 feedback;
 } YM_Oscillator;
 
 //@----------------------------------------------------------------------------
@@ -147,7 +129,7 @@ typedef struct
     u16 fNumber;            // $1x + $2x D0 - 9-bit F-Number
     u8  block;              // $2x D3-1 - octave, 0-7
     u8  keyOn;              // $2x D4 (melodic) or the matching $0E bit (rhythm ch6-8)
-    u8  sustain;            // $2x D5 - stored, currently unused by the mixer
+    u8  sustain;            // $2x D5 - stored; not currently applied by the mixer
 
     const YM_Instrument *instPtr;  // cached &customInstrument or &InstrumentROM[instrument] -
                                       // re-pointed only on a $3x write, not re-derived every sample
@@ -170,16 +152,14 @@ typedef struct
     u8 rhythmVolTOM, rhythmVolTCY;      // $38 D7-4, D3-0
     u8 testReg;                         // $0F, storage only
     u8 addressLatch;                    // last value written to the address-select port (caller's convenience)
-    u32 noiseLFSR;                      // feeds HH/SD/TOP-CY's high-pass-filtered-noise texture -
-                                        // must never be seeded 0
-    s32 rhythmPrevNoise;                // previous raw noise sample - the one-sample delay used
-                                        // for the high-pass filter (output = current - previous)
+    u32 noiseLFSR;                      // noise source for HH/SD/TOP-CY; must never be seeded 0
+    s32 rhythmPrevNoise;                // legacy previous-noise state; not used by current mixer
     YM_Oscillator rhythmSD;          // rhythm mode only: channel 7's SECOND voice's envelope (HH uses
                                         // channels[7].osc's envelope; both derive their actual waveform
                                         // from channels 7 & 8's phase, not their own - see YMMixer)
     YM_Oscillator rhythmTCY;         // rhythm mode only: channel 8's SECOND voice's envelope (TOM uses
                                         // channels[8].osc directly, both for envelope and waveform)
-    s32 outputFilterState;              // one-sample treble-damping state; included in save states
+    s32 outputFilterState;              // one-pole output-smoothing state; included in save states
 } YM;
 
 //@----------------------------------------------------------------------------
@@ -221,13 +201,6 @@ typedef struct
 #define YM_CHANNEL_BD        6       // zero-indexed - real-world "channel 7"
 #define YM_CHANNEL_HHSD      7       // real-world "channel 8"
 #define YM_CHANNEL_TOMTCY    8       // real-world "channel 9"
-
-//@----------------------------------------------------------------------------
-//@ Instrument table - real Yamaha ROM data (decoded from a verified
-//@ reference core), though the mixer currently only reads mulCar/mulMod
-//@ from each entry. Defined in YM.c.
-//@----------------------------------------------------------------------------
-extern const YM_Instrument YM_InstrumentROM[16];
 
 //@----------------------------------------------------------------------------
 //@ Public interface - same shape as the SCC driver.

@@ -426,7 +426,7 @@ ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
 /** VScroll changes the logical sprite scanline, but the  **/
 /** result is still drawn into physical XBuf row Y.       **/
 /***********************************************************/
-ITCM_CODE void RefreshSprites(register byte Y)
+void RefreshSprites(register byte Y)
 {
   register byte *PT,*AT;
   register byte *P,*T,C;

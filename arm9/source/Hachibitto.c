@@ -244,7 +244,7 @@ void SoundUnPause(void)
 // of FluBBa, we've swiched over to the maxmod sound core which performs much better.
 // --------------------------------------------------------------------------------------------
 #define sample_rate         (27965)    // To match the AY driver - this is good enough quality for the DS
-#define buffer_size         (512+16)   // Enough buffer that we don't have to fill it too often. Must be multiple of 16.
+#define buffer_size         (512)      // Enough buffer that we don't have to fill it too often. Must be multiple of 16.
 
 mm_ds_system sys   __attribute__((section(".dtcm")));
 mm_stream myStream __attribute__((section(".dtcm")));
@@ -422,6 +422,13 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
         }
         else  // Pretty simple... just AY (and maybe beeper)
         {
+            if (bFirstSoundOutput)
+            {
+                SmoothStartSound(len, dest);
+                bFirstSoundOutput = 0;
+                return len;
+            }
+            
             ay38910Mixer(len * 2, dest, &myAY);
 
             if (myConfig.expansion == MUSIC_2XPSG) // 2x PSG enabled? If so... mix it in.

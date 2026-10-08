@@ -12,8 +12,9 @@
 //
 //  msx_music.c
 //  MSX-MUSIC (Yamaha YM2413 / OPLL) sound chip emulator - music only.
-//  See YM.h for the accuracy-level disclaimer: this is a drastically
-//  simplified, minimal-FM, no-ADSR design chosen purely for speed.
+//  The normal/DSi mixer uses a simplified two-operator FM path with per-operator
+//  attack/decay/sustain/release states. The DS-Lite fast mixer retains a cheaper
+//  single-oscillator gain model. Neither path is a cycle-accurate OPLL core.
 //
 //  Please note: this file was largely generated with Claude.AI and ChatGPT with a lot
 //  of patience (and frustration) by the author. Sound drivers are not my specialty...
@@ -30,48 +31,30 @@
 #define YM_SAMPLE_RATE             27965     // confirmed value, matches the AY driver's rate
 #define YM_MASTER_CLOCK            3579545   // MSX standard clock, same as SCC's
 #define YM_SIN_SHIFT               24        // phase>>24 -> 8-bit (256 entry) table index
-#define YM_GAIN_RAMP_STEP          16        // ATTACK rate: gain moves this much per sample toward
-                                             // full on key-on - ~16 samples (~0.6ms), fast/click-free
-
-#define YM_RELEASE_STEP            3500      // MELODIC release rate: lower = longer/lusher
-                                             // tail; higher = faster fade and less overlap.
-
-#define YM_PERCUSSION_RELEASE_STEP 7500      // PERCUSSION release rate: higher = faster decay
+#define YM_GAIN_RAMP_STEP          16        // Legacy fast-mixer/rhythm gain ramp toward full
+                                             // level on key-on; the normal FM path has operator envelopes.
+#define YM_PERCUSSION_RELEASE_STEP 5500      // PERCUSSION release rate: higher = faster decay
                                              // for more distinct drum hits.
                                              
-/* Carrier sustain level test: map OPLL SL to the same approximate gain
-   levels used by the earlier envelope experiment, but move toward the target
-   very slowly.  V0 key-on/release behavior remains otherwise unchanged. */
-static const u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
+/* Legacy fast-mixer carrier sustain approximation: map OPLL SL to gain levels
+   and move toward the target slowly. The normal FM path uses operator envelopes. */
+static   u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
 {
     255, 181, 128, 90, 64, 45, 32, 22,
      16,  11,   8,  5,  4,  2,  1,  0
 };
 #define YM_SUSTAIN_TICK_SAMPLES 64  // Samples between sustain-level gain reductions
 
-#define YM_OUT_SHIFT  8     // Output headroom for everything - melodic channels AND
-                            // percussion now both go through YM_SinTable via real
-                            // phase-selection logic (see YMMixer), not a separate
-                            // noise path, so one shared shift is enough. The earlier
-                            // bump to 10 (and a separate, further-attenuated shift just
-                            // for percussion) were both compensating for problems that
-                            // turned out to have other causes (an AY sign-bias bug, and
-                            // generic-noise percussion overlapping continuously) -
-                            // neither issue exists anymore, so this is back to a single
-                            // plain constant.
+#define YM_OUT_SHIFT  8     // Output scaling for the legacy fast-mixer and rhythm paths.
+                            // The normal/DSi two-operator FM path scales its output separately.
 
 //@----------------------------------------------------------------------------
-//@ 256-entry waveform table, amplitude -127..127. One lookup per active
-//@ channel per sample - this is now the ONLY per-sample table lookup, so
-//@ this is free real estate to make the waveform itself richer at ZERO
-//@ extra cost. This was a pure sine originally, which is the single most
-//@ harmonic-free waveform possible - that's exactly why every channel
-//@ sounded "muffled"/"distant" (a pure tone has no overtones at all, no
-//@ amount of envelope tuning fixes that). This is now a soft square-wave
-//@ approximation (fundamental + 1/3 3rd harmonic + 1/5 5th + 1/7 7th),
-//@ giving real harmonic content/brightness for the same one-lookup cost.
+//@ 256-entry soft-square-like waveform table, amplitude -127..127. It supplies
+//@ additional harmonics for the carrier in the normal FM path and the legacy
+//@ single-oscillator path. The normal FM renderer also uses a separate sine
+//@ table for its modulator, so this is not the only per-sample table lookup.
 //@----------------------------------------------------------------------------
-static const s8 YM_SinTable[256] __attribute__((section(".dtcm"))) =
+static   s8 YM_SinTable[256] __attribute__((section(".dtcm"))) =
 {
        0,   13,   27,   39,   52,   64,   75,   85,   94,  102,  109,  115,  119,  123,  125,  127,
      127,  127,  125,  124,  121,  119,  116,  113,  110,  107,  104,  101,   99,   98,   97,   96,
@@ -92,12 +75,11 @@ static const s8 YM_SinTable[256] __attribute__((section(".dtcm"))) =
 };
 
 /*
- * Pure sine-wave lookup table for FM carrier generation.
- * Blended with YM_SinTable to reduce excessive harmonic content
- * and produce a smoother, less shrill tone. Stored in DTCM
- * for fast access during DSi audio mixing.
+ * Sine lookup used by the normal FM path's modulator and by the tonal rhythm
+ * voices. It is separate from YM_SinTable (the carrier/legacy waveform); the
+ * tables are not blended. Stored in DTCM for fast audio-rate access.
  */
-static const s8 YM_CarrierSineTable[256] __attribute__((section(".dtcm"))) =
+static   s8 YM_CarrierSineTable[256] __attribute__((section(".dtcm"))) =
 {
       0,   3,   6,   9,  12,  16,  19,  22,  25,  28,  31,  34,  37,  40,  43,  46,
      49,  51,  54,  57,  60,  63,  65,  68,  71,  73,  76,  78,  81,  83,  85,  88,
@@ -120,7 +102,7 @@ static const s8 YM_CarrierSineTable[256] __attribute__((section(".dtcm"))) =
 //@----------------------------------------------------------------------------
 //@ Real Yamaha MUL table, doubled (so index 0's real x0.5 is a whole number).
 //@----------------------------------------------------------------------------
-static const u8 YM_MulTableX2[16] __attribute__((section(".dtcm"))) =
+static   u8 YM_MulTableX2[16] __attribute__((section(".dtcm"))) =
 {
     1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30
 };
@@ -128,7 +110,7 @@ static const u8 YM_MulTableX2[16] __attribute__((section(".dtcm"))) =
 // Exact 3-step advance of the YM noise LFSR.
 // Indexed by the original low 3 bits.
 // Must be in DTCM/fast RAM if possible.
-static const u32 YM_NoiseAdvance3[8] __attribute__((section(".dtcm")))
+static   u32 YM_NoiseAdvance3[8] __attribute__((section(".dtcm")))
 =
 {
     0x000000,
@@ -142,10 +124,12 @@ static const u32 YM_NoiseAdvance3[8] __attribute__((section(".dtcm")))
 };
 
 //@----------------------------------------------------------------------------
-//@ 16-entry instrument table - real Yamaha ROM data. Only mulMod/mulCar are
-//@ read by the mixer right now; everything else is stored for later use.
+//@ 16-entry instrument table containing Yamaha ROM preset data. The normal
+//@ FM path uses MUL, TL, FB and the operator envelope rates/levels; other
+//@ parameters are decoded but are not all modeled yet. The DS-Lite fast path
+//@ uses a smaller subset.
 //@----------------------------------------------------------------------------
-const YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
+  YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
 {
     /*  0 unused/custom */ { 9,12, 0,0, 1,1, 0,0, 0,0, 1,0, 12, 0,1, 2, 0,0,0,0,   0,0,0,0  },
     /*  1 Violin        */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 30, 0,1, 7, 15,0,0,0,  7,8,1,7  },
@@ -165,22 +149,48 @@ const YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
     /* 15 Elec Guitar   */ { 1,1, 0,0,  1,1, 1,0, 0,0, 2,0, 9,  0,0, 3, 15,1,15,0, 15,4,1,3 },
 };
 
+/* Hot FM parameters. Keep these in DTCM: they are touched for every active
+   melodic channel on every synthesized sample pair.  All instrument/block/
+   volume-derived values are calculated when the channel configuration changes. */
+typedef struct
+{
+    u8 arMod, drMod, rrMod;
+    u8 arCar, drCar, rrCar;
+    u8 modAtten;       // TL-derived linear amplitude factor from YM_TLAtten[]
+    u8 modDepth;       // TL-derived phase-deviation scale (see YM_PrecomputeFMRates)
+    u8 fbDepth;        // YM_FM_FBDepth[FB]
+    u8 slMod;          // sustain attenuation target
+    u8 slCar;
+    u8 volume;         // 15 - channel volume
+} YM_FMParams;
+
+static YM_FMParams YM_FM[YM_NUM_CHANNELS] __attribute__((section(".dtcm")));
+
+static u8 YM_TLAtten[64] __attribute__((section(".dtcm"))) = {
+    255,234,215,197,181,166,152,139,128,117,108,99,90,83,76,70,
+    64,59,54,49,45,42,38,35,32,29,27,25,23,21,19,18,
+    16,15,14,12,11,10,10,9,8,7,7,6,6,5,5,4,
+    4,4,3,3,3,3,2,2,2,2,2,2,1,1,1,1
+};
+
+
 //@----------------------------------------------------------------------------
 //@ Small helpers
 //@----------------------------------------------------------------------------
-static const YM_Instrument *YM_GetInstrument(const YM *chip, u8 instrument)
+static   YM_Instrument *YM_GetInstrument(  YM *chip, u8 instrument)
 {
     if (instrument == 0)
         return &chip->customInstrument;
     return &YM_InstrumentROM[instrument & 0x0F];
 }
 
+static inline void YM_PrecomputeFMRates(YM *chip, int ch);
+
 static u32 YM_ComputePhaseIncrement(u16 fNumber, u8 block, u8 mulNibble)
 {
     // Integer-only: inc = F * 2^block * mulX2 * (masterClock << 12) / (72 * sampleRate)
-    // See chat history for the derivation - matches the Yamaha application manual's
-    // fmus formula, just rearranged to avoid floating point entirely. Both constants
-    // are plain integers now (no lingering compile-time-folded double literals).
+    // See the development notes for the derivation. This rearrangement avoids
+    // floating point entirely; both operands are integers.
     unsigned long long num = (unsigned long long)fNumber * (unsigned long long)YM_MulTableX2[mulNibble & 0x0F];
     num <<= block;
     num *= (unsigned long long)YM_MASTER_CLOCK << 12;
@@ -199,6 +209,8 @@ static void YM_UpdateChannelFreq(YM *chip, int ch)
 
     c->osc.modPhaseIncrement =
         YM_ComputePhaseIncrement(c->fNumber, c->block, inst->mulMod);
+
+    YM_PrecomputeFMRates(chip, ch);
 }
 
 static void YM_UpdateCustomUsers(YM *chip)
@@ -210,16 +222,13 @@ static void YM_UpdateCustomUsers(YM *chip)
 }
 
 //@----------------------------------------------------------------------------
-//@ One oscillator, one sample. Minimal FM, no ADSR - mostly a tone with a gain
+//@ Legacy single-oscillator gain/envelope helper used by the fast mixer and rhythm voices.
 //@----------------------------------------------------------------------------
-//@ Shared by both render functions below. Attack is instant-ish (whole-unit
-//@ steps, same as before). Release is a proper fractional ramp - a whole-
-//@ unit-per-sample step can't express a slow enough rate for a musically
-//@ reasonable fade, so this uses the same 16.16 accumulator technique as
-//@ the earlier ADSR version, just for one rate instead of a per-instrument
-//@ table.
+//@ The legacy fast-mixer/rhythm path uses a quick gain ramp on key-on and a
+//@ fractional release accumulator. The normal/DSi FM path uses separate
+//@ modulator and carrier envelope state machines instead.
 //@----------------------------------------------------------------------------
-ITCM_CODE static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
+static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 releaseStep)
 {
     if (keyOn)
     {
@@ -261,40 +270,14 @@ ITCM_CODE static inline void YM_UpdateGain2(YM_Oscillator *osc, u8 keyOn, u32 re
 }
 
 //@----------------------------------------------------------------------------
-//@ One oscillator, one sample. Minimal FM, no ADSR - just a tone with a gain
-//@ that ramps toward its key-on/off target. Takes keyOn/volume explicitly
-//@ (rather than reading a channel struct's fields directly) so the same
-//@ function serves both ordinary melodic channels and the tonal rhythm
-//@ voices (BD, TOM), which need their key-on state computed fresh from
-//@ the rhythm register each sample rather than stored on the channel.
-//@ isMelodic selects the release rate: melodic voices use the instrument's
-//@ actual carrier RR value; percussion keeps the fixed fast release.
+//@ Legacy single-oscillator renderer for the DS-Lite fast mixer. It uses a
+//@ gain ramp rather than the normal mixer's two-operator FM envelopes. The
+//@ rhythm voices use the related gain helper above.
 //@----------------------------------------------------------------------------
-/* RR-dependent release, normalized so RR=15 is about the old
-   150 ms V0 release, while lower RR values release faster. */
-/*
- * Simplified carrier envelope model
- *
- * The original V0 renderer used a simple gain ramp: notes reached full
- * volume while held and then decayed at a fixed rate after key-off.
- *
- * Two cheap OPLL-inspired additions are retained here:
- *
- *   - SL (sustain level) sets the level a held note settles toward.
- *     SL=15 is treated as full level.  This is important for sounds that
- *     change channel volume while a key remains held (for example Gaiden
- *     footsteps); treating SL=15 as silence breaks those sounds.
- *
- *   - RR (release rate) controls how quickly the gain falls after key-off.
- *     The table below is deliberately normalized to the V0 gain model
- *     rather than attempting to reproduce the OPLL envelope generator
- *     literally.  RR=15 uses the original V0 release rate, while lower RR
- *     values release progressively more slowly.
- *
- * These approximations give noticeably better note blending and fuller
- * melodic lines at a much lower CPU cost than a full OPLL envelope model.
- */
-static const u16 YM_RRReleaseStepTest[16] __attribute__((section(".dtcm"))) =
+/* Legacy fast-mixer release table. The mapping is an approximation rather
+   than a hardware-rate table; larger RR values produce faster release here. */
+
+static   u16 YM_RRReleaseStepTest[16] __attribute__((section(".dtcm"))) =
     {900,1000,1100,1200,1350,1500,1700,1900,2150,2400,2700,3000,3300,3550,3780,3984};
 
 //@----------------------------------------------------------------------------
@@ -466,43 +449,284 @@ void YMWrite(u8 value, u8 address, YM *chip)
     }
 }
 
-static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, u8 volume, u32 releaseStep, const YM_Instrument *inst)
+// =====================================================================================
+// Simplified melodic 2-operator FM path used by the normal/DSi mixer.
+//
+// This integer-only approximation is not a cycle-accurate YM2413 core. It models
+// two operators, simplified envelopes, MUL, TL and feedback. Block/KSR influence
+// the approximate envelope-rate calculation; KSL, AM, VIB and EG-TYP are decoded
+// but not currently applied. Rhythm synthesis and the DS-Lite fast mixer remain
+// separate paths.
+// =====================================================================================
+
+enum
 {
-    /*
-     * Advance the envelope by TWO audio samples.
-     */
-    if (!(keyOn && osc->gain == osc->sustainGain))
-        YM_UpdateGain2(osc, keyOn, releaseStep);
+    YM_FM_ENV_ATTACK = 0,
+    YM_FM_ENV_DECAY,
+    YM_FM_ENV_SUSTAIN,
+    YM_FM_ENV_RELEASE
+};
 
-    if (osc->gain == 0)
+static   u8 YM_FM_SustainAtten[16] =
+{
+      0,  8, 16, 24, 32, 40, 48, 56,
+     64, 72, 80, 88, 96,104,112,127
+};
+
+static   u8 YM_FM_FBDepth[8] =
+{
+    0, 2, 4, 8, 16, 32, 64, 96
+};
+
+static inline u8 YM_FMRateStepPrecompute(u8 rate, u8 block, u8 ksr)
+{
+    u32 r = rate & 0x0F;
+    if (r == 0)
+        return 1;
+    if (ksr)
+        r += block >> 1;
+    else
+        r += block >> 2;
+    if (r > 15)
+        r = 15;
+    return (u8)(1 + (r * r >> 3));
+}
+
+static inline void YM_PrecomputeFMRates(YM *chip, int ch)
+{
+    const YM_Instrument *inst = chip->channels[ch].instPtr;
+    u8 block = chip->channels[ch].block;
+    YM_FMParams *p = &YM_FM[ch];
+    p->arMod = YM_FMRateStepPrecompute(inst->arMod, block, inst->ksrMod);
+    p->drMod = YM_FMRateStepPrecompute(inst->drMod, block, inst->ksrMod);
+    p->rrMod = YM_FMRateStepPrecompute(inst->rrMod, block, inst->ksrMod);
+    p->arCar = YM_FMRateStepPrecompute(inst->arCar, block, inst->ksrCar);
+    p->drCar = YM_FMRateStepPrecompute(inst->drCar, block, inst->ksrCar);
+    p->rrCar = YM_FMRateStepPrecompute(inst->rrCar, block, inst->ksrCar);
+    /* YM2413 TL is 0.75 dB per step, not a linear 4/step attenuation.
+       Precompute the corresponding linear amplitude factor.  This is
+       particularly important for patches with a heavily attenuated
+       modulator: the old approximation could effectively erase it. */
+    p->modAtten = YM_TLAtten[inst->tl & 0x3F];
+    /* TL sets modulator level; do not apply the same attenuation a second
+       time to FM deviation.  Scale the surviving modulator into a useful
+       phase deviation range. */
+
+    p->modDepth = (u8)(8 + ((63 - (inst->tl & 0x3F)) >> 1));
+    if (p->modDepth > 16) p->modDepth = 16 + ((p->modDepth - 16) >> 1);
+        
+    p->fbDepth = YM_FM_FBDepth[inst->fb & 7];
+    p->slMod = YM_FM_SustainAtten[inst->slMod & 0x0F];
+    p->slCar = YM_FM_SustainAtten[inst->slCar & 0x0F];
+    p->volume = (u8)(15 - (chip->channels[ch].volume & 0x0F));
+}
+
+ITCM_CODE static inline void YM_FMEnvelopeStep(
+    YM_Oscillator *osc, u8 *env, u8 *state, u8 keyOn,
+    u8 arStep, u8 drStep, u8 sl, u8 rrStep)
+{
+    if (keyOn && !osc->previousKeyOn)
+    {
+        *env = 255;
+        *state = YM_FM_ENV_ATTACK;
+    }
+    else if (!keyOn && osc->previousKeyOn)
+    {
+        *state = YM_FM_ENV_RELEASE;
+    }
+
+    if (keyOn)
+    {
+        if (*state == YM_FM_ENV_ATTACK)
+        {
+            u8 step = arStep;
+            if (step >= *env)
+            {
+                *env = 0;
+                *state = YM_FM_ENV_DECAY;
+            }
+            else
+            {
+                // Faster as the envelope approaches zero, like a log-domain EG.
+                u16 delta = step + ((255 - *env) >> 5);
+                *env = (delta >= *env) ? 0 : (u8)(*env - delta);
+            }
+        }
+        else if (*state == YM_FM_ENV_DECAY)
+        {
+            u8 target = YM_FM_SustainAtten[sl & 0x0F];
+            u8 step = drStep;
+            u16 e = *env + step;
+
+            if (e >= target)
+            {
+                *env = target;
+                *state = YM_FM_ENV_SUSTAIN;
+            }
+            else
+            {
+                *env = (u8)e;
+            }
+        }
+        else if (*state == YM_FM_ENV_SUSTAIN)
+        {
+            // Hold the operator at its sustain level while the key is down.
+            // The previous approximation continued changing the envelope here,
+            // which caused audible level/timbre "waffling" on sustained notes.
+        }
+    }
+    else if (*state == YM_FM_ENV_RELEASE)
+    {
+        u8 step = rrStep;
+        u16 e = *env + step;
+        *env = (e >= 255) ? 255 : (u8)e;
+    }
+
+    osc->previousKeyOn = keyOn;
+}
+
+ITCM_CODE static inline s32 YM_RenderChannel2FM(
+    YM_Oscillator *osc, u8 keyOn, int ch)
+{
+      YM_FMParams *p = &YM_FM[ch];
+    u8 keyTransition = (keyOn && !osc->previousKeyOn);
+
+    /* The normal mixer still uses gain as the cheap channel-active flag.
+       Keep it synchronized with the new two-operator envelope so a released
+       voice can actually disappear from the mix. */
+    if (keyTransition)
+        osc->gain = 255;
+
+    YM_FMEnvelopeStep(osc, &osc->modEnv, &osc->modState, keyOn,
+                      p->arMod, p->drMod, p->slMod, p->rrMod);
+
+    // Use a separate carrier envelope state while sharing the oscillator's
+    // previous-key flag only as the channel gate.
+    // The two state machines are intentionally advanced from the same key event.
+    // The modulator call updated previousKeyOn. Use the saved transition for
+    // the carrier so both operators restart together on every key-on.
+    if (keyTransition)
+    {
+        osc->carEnv = 255;
+        osc->carState = YM_FM_ENV_ATTACK;
+        osc->phase = 0;
+        osc->modPhase = 0;
+        osc->feedback = 0;
+    }
+    else if (!keyOn && osc->carState != YM_FM_ENV_RELEASE)
+    {
+        osc->carState = YM_FM_ENV_RELEASE;
+    }
+
+    if (keyOn)
+    {
+        if (osc->carState == YM_FM_ENV_ATTACK)
+        {
+            u8 step = p->arCar;
+            if (step >= osc->carEnv)
+            {
+                osc->carEnv = 0;
+                osc->carState = YM_FM_ENV_DECAY;
+            }
+            else
+            {
+                u16 delta = step + ((255 - osc->carEnv) >> 5);
+                osc->carEnv = (delta >= osc->carEnv) ? 0 : (u8)(osc->carEnv - delta);
+            }
+        }
+        else if (osc->carState == YM_FM_ENV_DECAY)
+        {
+            u8 target = p->slCar;
+            u8 step = p->drCar;
+            u16 e = osc->carEnv + step;
+            if (e >= target)
+            {
+                osc->carEnv = target;
+                osc->carState = YM_FM_ENV_SUSTAIN;
+            }
+            else
+                osc->carEnv = (u8)e;
+        }
+        else if (osc->carState == YM_FM_ENV_SUSTAIN)
+        {
+            // Hold the carrier at its sustain level while the key is down.
+            // Do not artificially ramp it here; that was the source of the
+            // audible volume/timbre wavering in sustained notes.
+        }
+    }
+    else if (osc->carState == YM_FM_ENV_RELEASE)
+    {
+        u8 step = p->rrCar;
+        u16 e = osc->carEnv + step;
+        osc->carEnv = (e >= 255) ? 255 : (u8)e;
+    }
+
+    if (osc->modEnv == 255 && osc->carEnv == 255)
+    {
+        /* Both operators have reached true release/silence.  This is also
+           what allows YMMixer() to stop visiting the channel. */
+        osc->gain = 0;
         return 0;
+    }
 
-    /*
-     * Advance both FM operators by TWO samples.
-     *
-     * We still calculate the modulator and carrier, unlike the
-     * DS-Lite fast mixer.
-     */
+    /* While a released voice is still audible, keep the legacy active flag
+       asserted.  It is deliberately not used for amplitude here. */
+    osc->gain = 255;
+
+    // Two samples are synthesized at once, matching the existing normal mixer.
     osc->modPhase += osc->modPhaseIncrement << 1;
-
-    s32 mod = YM_SinTable[(osc->modPhase >> YM_SIN_SHIFT) & 0xFF];
-
-    s32 depth = (s32)(63 - (inst->tl & 0x3F)) >> 2;
-
     osc->phase += osc->phaseIncrement << 1;
 
-    s32 modIndex = (mod * depth) >> 8;
+    s32 mod = YM_CarrierSineTable[(osc->modPhase >> YM_SIN_SHIFT) & 0xFF];
+    s32 modGain = 255 - osc->modEnv;
+    mod = (mod * modGain) >> 8;
 
-    u32 carrierIndex =
-    ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
+    // TL-derived modulator attenuation, feedback depth and FM deviation are
+    // precomputed per channel. KSL is not currently applied by this approximation.
+    mod = (mod * p->modAtten) >> 8;
 
-    s32 originalCarrier = YM_SinTable[carrierIndex];
-    s32 sineCarrier = YM_CarrierSineTable[carrierIndex];
+    // Feedback is deliberately kept small.  The carrier phase table has 256
+    // entries, so feeding a raw +/-127 sample back into the index produces
+    // nearly a full-cycle phase jump and sounds like broadband grit.
+    s32 feedback = osc->feedback;
+    if (p->fbDepth)
+        mod += (feedback * p->fbDepth) >> 10;
+    osc->feedback = (s16)mod;
 
-    /* 3/8 original waveform + 5/8 sine */
-    s32 carrier = sineCarrier + (((originalCarrier - sineCarrier) * 3) >> 3);
+    // TL-derived modulation depth is also precomputed.
+    s32 modIndex = (mod * p->modDepth) >> 8;
 
-    return (carrier * (15 - volume) * osc->gain) >> YM_OUT_SHIFT;
+    u32 carrierIndex = ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
+    s32 carrier = YM_SinTable[carrierIndex];
+
+    // Carrier envelope followed by channel volume attenuation.
+    carrier = (carrier * (255 - osc->carEnv)) >> 8;
+    carrier = (carrier * p->volume) >> 4;
+
+    // Match the baseline YMMixer amplitude.  The carrier is already scaled
+    // by (15-volume) above; *16 here is equivalent to the old >>8 path
+    // and restores the roughly 2x level lost in the previous FM renderer.
+    return carrier * 16;
+}
+
+// Hot melodic path only: keep the expensive 2-op FM loop in ITCM while
+// leaving the much larger rhythm/output code in normal ARM9 I-cache.
+ITCM_CODE s32 YM_MixMelodicFM(YM *chip, int lastMelodic)
+{
+    s32 sample = 0;
+    int ch;
+
+    for (ch = 0; ch < lastMelodic; ch++)
+    {
+        YM_Channel *cc = &chip->channels[ch];
+
+        if (!cc->keyOn && cc->osc.gain == 0)
+            continue;
+
+        sample += YM_RenderChannel2FM(&cc->osc, cc->keyOn, ch);
+    }
+
+    return sample;
 }
 
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
@@ -514,45 +738,9 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
     for (i = 0; i < len; i += 2)
     {
         s32 sample = 0;
-        int ch;
 
-        /*
-         * -----------------------------------------------------------------
-         * Melodic channels
-         * -----------------------------------------------------------------
-         */
-        for (ch = 0; ch < lastMelodic; ch++)
-        {
-            YM_Channel *cc = &chip->channels[ch];
-
-            if (!cc->keyOn && cc->osc.gain == 0)
-                continue;
-
-            sample += YM_RenderChannel2FM(
-                &cc->osc,
-                cc->keyOn,
-                cc->volume,
-                (u32)YM_RRReleaseStepTest[cc->instPtr->rrCar & 0x0F] << 2,
-                cc->instPtr
-            );
-
-            /*
-             * Acoustic Bass fundamental.
-             */
-            if (ch == 3 &&
-                cc->instrument == 14 &&
-                cc->osc.gain != 0)
-            {
-                s32 fundamental =
-                    YM_SinTable[(cc->osc.phase >> YM_SIN_SHIFT) & 0xFF];
-
-                sample +=
-                    (fundamental *
-                     (15 - cc->volume) *
-                     cc->osc.gain) >>
-                    (YM_OUT_SHIFT + 1);
-            }
-        }
+        /* Melodic 2-op FM is kept in ITCM; rhythm/filter remain in main RAM. */
+        sample += YM_MixMelodicFM(chip, lastMelodic);
 
         /*
          * -----------------------------------------------------------------
@@ -580,7 +768,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 {
                     bd->osc.phase += bd->osc.phaseIncrement << 1;
 
-                    s32 s = YM_SinTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+                    s32 s = YM_CarrierSineTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
 
                     sample +=
                         (s *
@@ -605,7 +793,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 {
                     tt->osc.phase += tt->osc.phaseIncrement << 1;
 
-                    s32 s = YM_SinTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+                    s32 s = YM_CarrierSineTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
 
                     sample +=
                         (s *
@@ -759,44 +947,23 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         /*
          * Output filter.
          *
-         * One filter update per synthesized sample, which is consistent
+         * One low-pass smoothing update per synthesized sample, consistent
          * with the reduced-rate synthesis.
          */
-        sample +=
-            (chip->outputFilterState - sample) >> 4;
+        sample += (chip->outputFilterState - sample) >> 4;
 
         chip->outputFilterState = sample;
 
         /*
-         * Output sample 0
+         * Output sample 0 and repeat for sample 1
          */
-        s32 mixed =
-            ((s32)dest[i] + 32767) + sample;
-
-        if (mixed > 32767)
-            mixed = 32767;
-
-        if (mixed < -32768)
-            mixed = -32768;
-
+        s32 mixed = ((s32)dest[i] + 32767) + sample;
+        if ((u32)(mixed + 32768) > 65535) mixed = (mixed < 0) ? -32768 : 32767;
         dest[i] = (s16)mixed;
 
-        /*
-         * Hold the synthesized sample for output sample 1.
-         */
-        if (i + 1 < len)
-        {
-            mixed =
-                ((s32)dest[i + 1] + 32767) + sample;
-
-            if (mixed > 32767)
-                mixed = 32767;
-
-            if (mixed < -32768)
-                mixed = -32768;
-
-            dest[i + 1] = (s16)mixed;
-        }
+        mixed = ((s32)dest[i + 1] + 32767) + sample;
+        if ((u32)(mixed + 32768) > 65535) mixed = (mixed < 0) ? -32768 : 32767;
+        dest[i + 1] = (s16)mixed;
     }
 }
 
@@ -809,8 +976,9 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 //   State advances at 2x the normal per-output-sample increment, so pitch and
 //   envelope timing remain approximately correct.
 //
-// This deliberately trades high-frequency audio fidelity for CPU speed.
-// DSi/XL/LL should continue using the normal YMMixer().
+// This deliberately trades audio fidelity for CPU speed by using a single
+// oscillator per melodic channel and holding each synthesized sample across
+// multiple output samples. DSi/XL/LL should use the normal YMMixer().
 // =====================================================================================
 
 static inline s32 YM_RenderChannel2(YM_Oscillator *osc, u8 keyOn, u8 volume, u32 releaseStep)
@@ -913,10 +1081,10 @@ void YMMixerFast(int len, s16 *dest, YM *chip)
     int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
     int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
 
-    const int volBD  = 15 - chip->rhythmVolBD;
-    const int volHH  = 15 - chip->rhythmVolHH;
-    const int volTOM = 15 - chip->rhythmVolTOM;
-    const int volTCY = 15 - chip->rhythmVolTCY;
+      int volBD  = 15 - chip->rhythmVolBD;
+      int volHH  = 15 - chip->rhythmVolHH;
+      int volTOM = 15 - chip->rhythmVolTOM;
+      int volTCY = 15 - chip->rhythmVolTCY;
 
     for (i = 0; i < len; i += 3)
     {

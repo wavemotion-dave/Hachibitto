@@ -205,6 +205,7 @@ extern AY38910 myAY2;
 extern SCC     mySCC;
 extern YM      myYM;
 extern u8 msx_scc_enable;
+extern u8 bFirstSoundOutput;
 extern u8 JoyMode;
 extern u32 JoyState;
 extern u8 Port_PPI_A;

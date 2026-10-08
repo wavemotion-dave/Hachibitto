@@ -519,7 +519,11 @@ void HandleKonamiSCC8(u32* src, u8 block, u16 address, u8 value)
         if ((value & 0x3F) == 0x3F)
         {
             special_memory_access |= SPEC_MEM_SCC_ENABLED;  // SCC Registers are now "in view"
-            msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
+            if (!msx_scc_capable_game)
+            {
+                msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
+                bFirstSoundOutput = 1;
+            }
         }
         else
         {
@@ -756,7 +760,11 @@ void HandleSCCPlusModeRegister(u8 value)
 
     if (special_memory_access & (SPEC_MEM_SCC_ENABLED | SPEC_MEM_SCC_PLUS_ENABLED))
     {
-        msx_scc_capable_game = true;
+        if (!msx_scc_capable_game)
+        {
+            msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
+            bFirstSoundOutput = 1;
+        }
     }
 
     // Nothing else to do here - MSXCartPtr[MEDIA_CART2][]/MemoryMap[] already hold the last
