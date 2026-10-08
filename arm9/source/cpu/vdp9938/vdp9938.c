@@ -68,19 +68,35 @@ u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
   /* Per-scanline "has a sprite already written here" mask, aligned 1:1
      with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
      widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
-u8  OccBuf[320]         __attribute__((section(".dtcm")));
-u16 nibbleLUT16[256]    __attribute__((section(".dtcm")));
-u32 Screen2NibbleMask[16] __attribute__((section(".dtcm")));
+u8  OccBuf[320]             __attribute__((section(".dtcm")));
+u16 nibbleLUT16[256]        __attribute__((section(".dtcm")));
+u32 Screen2NibbleMask[16]   __attribute__((section(".dtcm")));
 
+#define DS_BLACK RGB15(0,0,0)
 inline void handle_transparency(void)
 {
-    u8 new_bg_color = (!BGColor || (VDP[8]&0x20)) ? XPalReal0 : XPal[BGColor];
-
-    // Only update the table if the XPal[] palette table is changing...
-    if (XPal[0] != new_bg_color)
+    if (ScrMode < 4)
     {
+        /*
+         * Legacy modes use XPal[0] == 0 as the sprite transparency
+         * sentinel.  Do NOT put the background color in XPal[0].
+         *
+         * Instead, make DS palette slot 0 the visible background
+         * color for pixels whose logical VDP color is 0.
+         *
+         * Logical color 0 maps to our real-black slot 4.
+         */
+        u8 bg_index = BGColor ? XPal[BGColor] : 4;
+
+        BG_PALETTE[0] = BG_PALETTE[bg_index];
+        XPal[0] = 0;
+    }
+    else // Non-Legacy modes require that palette entry 0 is BLACK
+    {
+        BG_PALETTE[0] = DS_BLACK;
+
+        u8 new_bg_color = (!BGColor || (VDP[8] & 0x20)) ? XPalReal0 : XPal[BGColor];
         XPal[0] = new_bg_color;
-        if (ScrMode < 4) RebuildLutTablehh();
     }
 }
 
@@ -353,7 +369,7 @@ ITCM_CODE int ScanSprites(byte Y, unsigned int *Mask)
 
     s16 fifth_sprite_num =-1;                   // Used to detect the 5th sprite on a line
     AT = SprTab;                                // Pointer to the sprite table in VDP memory
-    MS = (myConfig.maxSprites ? 32:4)+1;     // We either render 4 sprites (normal - this is how an 9918 would work) or 32 sprites (enhanded mode for emulation only)
+    MS = (myConfig.maxSprites ? 32:4)+1;        // We either render 4 sprites (normal - this is how an 9918 would work) or 32 sprites (enhanced mode for emulation only)
     S5 = 5;                                     // We always want to trap on the 5th sprite
     u8 last = 31;                               // The last sprite number is 31 but we may break early if Y==208
 
