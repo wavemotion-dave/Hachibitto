@@ -244,7 +244,7 @@ void SoundUnPause(void)
 // of FluBBa, we've swiched over to the maxmod sound core which performs much better.
 // --------------------------------------------------------------------------------------------
 #define sample_rate         (27965)    // To match the AY driver - this is good enough quality for the DS
-#define buffer_size         (512)      // Enough buffer that we don't have to fill it too often. Must be multiple of 16.
+#define buffer_size         (512+16)   // Enough buffer that we don't have to fill it too often. Must be multiple of 16.
 
 mm_ds_system sys   __attribute__((section(".dtcm")));
 mm_stream myStream __attribute__((section(".dtcm")));

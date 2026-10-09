@@ -513,7 +513,6 @@ static inline void YM_PrecomputeFMRates(YM *chip, int ch)
        phase deviation range. */
 
     p->modDepth = (u8)(8 + ((63 - (inst->tl & 0x3F)) >> 1));
-    if (p->modDepth > 16) p->modDepth = 16 + ((p->modDepth - 16) >> 1);
         
     p->fbDepth = YM_FM_FBDepth[inst->fb & 7];
     p->slMod = YM_FM_SustainAtten[inst->slMod & 0x0F];
@@ -693,19 +692,19 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
     osc->feedback = (s16)mod;
 
     // TL-derived modulation depth is also precomputed.
-    s32 modIndex = (mod * p->modDepth) >> 6;
+    s32 modIndex = (mod * p->modDepth) >> 8;
 
     u32 carrierIndex = ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
     s32 carrier = YM_SinTable[carrierIndex];
 
     // Carrier envelope followed by channel volume attenuation.
-    carrier = (carrier * (255 - osc->carEnv)) >> 8;
-    carrier = (carrier * p->volume) >> 4;
+    carrier = (carrier * (255 - osc->carEnv)) >> 7;
+    carrier = (carrier * p->volume) >> 3;
 
     // Match the baseline YMMixer amplitude.  The carrier is already scaled
     // by (15-volume) above; *16 here is equivalent to the old >>8 path
     // and restores the roughly 2x level lost in the previous FM renderer.
-    return carrier * 16;
+    return carrier * 6;
 }
 
 // -------------------------------------------------------------------------

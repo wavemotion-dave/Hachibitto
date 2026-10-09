@@ -1722,9 +1722,19 @@ void HachibittoMainMenu(void)
                 BottomScreenMainMenu();
                 DisplayFileNames();
             }
-            else if ((touch.py >= 145) && (touch.py < 192)) // Main Menu Icons
+            else if ((touch.py >= 145) && (touch.py < 192)) // Main Menu Icons (bottom row)
             {
-              if ((touch.px >= 20) && (touch.px < 92)) // Options
+              if ((touch.px >= 1) && (touch.px < 56)) // Exit Emulator
+              {
+                  BottomScreenOptions();
+                  if (showMessage("DO YOU REALLY WANT TO", "QUIT THE EMULATOR?") == ID_SHM_YES)
+                  {
+                      exit(0);
+                  }
+                  BottomScreenMainMenu();
+                  DisplayFileNames();
+              }
+              else if ((touch.px >= 56) && (touch.px < 128)) // Options
               {
                   if (GetMasterCRC())
                   {
@@ -1742,7 +1752,7 @@ void HachibittoMainMenu(void)
                       DisplayFileNames();
                   }
               }
-              else if ((touch.px >= 92) && (touch.px < 167)) // Play Game
+              else if ((touch.px >= 128) && (touch.px < 192)) // Play Game
               {
                   if (GetMasterCRC())
                   {
@@ -1756,7 +1766,7 @@ void HachibittoMainMenu(void)
                       DisplayFileNames();
                   }
               }
-              else if ((touch.px >= 167) && (touch.px < 245)) // Controller Map
+              else if ((touch.px >= 192) && (touch.px < 256)) // Controller Map
               {
                   if (GetMasterCRC())
                   {
