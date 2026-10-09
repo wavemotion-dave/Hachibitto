@@ -16,6 +16,8 @@
 #include "Hachibitto.h"
 #include "cpu/z80/Z80_interface.h"
 
+#define MAX_TRACKS 80
+
 // The MSX FDC controller
 struct FDC_t
 {
@@ -35,11 +37,12 @@ struct FDC_t
     u8  int_req;
     u8  read_timeout;
     u8  seekDestination;
-    u8  track_dirty[2];         // True if at least 1 track is dirty on this disk
-    u8  track_buffer[10240];    // Enough for 16+ sectors of 512 bytes or 10 sectors of 1024 bytes
-    u16 track_buffer_idx;
-    u16 track_buffer_end;
-    u16 indexPulseCounter;      // Driven by LoopFDC() at scanline granularity
+    u8  any_track_dirty[2];             // True if at least 1 track is dirty on this disk
+    u8  tracks_to_write[2][MAX_TRACKS]; // If set to 1, this side/track needs to be written back out
+    u8  track_buffer[10240];            // Enough for 16+ sectors of 512 bytes or 10 sectors of 1024 bytes
+    u16 track_buffer_idx;               // Where are we reading/writing?
+    u16 track_buffer_end;               // And when does the reading/writing end?
+    u16 indexPulseCounter;              // Driven by LoopFDC() at scanline granularity
     u16 sector_byte_counter;
     u16 write_track_byte_counter;
     u32 busy_countdown;
@@ -66,6 +69,7 @@ extern void fdc_setDrive(u8 drive);
 extern void fdc_setSide(u8 side);
 extern void fdc_reset(u8 full_reset);
 extern void fdc_init(u8 drives, u8 sides, u8 tracks, u8 sectors, u16 sectorSize, u8 startSector, u8 *diskBuffer0, u8 *diskBuffer1);
+extern void fdc_persist_disk(void);
 extern void LoopFDC(void);     // Call once per scanline, like Loop9938() to process background disk "activity"
 
 #endif //_FDC_H

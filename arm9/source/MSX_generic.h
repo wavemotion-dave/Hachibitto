@@ -268,7 +268,7 @@ extern void HachibittoGameOptions(bool);
 extern void FadeToColor(unsigned char ucSens, unsigned short ucBG, unsigned char ucScr, unsigned char valEnd, unsigned char uWait);
 extern void DisplayFileNames(void);
 extern u32  ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset, u32 *crc);
-extern u8   HachibittoChooseFile(u8 media_id);
+extern u8   HachibittoChooseFile(u8 media_id, u8 allow_dir_change);
 extern u8   showMessage(char *szCh1, char *szCh2);
 extern u32  LoopZ80(void);
 extern u8   RomDB_Lookup(u8 media_id);

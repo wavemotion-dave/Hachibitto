@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x000C  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x000D  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -584,9 +584,18 @@ void msxLoadState(void)
         fclose(handle);
     }
 
-    // Recalculate a few things...
+    // Recalculate a few things on the VDP side...
     VPAGE=VDP_Memory+((int)VDP[14]<<14);
     CheckNewMode(); // This will rebuild any lookup tables as needed
+    
+    // If there was a disk inserted, re-insert the same one
+    if (MyMedia[MEDIA_DISK].filecrc)
+    {
+        chdir(MyMedia[MEDIA_DISK].filepath);  // Get into the right directory
+        MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(MyMedia[MEDIA_DISK].currdisk, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
+        fdc_init(1, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, NULL);
+        fdc_reset(false);
+    }
 
     restoreCompressedMem();
 

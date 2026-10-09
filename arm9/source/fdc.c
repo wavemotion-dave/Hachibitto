@@ -76,7 +76,7 @@ void fdc_buffer_track(void)
     {
         memcpy(FDC.track_buffer, diskPtr + (((Geom.sides * FDC.track) + FDC.side) * track_len), track_len);
     }
-    FDC.track_dirty[FDC.drive] = 0;
+    FDC.any_track_dirty[FDC.drive] = 0;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ void fdc_buffer_track(void)
 // ---------------------------------------------------------------------------------------------------
 void fdc_flush_track(void)
 {
-    if (FDC.track_dirty[FDC.drive])
+    if (FDC.any_track_dirty[FDC.drive])
     {
         u16 track_len = Geom.sectorSize*Geom.sectors;
         u8 *diskPtr = (FDC.drive == 0) ? Geom.disk0 : Geom.disk1;
@@ -92,19 +92,52 @@ void fdc_flush_track(void)
         {
             int file_offset = (((Geom.sides * FDC.track) + FDC.side) * track_len);
             memcpy(diskPtr + file_offset, FDC.track_buffer, track_len);
-
-            // ------------------------------------------------------------------------------------------------
-            // And here we actually write the disk back to the file storage... we only re-write the one track.
-            // ------------------------------------------------------------------------------------------------
-            FILE *fp = fopen(MyMedia[MEDIA_DISK].currdisk, "rb+"); // Open file for read/write
-            if (fp)
-            {
-                fseek(fp, file_offset, SEEK_SET);           // Seek to the right spot
-                fwrite(FDC.track_buffer, track_len, 1, fp); // And write out the track (~4K write)
-                fclose(fp);
-            }
+            FDC.tracks_to_write[FDC.side][FDC.track] = 1; // Mark this track as needing writing (after a few seconds to allow other the possibility of other sector writes)
         }
-        FDC.track_dirty[FDC.drive] = 0;
+        FDC.any_track_dirty[FDC.drive] = 0;
+    }
+}
+
+// ------------------------------------------------------------------
+// Check if any tracks need to be written back out to the SD card... 
+// ------------------------------------------------------------------
+void fdc_persist_disk(void)
+{
+    u8 bDiskNeedsWriting = 0;
+    u16 track_len = Geom.sectorSize*Geom.sectors;
+    
+    // If any track is dirty, we write it.
+    for (int side=0; side<2; side++)
+    {
+        for (int track=0; track<MAX_TRACKS; track++)
+        {
+            if (FDC.tracks_to_write[side][track]) bDiskNeedsWriting = 1;
+        }
+    }
+    
+    if (bDiskNeedsWriting)
+    {
+        // ---------------------------------------------------------------------------------------------------------
+        // And here we actually write the disk back to the file storage... we only re-write the tracks that changed.
+        // ---------------------------------------------------------------------------------------------------------
+        FILE *fp = fopen(MyMedia[MEDIA_DISK].currdisk, "rb+"); // Open file for read/write
+        if (fp)
+        {
+            for (int side=0; side<2; side++)
+            {
+                for (int track=0; track<MAX_TRACKS; track++)
+                {
+                    if (FDC.tracks_to_write[side][track])
+                    {
+                        int file_offset = (((Geom.sides * track) + side) * track_len);
+                        fseek(fp, file_offset, SEEK_SET);                   // Seek to the right spot
+                        fwrite(DISK_Memory+file_offset, track_len, 1, fp);  // And write out the track (~4K write)
+                        FDC.tracks_to_write[side][track] = 0;               // This track is persisted
+                    }
+                }
+            }
+            fclose(fp);
+        }
     }
 }
 
@@ -260,7 +293,7 @@ void fdc_state_machine(void)
             }
             else if (FDC.wait_for_write == 0)
             {
-                FDC.track_dirty[FDC.drive] = 1;
+                FDC.any_track_dirty[FDC.drive] = 1;
                 FDC.track_buffer[FDC.track_buffer_idx++] = FDC.data; // Store CPU byte into our FDC buffer
                 if (FDC.track_buffer_idx >= FDC.track_buffer_end)
                 {

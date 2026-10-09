@@ -514,7 +514,7 @@ void HachibittoFindFiles(u8 media_id)
 // ----------------------------------------------------------------
 // Let the user select a new game (rom) file and load it up!
 // ----------------------------------------------------------------
-u8 HachibittoChooseFile(u8 media_id)
+u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
 {
     bool bDone=false;
     u16 ucHaut=0x00, ucBas=0x00,ucSHaut=0x00, ucSBas=0x00, romSelected= 0, firstRomDisplay=0,nbRomPerPage, uNbRSPage;
@@ -706,20 +706,29 @@ u8 HachibittoChooseFile(u8 media_id)
         }
         else
         {
-          chdir(gpFic[ucGameAct].szName);
-          HachibittoFindFiles(media_id);
-          ucGameAct = 0;
-          nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
-          uNbRSPage = (countMSX>=5 ? 5 : countMSX);
-          if (ucGameAct>countMSX-nbRomPerPage) {
-            firstRomDisplay=countMSX-nbRomPerPage;
-            romSelected=ucGameAct-countMSX+nbRomPerPage;
+            if (allow_dir_change)
+            {
+              chdir(gpFic[ucGameAct].szName);
+              HachibittoFindFiles(media_id);
+              ucGameAct = 0;
+              nbRomPerPage = (countMSX>=16 ? 16 : countMSX);
+              uNbRSPage = (countMSX>=5 ? 5 : countMSX);
+              if (ucGameAct>countMSX-nbRomPerPage) {
+                firstRomDisplay=countMSX-nbRomPerPage;
+                romSelected=ucGameAct-countMSX+nbRomPerPage;
+              }
+              else {
+                firstRomDisplay=ucGameAct;
+                romSelected=0;
+              }
+              dsDisplayFiles(firstRomDisplay,romSelected);
           }
-          else {
-            firstRomDisplay=ucGameAct;
-            romSelected=0;
+          else
+          {
+              DSPrint(5,22,0,"NO DIR CHANGE FOR SWAP");
+              WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
+              DSPrint(5,22,0,"                      ");
           }
-          dsDisplayFiles(firstRomDisplay,romSelected);
           while (keysCurrent() & KEY_A);
         }
       }
@@ -1654,7 +1663,7 @@ void HachibittoMainMenu(void)
                 else if (touch.px < 220)
                 {
                     BottomScreenOptions();
-                    HachibittoChooseFile(MEDIA_CART1);
+                    HachibittoChooseFile(MEDIA_CART1, 1);
                     if (ucGameChoice != -1)
                     {
                         LoadGameIntoMedia(MEDIA_CART1, gpFic[ucGameChoice].szName);
@@ -1676,7 +1685,7 @@ void HachibittoMainMenu(void)
                     else if (touch.px < 220)
                     {
                         BottomScreenOptions();
-                        HachibittoChooseFile(MEDIA_CART2);
+                        HachibittoChooseFile(MEDIA_CART2, 1);
                         if (ucGameChoice != -1)
                         {
                             LoadGameIntoMedia(MEDIA_CART2, gpFic[ucGameChoice].szName);
@@ -1703,7 +1712,7 @@ void HachibittoMainMenu(void)
                 else if (touch.px < 220)
                 {
                     BottomScreenOptions();
-                    HachibittoChooseFile(MEDIA_DISK);
+                    HachibittoChooseFile(MEDIA_DISK, 1);
                     if (ucGameChoice != -1)
                     {
                         LoadGameIntoMedia(MEDIA_DISK, gpFic[ucGameChoice].szName);

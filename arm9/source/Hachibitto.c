@@ -705,7 +705,11 @@ void DisplayStatusLine(void)
             io_show_status = 6;      // Show icon briefly
             if (myGlobalConfig.bDiskSounds) mmEffect(SFX_FLOPPY);    // Short disk sound effect
         }
-        io_show_status--;
+        
+        if (--io_show_status == 0) // Done with read/write activity
+        {
+            fdc_persist_disk(); // See if the disk needs to be persisted.
+        }
     }
     // ------------------------------------------------------------
     // If we aren't showing the disk icon or SRAM above, we can
@@ -1317,7 +1321,7 @@ void HachibittoRunEmu(void)
                       case MENU_CHOICE_SWAP_DISK:
                           SoundPause();
                           BottomScreenOptions();
-                          HachibittoChooseFile(MEDIA_DISK);
+                          HachibittoChooseFile(MEDIA_DISK, 0); // Swap disk but do NOT allow directory change
                           if (ucGameChoice >= 0) // Did the user select a game?
                           {
                               BottomScreenOptions();
