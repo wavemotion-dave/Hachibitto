@@ -177,6 +177,7 @@ typedef struct
 {
     char    filename[MAX_FILE_NAME_LEN];    // Always uppercase to help strstr()
     char    filepath[MAX_PATH_NAME_LEN];    // Where the file was found on the SD card
+    char    currdisk[MAX_FILE_NAME_LEN];    // Current disk name - since we can swap disks
     u32     filesize;                       // How big this file was (0 if no file in this slot)
     u32     filecrc;                        // The CRC32 of the file (0 if no file in this slot)
     u8      mapperType;                     // Mapper type for the CARTs (Disk will always be 0x00)

@@ -1322,8 +1322,13 @@ void HachibittoRunEmu(void)
                           {
                               BottomScreenOptions();
                               DSPrint(11,13,6, "LOADING...");
-                              // Do NOT save this new disk/filename into MyMedia[].filename as it would overwrite the master. Same for filecrc.
-                              MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(gpFic[ucGameChoice].szName, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
+                              // -------------------------------------------------------------------------
+                              // Do NOT save this new disk/filename into MyMedia[].filename as it would 
+                              // overwrite the master. Same for filecrc. Instead we save it into filename2
+                              // which always represents the current file for the disk swapped in.
+                              // -------------------------------------------------------------------------
+                              strcpy(MyMedia[MEDIA_DISK].currdisk, gpFic[ucGameChoice].szName);
+                              MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(MyMedia[MEDIA_DISK].currdisk, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
                               fdc_init(1, (MyMedia[MEDIA_DISK].filesize/1024 == 360) ? 1:2, 80, 9, 512, 1, DISK_Memory, NULL);
                               fdc_reset(false);
                           }
@@ -2262,6 +2267,7 @@ void LoadGameIntoMedia(u8 media_id, char *filename)
     }
     else // Must be MEDIA_DISK
     {
+        strcpy(MyMedia[MEDIA_DISK].currdisk, MyMedia[media_id].filename);   // This is the current disk name - since disks can be wapped.
         MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, &MyMedia[media_id].filecrc);
     }
 
