@@ -129,7 +129,7 @@ static   u32 YM_NoiseAdvance3[8] __attribute__((section(".dtcm")))
 //@ parameters are decoded but are not all modeled yet. The DS-Lite fast path
 //@ uses a smaller subset.
 //@----------------------------------------------------------------------------
-  YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
+YM_Instrument YM_InstrumentROM[16] __attribute__((section(".dtcm"))) =
 {
     /*  0 unused/custom */ { 9,12, 0,0, 1,1, 0,0, 0,0, 1,0, 12, 0,1, 2, 0,0,0,0,   0,0,0,0  },
     /*  1 Violin        */ { 1,1,  0,0, 1,1, 1,1, 0,0, 0,0, 30, 0,1, 7, 15,0,0,0,  7,8,1,7  },
@@ -177,7 +177,7 @@ static u8 YM_TLAtten[64] __attribute__((section(".dtcm"))) = {
 //@----------------------------------------------------------------------------
 //@ Small helpers
 //@----------------------------------------------------------------------------
-static   YM_Instrument *YM_GetInstrument(  YM *chip, u8 instrument)
+static YM_Instrument *YM_GetInstrument(  YM *chip, u8 instrument)
 {
     if (instrument == 0)
         return &chip->customInstrument;
@@ -554,7 +554,7 @@ ITCM_CODE static inline void YM_FMEnvelopeStep(
         }
         else if (*state == YM_FM_ENV_DECAY)
         {
-            u8 target = YM_FM_SustainAtten[sl & 0x0F];
+            u8 target = sl;
             u8 step = drStep;
             u16 e = *env + step;
 
@@ -585,8 +585,7 @@ ITCM_CODE static inline void YM_FMEnvelopeStep(
     osc->previousKeyOn = keyOn;
 }
 
-ITCM_CODE static inline s32 YM_RenderChannel2FM(
-    YM_Oscillator *osc, u8 keyOn, int ch)
+ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, int ch)
 {
       YM_FMParams *p = &YM_FM[ch];
     u8 keyTransition = (keyOn && !osc->previousKeyOn);
@@ -694,7 +693,7 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(
     osc->feedback = (s16)mod;
 
     // TL-derived modulation depth is also precomputed.
-    s32 modIndex = (mod * p->modDepth) >> 8;
+    s32 modIndex = (mod * p->modDepth) >> 6;
 
     u32 carrierIndex = ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
     s32 carrier = YM_SinTable[carrierIndex];
@@ -709,26 +708,10 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(
     return carrier * 16;
 }
 
-// Hot melodic path only: keep the expensive 2-op FM loop in ITCM while
-// leaving the much larger rhythm/output code in normal ARM9 I-cache.
-ITCM_CODE s32 YM_MixMelodicFM(YM *chip, int lastMelodic)
-{
-    s32 sample = 0;
-    int ch;
-
-    for (ch = 0; ch < lastMelodic; ch++)
-    {
-        YM_Channel *cc = &chip->channels[ch];
-
-        if (!cc->keyOn && cc->osc.gain == 0)
-            continue;
-
-        sample += YM_RenderChannel2FM(&cc->osc, cc->keyOn, ch);
-    }
-
-    return sample;
-}
-
+// -------------------------------------------------------------------------
+// And finally the mixer - this is a real hot-spot of emulation given the
+// number of music channels that need to be handled. In ITCM to help speed.
+// -------------------------------------------------------------------------
 ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 {
     int i;
@@ -739,8 +722,16 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
     {
         s32 sample = 0;
 
-        /* Melodic 2-op FM is kept in ITCM; rhythm/filter remain in main RAM. */
-        sample += YM_MixMelodicFM(chip, lastMelodic);
+        /* Melodic 2-op FM - run through all possible channels */
+        for (int ch = 0; ch < lastMelodic; ch++)
+        {
+            YM_Channel *cc = &chip->channels[ch];
+
+            if (!cc->keyOn && cc->osc.gain == 0)
+                continue;
+
+            sample += YM_RenderChannel2FM(&cc->osc, cc->keyOn, ch);
+        }
 
         /*
          * -----------------------------------------------------------------

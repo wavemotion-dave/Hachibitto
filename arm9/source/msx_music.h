@@ -132,7 +132,7 @@ typedef struct
     u8  sustain;            // $2x D5 - stored; not currently applied by the mixer
 
     const YM_Instrument *instPtr;  // cached &customInstrument or &InstrumentROM[instrument] -
-                                      // re-pointed only on a $3x write, not re-derived every sample
+                                   // re-pointed only on a $3x write, not re-derived every sample
 
     YM_Oscillator osc;
 } YM_Channel;
@@ -154,10 +154,10 @@ typedef struct
     u8 addressLatch;                    // last value written to the address-select port (caller's convenience)
     u32 noiseLFSR;                      // noise source for HH/SD/TOP-CY; must never be seeded 0
     s32 rhythmPrevNoise;                // legacy previous-noise state; not used by current mixer
-    YM_Oscillator rhythmSD;          // rhythm mode only: channel 7's SECOND voice's envelope (HH uses
+    YM_Oscillator rhythmSD;             // rhythm mode only: channel 7's SECOND voice's envelope (HH uses
                                         // channels[7].osc's envelope; both derive their actual waveform
                                         // from channels 7 & 8's phase, not their own - see YMMixer)
-    YM_Oscillator rhythmTCY;         // rhythm mode only: channel 8's SECOND voice's envelope (TOM uses
+    YM_Oscillator rhythmTCY;            // rhythm mode only: channel 8's SECOND voice's envelope (TOM uses
                                         // channels[8].osc directly, both for envelope and waveform)
     s32 outputFilterState;              // one-pole output-smoothing state; included in save states
 } YM;
