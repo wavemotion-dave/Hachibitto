@@ -88,7 +88,9 @@ When zoomed, use the Left/Right shoulder buttons to pan the screen left and righ
 
 Known Issues :
 -----------------------
-* MSX-MUSIC is vastly simplified processing so that it will run on the older DS hardware. Sound is passable but nowhere near authentic.
+* MSX-MUSIC is vastly simplified processing so that it will run on the older DS hardware. On DSi/XL/LL, the sound is passable but nowhere near authentic (and in a few games is downright terrible).
+* Manbow 2 plays but has corruption on title screen and the music is overly harsh. Reasons unknown.
+
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------

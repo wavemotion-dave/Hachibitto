@@ -651,7 +651,8 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   }
   else if (Port == 0x12)  // 2xPSG Read...
   {
-      return ay38910DataR(&myAY2);
+      if (myConfig.expansion == MUSIC_2XPSG) return ay38910DataR(&myAY2);
+      else return NORAM;
   }
   else if (Port == 0xA8)  // Feedback on Slot mapping
   {
