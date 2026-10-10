@@ -732,10 +732,8 @@ void DisplayStatusLine(void)
         else if (myConfig.expansion == MUSIC_2XPSG)
         {
             // 2X PSG
-            DSPrint(20, 0, 0, " ");
-            DSPrint(20, 1, 0, " ");
-            DSPrint(21, 0, 2, "\"#");
-            DSPrint(21, 1, 2, "BC");
+            DSPrint(20, 0, 2, "!\"#");
+            DSPrint(20, 1, 2, "ABC");
         }
         else // Clear the icon display area...
         {
@@ -761,7 +759,7 @@ void DisplayStatusLine(void)
         }
 
         DSPrint(1,19,0, (key_shift ? "A":" "));
-        DSPrint(2,19,(key_shift ? 2:0), (key_shift ? "A":" "));
+        DSPrint(2,19,0, (key_shift ? "!":" "));
 
         DSPrint(1,15,0, (key_ctrl  ? "@":" "));
         DSPrint(2,15,(key_ctrl  ? 2:0), (key_ctrl  ? "@":" "));
