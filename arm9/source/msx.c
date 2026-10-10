@@ -1162,7 +1162,8 @@ void msxWipeRAM(void)
 // -------------------------------------------------------------------
 u8 Is16kBanking(void)
 {
-    if (MyMedia[MEDIA_CART1].mapperType == ASC16 || MyMedia[MEDIA_CART1].mapperType == ASC16SRAM2 || MyMedia[MEDIA_CART1].mapperType == ASC16SRAM8 || MyMedia[MEDIA_CART1].mapperType == ZEN16 || MyMedia[MEDIA_CART1].mapperType == XBLAM || MyMedia[MEDIA_CART1].mapperType == SUPERLR || MyMedia[MEDIA_CART1].mapperType == XEVIOUS)
+    if (MyMedia[MEDIA_CART1].mapperType == ASC16 || MyMedia[MEDIA_CART1].mapperType == ASC16SRAM2 || MyMedia[MEDIA_CART1].mapperType == ASC16SRAM8 || MyMedia[MEDIA_CART1].mapperType == XBLAM || 
+        MyMedia[MEDIA_CART1].mapperType == SUPERLR || MyMedia[MEDIA_CART1].mapperType == XEVIOUS || MyMedia[MEDIA_CART1].mapperType == GENERIC_16K)
         return 1;
     else
         return 0;
@@ -1175,7 +1176,7 @@ void MSX_CartSetup(u8 media_id)
     // ------------------------------------------------------------
     // Setup the Z80 memory based on the MSX game ROM size loaded
     // ------------------------------------------------------------
-    if (MyMedia[media_id].filesize == (8 * 1024))
+    if (MyMedia[media_id].filesize == (8 * 1024)) // 8K Cartridges
     {
         if (msx_basic)  // Basic Game loads at 0x8000 ONLY (no mirrors)
         {
@@ -1183,7 +1184,7 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 4 - Actual ROM is here
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 4 - Actual ROM is here
             MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
@@ -1200,27 +1201,70 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x0000;        // Segment 0
         }
     }
-    else if (MyMedia[media_id].filesize <= (16 * 1024) && (MyMedia[media_id].mapperType != SCC8))
+    else if (MyMedia[media_id].filesize <= (16 * 1024)) // 16K Cartridges
     {
-        if (MyMedia[media_id].mapperType == AT4K)  // Load the 16K rom at 0x4000 without Mirrors
+        if (MyMedia[media_id].mapperType == AT4K)  // Load the 16K rom at 0x4000 with Mirror to Page 2
         {
                 MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
-                MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-                MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-                MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;          // Segment NA
-                MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0
+                MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 1
+                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0 (mirror)
+                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1 (mirror)
                 MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
         }
-        else if (MyMedia[media_id].mapperType == AT8K) // Load the 16K rom at 0x8000 without Mirrors
+        else if (MyMedia[media_id].mapperType == ROM_NORMAL)  // Load the 16K rom based on if BASIC or not
+        {
+                MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
+                if (msx_basic)
+                {
+                    MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
+                    MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
+                    MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+                    MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
+                }
+                else
+                {
+                    MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0
+                    MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 1
+                    MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;          // Segment NA
+                    MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment NA
+                }
+                MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+        }
+        else if (MyMedia[media_id].mapperType == PAGE2) // Load the 16K rom at 0x8000 without Mirrors
         {
                 MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
+                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
+                MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+        }
+        else if (MyMedia[media_id].mapperType == NAMCO) // Namco 16K Originals map using A15 as bank selection
+        {
+                MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 (1st 8K)
+                MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x0000;       // Segment 1 (1st 8K Mirror)
+                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x2000;       // Segment 2 (2nd 8K)
+                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 3 (2nd 8K Mirror)
+                MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+        }
+        else if (MyMedia[media_id].mapperType == AT8K) // Load the 16K rom at 0x8000 with Mirror to Page 1
+        {
+                MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
+                MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 (mirror)
+                MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 1 (mirror)
+                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
                 MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
         }
@@ -1232,8 +1276,8 @@ void MSX_CartSetup(u8 media_id)
                 MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
+                MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+                MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
                 MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
                 MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
             }
@@ -1265,21 +1309,21 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Segment 1
             MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x4000;        // Segment 2
             MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x6000;        // Segment 3
-            MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;           // Segment NA
         }
         else  if (MyMedia[media_id].mapperType == AT4K)  // Then the full 32K ROM is mapped here
         {
-            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;           // Segment NA
             MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
             MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
             MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;        // Segment 2
             MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;        // Segment 3
-            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;           // Segment NA
         }
         else if (MyMedia[media_id].mapperType == AT8K)  // Then the full 32K ROM is mapped here
         {
@@ -1287,10 +1331,10 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment NA
             MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x4000;        // Segment 2
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x6000;        // Segment 3
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x4000;       // Segment 2
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x6000;       // Segment 3
         }
         else // MIRRORED (in some way)
         {
@@ -1320,7 +1364,7 @@ void MSX_CartSetup(u8 media_id)
     }
     else if (MyMedia[media_id].filesize == (48 * 1024) && (MyMedia[media_id].mapperType != SCC8))
     {
-        if ((MyMedia[media_id].mapperType == KON8) || (MyMedia[media_id].mapperType == ZEN8))
+        if (MyMedia[media_id].mapperType == KON8)
         {
             MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x4000;        // Segment 2 Mirror
             MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x6000;        // Segment 3 Mirror
@@ -1348,24 +1392,12 @@ void MSX_CartSetup(u8 media_id)
         {
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Unmapped
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Unmapped
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 1
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 1
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Unmapped
-            MyMedia[media_id].mapperMask = 0x03;
-        }
-        else if (myConfig.msxMapper == ZEN16)
-        {
-            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 1
-            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0
-            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;        // Segment 1
             MyMedia[media_id].mapperMask = 0x03;
         }
         else if (MyMedia[media_id].mapperType == AT4K) // Mirror Page 1 to Page 0
@@ -1387,8 +1419,8 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x6000;        // Segment 3
             MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x8000;        // Segment 4
             MSXCartPtr[media_id][5] = (u8*)CART_Memory+0xA000;        // Segment 5
-            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment NA
-            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment NA
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;           // Segment NA
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;           // Segment NA
         }
     }
     else if ((MyMedia[media_id].filesize == (64 * 1024)) && (MyMedia[media_id].mapperType == LIN64))   // 64K Linear ROM
@@ -1404,7 +1436,7 @@ void MSX_CartSetup(u8 media_id)
     }
     else if ((MyMedia[media_id].filesize >= (16 * 1024)) && (MyMedia[media_id].filesize <= (MAX_CART_SIZE_KB * 1024)))   // We'll take anything between these two...
     {
-        if ((MyMedia[media_id].mapperType == KON8) || (MyMedia[media_id].mapperType == SCC8) || (MyMedia[media_id].mapperType == ZEN8) || (MyMedia[media_id].mapperType == MAJUT))
+        if ((MyMedia[media_id].mapperType == KON8) || (MyMedia[media_id].mapperType == SCC8) || (MyMedia[media_id].mapperType == MAJUT))
         {
             MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x4000;        // Segment 2 Mirror
             MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x6000;        // Segment 3 Mirror
@@ -1426,14 +1458,14 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x0000;        // Segment 0 default
         }
-        else if (MyMedia[media_id].mapperType == ASC16 || MyMedia[media_id].mapperType == ZEN16 || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8)
+        else if (MyMedia[media_id].mapperType == ASC16 || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8)
         {
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment Unmapped
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 0 default
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 0 default
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }
@@ -1441,8 +1473,8 @@ void MSX_CartSetup(u8 media_id)
         {
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment Unmapped
-            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
             MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1466,10 +1498,65 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][2] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][3] = (u8*)Unmapped_Memory;          // Segment Unmapped
-            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0 default
-            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 0 default
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
+        }
+        else if (MyMedia[media_id].mapperType == GAME_MASTER2)   // Just for Game Master 2 by Konami
+        {
+            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default - this is the fixed 8K bank
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 1 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;       // Segment 2 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;       // Segment 3 default
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
+        }
+        else if (MyMedia[media_id].mapperType == GENERIC_8K)  // Similar to ASCII-8 but hotspots use A14+A15
+        {
+            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x0000;        // Segment 1
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x2000;        // Segment 2
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;        // Segment 3
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;           // Segment Unmapped
+        }
+        else if (MyMedia[media_id].mapperType == GENERIC_16K)  // Similar to ASCII-16 but hotspots use A14+A15
+        {
+            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;        // Segment 2
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;        // Segment 3
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;           // Segment Unmapped
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;           // Segment Unmapped
+        }
+        else if (MyMedia[media_id].mapperType == WIZARDRY)  // Just for Wizardry with SRAM (similar to ASC8)
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+        }
+        else if (MyMedia[media_id].mapperType == KOEISRAM32)  // KOEI 32K SRAM similar to ASC8 with 'expanded' SRAM 
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x0000;        // Segment 0 default
         }
 
         // ---------------------------------------------------------------------
@@ -1658,7 +1745,8 @@ void MSX_InitialMemoryLayout(void)
     // If we are dealing with one of the rare SRAM games, read the SRAM file from the SD card back into memory.
     // We only allow this for CART1 - we will ignore any SRAM-based CART that is in slot 2...
     // ---------------------------------------------------------------------------------------------------------
-    if ((MyMedia[MEDIA_CART1].mapperType == ASC8SRAM2) || (MyMedia[MEDIA_CART1].mapperType == ASC8SRAM8) || (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM2) || (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM8))
+    if ((MyMedia[MEDIA_CART1].mapperType == ASC8SRAM2) || (MyMedia[MEDIA_CART1].mapperType == ASC8SRAM8) || (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM2) || 
+        (MyMedia[MEDIA_CART1].mapperType == ASC16SRAM8) || (MyMedia[MEDIA_CART1].mapperType == GAME_MASTER2) || (MyMedia[MEDIA_CART1].mapperType == KOEISRAM32))
     {
         msxLoadSRAM();
     }
@@ -1746,6 +1834,13 @@ void msx_reset(void)
     myPaddle.current_position = 130;
 }
 
+int GetSizeSRAM(void)
+{
+         if (MyMedia[MEDIA_CART1].mapperType == KOEISRAM32) return 0x8000;   // KOEI makes use of large 32K SRAM areas
+    else if (MyMedia[MEDIA_CART1].mapperType == GAME_MASTER2) return 0x4000; // Really 8K but due to mapping we need to save 16K
+    else return 0x2000; // This covers 2K to 8K which is very typical...
+}
+
 // -------------------------------------------------------------------
 // For the few games that have SRAM built in. We back the SRAM onto
 // a file with the same base filename but the extension is .SRM
@@ -1771,8 +1866,8 @@ void msxSaveSRAM(void)
     FILE *handle = fopen(szName, "wb+");
     if (handle != NULL)
     {
-        // SRAM is either 2K or 8K but we always just save 8K as the 2K has mirrors
-        fwrite(SRAM_Memory, 0x2000, 1, handle);
+        // SRAM is up to 32K in size...
+        fwrite(SRAM_Memory, GetSizeSRAM(), 1, handle);
         fclose(handle);
     }
 }
@@ -1795,9 +1890,9 @@ void msxLoadSRAM(void)
     szName[len-0] = 0;
 
     // Check if the file exists... if so read it...
-    if (ReadFileCarefully(szName, SRAM_Memory, 0x2000, 0, NULL) == 0)
+    if (ReadFileCarefully(szName, SRAM_Memory, 0x8000, 0, NULL) == 0)   // SRAM can be anywhere from 2K to 32K
     {
-        memset(SRAM_Memory, 0xFF, 0x2000); // Not found, so init the SRAM area
+        memset(SRAM_Memory, 0xFF, 0x8000); // Not found, so init the SRAM area
     }
 }
 

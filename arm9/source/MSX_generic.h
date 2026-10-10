@@ -143,8 +143,8 @@ extern u8 mirror_ram_bank[4];
 #define ASC8            3
 #define SCC8            4
 #define ASC16           5
-#define ZEN8            6
-#define ZEN16           7
+#define GENERIC_8K      6
+#define GENERIC_16K     7
 #define XBLAM           8
 #define SUPERLR         9
 #define XEVIOUS         10
@@ -156,8 +156,15 @@ extern u8 mirror_ram_bank[4];
 #define AT4K            16
 #define AT8K            17
 #define LIN64           18
+#define PAGE2           19
+#define ROM_NORMAL      20
 
+
+#define GAME_MASTER2    69  // Not one of the general mappers a user can pick
 #define MAJUT           70  // Not one of the general mappers a user can pick
+#define NAMCO           71  // Not one of the general mappers a user can pick
+#define WIZARDRY        72  // Not one of the general mappers a user can pick
+#define KOEISRAM32      73  // Not one of the general mappers a user can pick
 
 #define FMPAC_SRAM      87  // For our special FM-PAC Cart
 #define SCCPLUS_RAM     88  // For our special SCC+ "Cart"
@@ -171,7 +178,7 @@ extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
 extern u8 RAM_Memory[0x20000];
 extern u8 BIOS_Memory[0x8000];
-extern u8 SRAM_Memory[0x2000];
+extern u8 SRAM_Memory[0x8000];
 extern u8 SCC_Memory[0x10000];
 
 extern const unsigned char MSXBios_DISK[0x4000];

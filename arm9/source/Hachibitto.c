@@ -81,7 +81,7 @@ u8 *ROM_Memory;                                         // ROM Carts up to 1MB/4
 u8 *DISK_Memory;                                        // Disk Memory will be 720K to support DSDD disks
 u8 RAM_Memory[0x20000]          ALIGN(32) = {0};        // RAM is 128K for the MSX2 (this is fairly standard for MSX2 machines)
 u8 BIOS_Memory[0x8000]          ALIGN(32) = {0};        // To hold our MSX BIOS - always in the lower 32K memory region of slot 0
-u8 SRAM_Memory[0x2000]          ALIGN(32) = {0};        // To hold up to 8K of SRAM (FM-PAC or special SRAM capable carts)
+u8 SRAM_Memory[0x8000]          ALIGN(32) = {0};        // To hold up to 32K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
 u8 SCC_Memory[0x10000]          ALIGN(32) = {0};        // To hold the 64K of SCC-backed RAM
 
 u8 io_show_status = 0;      // Used to indicate a disk activity icons
@@ -428,7 +428,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
                 bFirstSoundOutput = 0;
                 return len;
             }
-            
+
             ay38910Mixer(len * 2, dest, &myAY);
 
             if (myConfig.expansion == MUSIC_2XPSG) // 2x PSG enabled? If so... mix it in.
@@ -705,7 +705,7 @@ void DisplayStatusLine(void)
             io_show_status = 6;      // Show icon briefly
             if (myGlobalConfig.bDiskSounds) mmEffect(SFX_FLOPPY);    // Short disk sound effect
         }
-        
+
         if (--io_show_status == 0) // Done with read/write activity
         {
             fdc_persist_disk(); // See if the disk needs to be persisted.
@@ -790,7 +790,7 @@ u8 MiniMenu(void)
     u8 retVal = MENU_CHOICE_NONE;
 
     SoundPause();
-    
+
     while ((keysCurrent() & (KEY_TOUCH | KEY_LEFT | KEY_RIGHT | KEY_A ))!=0);
 
     BottomScreenMiniMenu();
@@ -803,7 +803,7 @@ u8 MiniMenu(void)
           retVal = MENU_CHOICE_NONE;
           break;    // We're done...
       }
-      
+
       if (nds_key & KEY_TOUCH)
       {
           touchPosition touch;
@@ -814,7 +814,7 @@ u8 MiniMenu(void)
               else if (touch.px <= 128) retVal = MENU_CHOICE_LOAD_GAME;
               else if (touch.px <= 192) retVal = MENU_CHOICE_SWAP_DISK;
               else if (touch.px <= 256) retVal = MENU_CHOICE_END_GAME;
-              
+
               break;
           }
           if ((touch.py >= 98) && (touch.py < 190))   // Bottom row of Icons
@@ -823,7 +823,7 @@ u8 MiniMenu(void)
               else if (touch.px <= 128) retVal = MENU_CHOICE_GAME_OPTIONS;
               else if (touch.px <= 192) retVal = MENU_CHOICE_DEFINE_KEYS;
               else if (touch.px <= 256) retVal = MENU_CHOICE_RESET_GAME;
-              
+
               break;
           }
       }
@@ -831,7 +831,7 @@ u8 MiniMenu(void)
 
     while ((keysCurrent() & (KEY_TOUCH | KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT))!=0)
         ;
-    
+
     WAITVBL;WAITVBL;
 
     BottomScreenKeypad();
@@ -1327,7 +1327,7 @@ void HachibittoRunEmu(void)
                               BottomScreenOptions();
                               DSPrint(11,13,6, "LOADING...");
                               // -------------------------------------------------------------------------
-                              // Do NOT save this new disk/filename into MyMedia[].filename as it would 
+                              // Do NOT save this new disk/filename into MyMedia[].filename as it would
                               // overwrite the master. Same for filecrc. Instead we save it into filename2
                               // which always represents the current file for the disk swapped in.
                               // -------------------------------------------------------------------------
@@ -1706,7 +1706,7 @@ void BottomScreenOptions(void)
     decompress(optionsTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(optionsMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) optionsPal,(void*) BG_PALETTE_SUB,256*2);
-    
+
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1724,7 +1724,7 @@ void BottomScreenMainMenu(void)
     decompress(mainmenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(mainmenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) mainmenuPal,(void*) BG_PALETTE_SUB,256*2);
-    
+
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1743,7 +1743,7 @@ void BottomScreenMiniMenu(void)
     decompress(minimenuTiles, bgGetGfxPtr(bg0b), LZ77Vram);
     decompress(minimenuMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
     dmaCopy((void*) minimenuPal,(void*) BG_PALETTE_SUB,256*2);
-    
+
     unsigned short dmaVal = *(bgGetMapPtr(bg1b)+24*32);
     dmaFillWords(dmaVal | (dmaVal<<16),(void*) bgGetMapPtr(bg1b),32*24*2);
 }
@@ -1951,7 +1951,7 @@ int main(int argc, char **argv)
         MAX_CART_SIZE_KB = 1024;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
     }
-    
+
     // Clear out the ROM memory with all 0xFF values...
     memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
 
@@ -1963,10 +1963,10 @@ int main(int argc, char **argv)
 
     // Make sure the DISK memory is reset...
     memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
-    
+
     // Make sure the SRAM is reset... This small buffer is pre-allocated.
     memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
-    
+
     // ------------------------------------------
     // Load the High Score table into memory...
     // ------------------------------------------
@@ -2212,7 +2212,7 @@ u32 GetMasterCRC(void)
 {
     if (MyMedia[MEDIA_CART1].filecrc) return MyMedia[MEDIA_CART1].filecrc;
     else if (MyMedia[MEDIA_DISK].filecrc) return MyMedia[MEDIA_DISK].filecrc;
-    
+
     return 0x00000000;
 }
 

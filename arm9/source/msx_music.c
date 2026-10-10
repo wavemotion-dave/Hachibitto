@@ -35,7 +35,7 @@
                                              // level on key-on; the normal FM path has operator envelopes.
 #define YM_PERCUSSION_RELEASE_STEP 5500      // PERCUSSION release rate: higher = faster decay
                                              // for more distinct drum hits.
-                                             
+
 /* Legacy fast-mixer carrier sustain approximation: map OPLL SL to gain levels
    and move toward the target slowly. The normal FM path uses operator envelopes. */
 static   u8 YM_SustainGain[16] __attribute__((section(".dtcm"))) =
@@ -194,8 +194,8 @@ static u32 YM_ComputePhaseIncrement(u16 fNumber, u8 block, u8 mulNibble)
     unsigned long long num = (unsigned long long)fNumber * (unsigned long long)YM_MulTableX2[mulNibble & 0x0F];
     num <<= block;
     num *= (unsigned long long)YM_MASTER_CLOCK << 12;
-    unsigned long long inc = num / ((unsigned long long)72 * (unsigned long long)YM_SAMPLE_RATE);
-    if (inc > 0xFFFFFFFFULL) inc = 0xFFFFFFFFULL;
+    u32 inc = num / ((unsigned long long)72 * (unsigned long long)YM_SAMPLE_RATE);
+    //if (inc > 0xFFFFFFFFULL) inc = 0xFFFFFFFFULL;
     return (u32)inc;
 }
 
@@ -513,7 +513,7 @@ static inline void YM_PrecomputeFMRates(YM *chip, int ch)
        phase deviation range. */
 
     p->modDepth = (u8)(8 + ((63 - (inst->tl & 0x3F)) >> 1));
-        
+
     p->fbDepth = YM_FM_FBDepth[inst->fb & 7];
     p->slMod = YM_FM_SustainAtten[inst->slMod & 0x0F];
     p->slCar = YM_FM_SustainAtten[inst->slCar & 0x0F];

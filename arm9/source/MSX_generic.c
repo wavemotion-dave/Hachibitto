@@ -881,24 +881,24 @@ static const GameTweak gameTweaks[] =
     { "URIDIUM",         NULL,                TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
     { "ANTARCTIC",       "ADVENTURE",         TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
     { "ADVENTURES",      "PARK",              TWEAK_NONE,      TWEAK_NONE,  0,           TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // SCC+                                                                                                                 
+
+    // SCC+
     { "SNATCHER",        NULL,                MUSIC_SCC,    FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // Aggressive frame skip on DS-Lite                                                                                     
+
+    // Aggressive frame skip on DS-Lite
     { "MANBOW",          NULL,                TWEAK_NONE,   FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // MSX-MUSIC - works on DS-Lite                                                                                         
+
+    // MSX-MUSIC - works on DS-Lite
     { "LUBECK",          NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "XAK",             NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "FAMICLE",         NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "FRAY",            NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "SINGULAR",        "STONE",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // MSX-MUSIC + aggressive frame skip on DS-Lite                                                                         
+
+    // MSX-MUSIC + aggressive frame skip on DS-Lite
     { "LILLY",           "SAGA",              MUSIC_MSX,    FS_AGGRESSIVE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // MSX-MUSIC - DSi only                                                                                                 
+
+    // MSX-MUSIC - DSi only
     { "ALESTE",          NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "MONOGATARI",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "SLAYER",          "VI",                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
@@ -908,7 +908,6 @@ static const GameTweak gameTweaks[] =
     { "SUPER",           "COOKS",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "PSYCH",           "WORLD",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "MAD",             "HOUSE",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
-    { "DAIKOUKAI",       "JIDAI",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "DEAD",            "BRAIN",             MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "EUROPE",          "WAR",               MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "FAMILY",          "STADIUM",           MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
@@ -919,6 +918,7 @@ static const GameTweak gameTweaks[] =
     { "PENGUIN",         "WARS",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "BLASTER",         "BURN",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "LAYDOCK",         "LAST",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
+    { "THEXDER",         "HAWK",              MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "BUSHOUHUUNROKU",  NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "SENKOKUGUNYUDEN", NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "FARDRAUT",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
@@ -931,20 +931,20 @@ static const GameTweak gameTweaks[] =
     { "FEEDBACK",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "MASTER 3",        NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
     { "MASTER III",      NULL,                MUSIC_MSX,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         1 },
-                                                                                                                            
-    // PSG                                                                                                                  
+
+    // PSG
     { "BLADE",           "LORDS",             MUSIC_PSG,       TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
-                                                                                                                            
-    // D-Pad                                                                                                                
+
+    // D-Pad
     { "ARKANOID",        NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_ARKANOID,      0 },
     { "CHUCKIE",         NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_SLIDE_N_GLIDE, 0 },
     { "QBERT",           NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_DIAGONALS,     0 },
     { "Q-BERT",          NULL,                TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    DPAD_DIAGONALS,     0 },
-                                                                                                                            
-    // Machine type                                                                                                         
+
+    // Machine type
     { "KING",            "BALLOON",           TWEAK_NONE,      TWEAK_NONE,  TWEAK_NONE,  MACHINE_MSX1,  TWEAK_NONE,         0 },
-                                                                                                                            
-    // Beeper                                                                                                               
+
+    // Beeper
     { "WAY",             "TIGER",             MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "JACK",            "NIPPER",            MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
     { "MASTER",          "LAMPS",             MUSIC_BEEPER,    TWEAK_NONE,  TWEAK_NONE,  TWEAK_NONE,    TWEAK_NONE,         0 },
@@ -1062,7 +1062,7 @@ void SetDefaultGameConfig(void)
     myConfig.maxSprites   = 1;                           // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
     myConfig.dpad         = DPAD_NORMAL;                 // Normal DPAD use - mapped to joystick
     myConfig.yOffset      = 0;                           // Default is no Y offset
-    myConfig.expansion  = MUSIC_PSG;                   // Default is no expansion (normal PSG sound)
+    myConfig.expansion    = MUSIC_PSG;                   // Default is no expansion (normal PSG sound)
     myConfig.cpuBoost     = 0;                           // Run CPU at true speed (1=boost 10%)
     myConfig.splitRefresh = 2;                           // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen  = 0;                           // 0=No Screen Scale. 1=Vertical Compression (yuck!)
@@ -1175,8 +1175,8 @@ const struct options_t Option_Table[1][20] =
 {
     // Page 1
     {
-        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","ZEMINA 8K","ZEMINA 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
-                            "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR"},                                              &myConfig.msxMapper,        19},
+        {"MSX MAPPER",     {"GUESS","MIRRORED", "KONAMI 8K","ASCII 8K","KONAMI SCC","ASCII 16K","GENERIC 8K","GENERIC 16K","ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
+                            "ASC16 SRAM 8K", "CROSSBLAIM","LODERUNNER", "XEVIOUS", "AT 0000H","AT 4000H","AT 8000H","64K LINEAR", "PAGE2", "NORMAL 8K/16K"},                    &myConfig.msxMapper,        21},
         {"MACHINE TYPE",   {"MSX2 - NORMAL", "MSX1 - LEGACY"},                                                                                                                  &myConfig.machineType,      2},
         {"KEYBOARD",       {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                                 &myConfig.keyboard,         2},
         {"MAX SPRITES",    {"4/8 PER LINE", "32 PER LINE"},                                                                                                                     &myConfig.maxSprites,       2},
@@ -1184,7 +1184,7 @@ const struct options_t Option_Table[1][20] =
         {"JOYSTICK",       {"NORMAL", "DIAGONALS", "ARKANOID", "SLIDE-N-GLILDE"},                                                                                               &myConfig.dpad,             4},
         {"SPLIT TIMING",   {"0 LINES", "1 LINE", "2 LINES"},                                                                                                                    &myConfig.splitRefresh,     3},
         {"CPU SPEED",      {"NORMAL", "BOOSTED 10%", "BOOSTED 20%"},                                                                                                            &myConfig.cpuBoost,         3},
-        {"EXPANSION",      {"NONE", "FM-PAC", "SCC+ (SCC-I)", "2x PSG", "BEEPER"},                                                                                              &myConfig.expansion,      5},
+        {"EXPANSION",      {"NONE", "FM-PAC", "SCC+ (SCC-I)", "2x PSG", "BEEPER"},                                                                                              &myConfig.expansion,        5},
         {"Y OFFSET",       {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19", "+20"},         &myConfig.yOffset,          21},
         {"SCREEN SCALE",   {"NONE", "COMPRESSED"},                                                                                                                              &myConfig.scaleScreen,      2},
         {"BORDER MASK",    {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                           &myConfig.maskBorders,      4},
