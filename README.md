@@ -17,11 +17,13 @@ Features :
 * Two cart slots supported (if a 2nd cart is utilized, it cuts the max .ROM filesizes above in half).
 * Loads .DSK disk files that are single side (360K) or double sided (720K) with in-game disk swap.
 * Emulated machine is 256K of User RAM and 128K of VRAM.
+* MEGARAM SCC option available to boost system memory to 512K (DS-Lite) or 1024K (DSi) with SCC support.
 * Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard.
 * Save and Restore states so you can pick up where you left off on a per-game basis.
 * Standard PSG, 2x PSG, SCC, SCC+ and FM-PAC (MSX-MUSIC + SRAM) available.
 * SRAM carts backed to SD card automatically.
 * Slide-n-Glide style Joystick configuration to make climbing ladders in games like Chuckie-Egg more forgiving (try it - you'll like it!).
+* Overscan support for the few games that extend past the 212 scanline "limit". See options.
 * Arkanoid paddle controllers supported (only 2 games known to make use of it - hold B button to speed up paddle movement).
 * High Score saving for 10 scores with initials, date/time.
 * Favorites list so you can mark games as 'like' or 'love' - a yellow or red heart icon will mark your favorite games.
@@ -56,7 +58,9 @@ Thanks to Flubba for the AY38910 and SCC sound cores. You can seek out his lates
 
 Also thanks to Marat Fayzullin, as the author of fMSX - which is where the CZ80 CPU core and initial VDP9938 handling came from.
 
-And Nishi.
+The ROM Database is courtesy of https://romdb.vampier.net/
+
+And the most special of thanks to Nishi.
 
 Options :
 -----------------------
@@ -89,8 +93,7 @@ When zoomed, use the Left/Right shoulder buttons to pan the screen left and righ
 Known Issues :
 -----------------------
 * MSX-MUSIC is complicated and consumes quite a bit of the DS CPU horsepower. As such, the Yamaha YM2413 / OPLL implementation is vastly simplified. It only runs full-speed on the DSi or above with the 2X CPU. Do not judge MSX-MUSIC harshly based on this emulator's ability.
-* Manbow 2 requires one of the hacks that does not try to address the flash chip (look for the "60Hz Patch" as one that works).
-* Breaker has severe screen glitching due to simplified VRAM handling of the emulator.
+* Manbow 2 has some minor glitching when using save/continue functionality. Does not affect gameplay.
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------
@@ -104,6 +107,18 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.5 - 17-Oct-2026 by wavemotion-dave
+* Overscan support for the few games that extend beyond the normal 212 scaline limit.
+* Double buffer graphics output to eliminate glitching.
+* Screen 8 now interleaves VRAM (Breakers and Manbow 2 run).
+* Fix VDP timing so Pengo now runs.
+* Added flash write for Megarom SCC with flash. Not yet backed to SD.
+* Fix 1-pixel scroll sprite jitter on games like Manbow 2
+* A few new mappers added - general cleanup across the board.
+* MEGARAM SCC expansion added to bump system ram to 512K (DS-Lite) / 1024K (DSi)
+* Improved pop/click removal when resetting games.
+* New FM-PAC and SCC-I banners for the main menu.
+
 Version 1.4b - 13-Oct-2026 by wavemotion-dave
 * Hotfix for MSX-MUSIC with new sound rebalance configuration for games like XAK I.
 * DS-Lite now defaults to PSG over MSX-MUSIC due to CPU constraints.

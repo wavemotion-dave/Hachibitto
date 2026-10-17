@@ -821,7 +821,7 @@ static inline u8 Screen8SpriteByte(const u8 *base, int offset)
         return VDP_Memory[VDP9938Screen8Address(address)];
 }
 
-u8 DoesScreen8LineHaveSprites(uint8_t Y)
+ITCM_CODE u8 DoesScreen8LineHaveSprites(uint8_t Y)
 {
     static const uint8_t SprHeights[4] = { 8,16,16,32 };
     uint8_t IH,OH;
@@ -1458,14 +1458,16 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
     }
     else
     {
-        uint32_t K, *T;
+        typedef uint16_t may_alias_u16 __attribute__((__may_alias__));
+        uint32_t K;
+        uint8_t *T;
         int I, J;
 
         uint8_t *P = RefreshBorder(Y);
 
         uint32_t srcY = Y + VScroll;
 
-        T = (uint32_t*)(ChrTab + ((int)(srcY & 0xF8) << 2));
+        T = ChrTab + ((int)(srcY & 0xF8) << 2);
         I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
         int misaligned = ((uintptr_t)P & 3) != 0;
@@ -1483,8 +1485,8 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
         {
             do
             {
-                uint32_t chars = *T;
-                T = (uint32_t*)((uint8_t*)T + 2);
+                uint16_t chars = *(const may_alias_u16 *)T;
+                T += sizeof(chars);
 
                 /* Character 0 */
                 uint32_t t_val = chars & 0xFF;
@@ -1502,15 +1504,16 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 
                     K = ChrGen[idx & ChrGenM];
 
-                    p0 = ((K & 0x80) ? FC : BC) |
-                         (((K & 0x40) ? FC : BC) << 8) |
-                         (((K & 0x20) ? FC : BC) << 16) |
-                         (((K & 0x10) ? FC : BC) << 24);
+                    uint32_t fg = FC;
+                    uint32_t bg = BC;
+                    fg |= fg << 8;
+                    fg |= fg << 16;
+                    bg |= bg << 8;
+                    bg |= bg << 16;
 
-                    p1 = ((K & 0x08) ? FC : BC) |
-                         (((K & 0x04) ? FC : BC) << 8) |
-                         (((K & 0x02) ? FC : BC) << 16) |
-                         (((K & 0x01) ? FC : BC) << 24);
+                    uint32_t diff = fg ^ bg;
+                    p0 = bg ^ (diff & Screen2NibbleMask[K >> 4]);
+                    p1 = bg ^ (diff & Screen2NibbleMask[K & 0x0F]);
                 }
 
                 P32[0] = p0;
@@ -1534,15 +1537,16 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 
                     K = ChrGen[idx & ChrGenM];
 
-                    p0 = ((K & 0x80) ? FC : BC) |
-                         (((K & 0x40) ? FC : BC) << 8) |
-                         (((K & 0x20) ? FC : BC) << 16) |
-                         (((K & 0x10) ? FC : BC) << 24);
+                    uint32_t fg = FC;
+                    uint32_t bg = BC;
+                    fg |= fg << 8;
+                    fg |= fg << 16;
+                    bg |= bg << 8;
+                    bg |= bg << 16;
 
-                    p1 = ((K & 0x08) ? FC : BC) |
-                         (((K & 0x04) ? FC : BC) << 8) |
-                         (((K & 0x02) ? FC : BC) << 16) |
-                         (((K & 0x01) ? FC : BC) << 24);
+                    uint32_t diff = fg ^ bg;
+                    p0 = bg ^ (diff & Screen2NibbleMask[K >> 4]);
+                    p1 = bg ^ (diff & Screen2NibbleMask[K & 0x0F]);
                 }
 
                 P32[0] = p0;
@@ -1560,8 +1564,7 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 
             do
             {
-                uint32_t t_val = *(uint8_t*)T;
-                T = (uint32_t*)((uint8_t*)T + 1);
+                uint32_t t_val = *T++;
 
                 if (t_val != lastT)
                 {
@@ -1576,15 +1579,16 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
 
                     K = ChrGen[idx & ChrGenM];
 
-                    p0 = ((K & 0x80) ? FC : BC) |
-                         (((K & 0x40) ? FC : BC) << 8) |
-                         (((K & 0x20) ? FC : BC) << 16) |
-                         (((K & 0x10) ? FC : BC) << 24);
+                    uint32_t fg = FC;
+                    uint32_t bg = BC;
+                    fg |= fg << 8;
+                    fg |= fg << 16;
+                    bg |= bg << 8;
+                    bg |= bg << 16;
 
-                    p1 = ((K & 0x08) ? FC : BC) |
-                         (((K & 0x04) ? FC : BC) << 8) |
-                         (((K & 0x02) ? FC : BC) << 16) |
-                         (((K & 0x01) ? FC : BC) << 24);
+                    uint32_t diff = fg ^ bg;
+                    p0 = bg ^ (diff & Screen2NibbleMask[K >> 4]);
+                    p1 = bg ^ (diff & Screen2NibbleMask[K & 0x0F]);
                 }
 
                 P16[0] = (uint16_t)p0;
