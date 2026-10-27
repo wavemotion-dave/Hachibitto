@@ -123,6 +123,7 @@ The Hachibitto HB-8 Fantasy Console :
 Version History :
 -----------------------
 Version 1.7 - 27-Oct-2026 by wavemotion-dave
+* Fix for save state not loading back properly when new versions come out
 * Fix for artwork not showing properly (wrong colors and image jittering) after playing some games.
 * MSXDOS2 mapper added - ASCII MSX-DOS2 v2.2 supported
 * R-Type ROM mapper added.
