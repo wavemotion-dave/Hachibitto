@@ -122,9 +122,12 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
-Version 1.6c - 24-Oct-2026 by wavemotion-dave
+Version 1.7 - 27-Oct-2026 by wavemotion-dave
+* Fix for artwork not showing properly (wrong colors and image jittering) after playing some games.
+* MSXDOS2 mapper added - ASCII MSX-DOS2 v2.2 supported
 * R-Type ROM mapper added.
-* 16K Mapper support for Slot 2.
+* 16K Mapper support for Slot 2 supported.
+* Cursor key hit detection improved.
 * DSK files now compute CRC32 based on filename (so re-written disks don't change CRC32).
 
 Version 1.6b - 24-Oct-2026 by wavemotion-dave

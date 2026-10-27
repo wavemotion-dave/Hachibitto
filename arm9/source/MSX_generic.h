@@ -182,10 +182,11 @@ extern u8 zanac_glitch_patch;
 #define HAMARAJANIGHT   31  // Not one of the general mappers a user can pick
 #define RBSC_FLASH      32  // Not one of the general mappers a user can pick
 #define MATRACOMP       33  // Not one of the general mappers a user can pick
-#define MEGA_SCC        34  // For our special MEGARAM SCC 'Cart'
-#define FMPAC_SRAM      35  // For our special FM-PAC 'Cart'
-#define SCCPLUS_RAM     36  // For our special SCC+ 'Cart'
-#define END_MAPPERS     37
+#define MSXDOS2         34  // Not one of the general mappers a user can pick
+#define MEGA_SCC        35  // For our special MEGARAM SCC 'Cart'
+#define FMPAC_SRAM      36  // For our special FM-PAC 'Cart'
+#define SCCPLUS_RAM     37  // For our special SCC+ 'Cart'
+#define END_MAPPERS     38
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 

@@ -1177,10 +1177,15 @@ void msxWipeRAM(void)
 u8 Is16kBanking(u8 media_id)
 {
     if (MyMedia[media_id].mapperType == ASC16 || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8 || MyMedia[media_id].mapperType == XBLAM ||
-        MyMedia[media_id].mapperType == SUPERLR || MyMedia[media_id].mapperType == XEVIOUS || MyMedia[media_id].mapperType == GENERIC_16K || MyMedia[media_id].mapperType == RTYPE)
+        MyMedia[media_id].mapperType == SUPERLR || MyMedia[media_id].mapperType == XEVIOUS || MyMedia[media_id].mapperType == GENERIC_16K || MyMedia[media_id].mapperType == RTYPE ||
+        MyMedia[media_id].mapperType == MSXDOS2)
+    {
         return 1;
+    }
     else
+    {
         return 0;
+    }
 }
 
 void MSX_CartSetup(u8 media_id)
@@ -1480,6 +1485,17 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
             MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x0000;       // Segment 0 default
             MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+            MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
+        }
+        else if (MyMedia[media_id].mapperType == MSXDOS2)
+        {
+            MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)Unmapped_Memory;          // Segment Unmapped
+            MSXCartPtr[media_id][5] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }

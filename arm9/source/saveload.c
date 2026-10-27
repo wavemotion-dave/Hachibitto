@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x000F  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0010  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -160,7 +160,7 @@ void msxSaveState(void)
         // We need to save off the MSX Cart offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
         {
-            if ((MSXCartPtr[MEDIA_CART1][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < ROM_Memory+(sizeof(ROM_Memory))))
+            if ((MSXCartPtr[MEDIA_CART1][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < ROM_Memory+(MAX_CART_SIZE_KB * 1024)))
             {
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - ROM_Memory;
@@ -182,7 +182,7 @@ void msxSaveState(void)
         // We need to save off the MSX Cart2 offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
         {
-            if ((MSXCartPtr[MEDIA_CART2][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < ROM_Memory+(sizeof(ROM_Memory))))
+            if ((MSXCartPtr[MEDIA_CART2][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < ROM_Memory+(MAX_CART_SIZE_KB * 1024)))
             {
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = MSXCartPtr[MEDIA_CART2][i] - ROM_Memory;

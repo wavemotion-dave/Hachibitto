@@ -1047,26 +1047,30 @@ u8 last_special_key_dampen = 0;
 u8 last_kbd_key = 0;
 u8 dampen_zoom = 0;
 
+#define CUR_W 43
+#define CUR_H 58
+
+int cursor_hit(int x, int y)   /* x,y relative to image top-left */
+{
+    if (x < 0 || y < 0 || x >= CUR_W || y >= CUR_H)
+        return 0x00;
+
+    int dx = 2 * x - CUR_W;    /* -43..+43 */
+    int dy = 2 * y - CUR_H;    /* -58..+58 */
+    int adx = dx < 0 ? -dx : dx;
+    int ady = dy < 0 ? -dy : dy;
+
+    if (adx * CUR_H > ady * CUR_W)
+        return dx < 0 ? KBD_KEY_LEFT : KBD_KEY_RIGHT;
+    else
+        return dy < 0 ? KBD_KEY_UP : KBD_KEY_DOWN;
+}
+
 u8 handle_msx_keyboard_press(u16 iTx, u16 iTy) // MSX Keyboard
 {
-    if ((iTx > 212) && (iTy >= 102) && (iTy < 162)) // Triangular Arrow Keys... do our best
+    if ((iTx >= 214) && (iTy >= 103) && (iTy < 162)) // Triangular Arrow Keys... do our best
     {
-        if (iTy < 120)
-        {
-            kbd_key = KBD_KEY_UP;
-        }
-        else if (iTy > 145)
-        {
-            kbd_key = KBD_KEY_DOWN;
-        }
-        else if (iTx < 234)
-        {
-            kbd_key = KBD_KEY_LEFT;
-        }
-        else
-        {
-            kbd_key = KBD_KEY_RIGHT;
-        }
+        kbd_key = cursor_hit(iTx-214, iTy-103);
     }
     else if ((iTy >= 12) && (iTy < 42)) // Row 1 (top row with Function Keys)
     {

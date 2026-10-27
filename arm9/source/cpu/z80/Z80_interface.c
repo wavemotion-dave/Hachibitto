@@ -192,6 +192,22 @@ void __attribute__((noinline)) HandleAscii16(u8 media_id, u16 address, u8 value)
     }
 }
 
+// MSX DOS 2 by ASCII only maps 0x4000-0x7FFF and the hotpsot is at 0x7FFE
+void __attribute__((noinline)) HandleMSXDOS2(u8 media_id, u16 address, u8 value)
+{
+    u32 block = (value & MyMedia[media_id].mapperMask);
+    u32 msx_offset = block * MyMedia[media_id].blockSize;
+    u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
+
+    if (address == 0x7FFE)
+    {
+        MSXCartPtr[media_id][2] = (u8*)src;
+        MSXCartPtr[media_id][3] = (u8*)src+0x2000;
+        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
+        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
+    }
+}
+
 // Segment 16 is fixed at 0x4000
 void __attribute__((noinline)) HandleRType(u8 media_id, u16 address, u8 value)
 {
@@ -1600,6 +1616,7 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
     [HAMARAJANIGHT]     = HandleSCCFlash,
     [RBSC_FLASH]        = HandleSCCFlash,
     [MATRACOMP]         = HandleMatraCompilation,
+    [MSXDOS2]           = HandleMSXDOS2,
     [MEGA_SCC]          = HandleMegaSCC,
     [FMPAC_SRAM]        = HandleFMPAC,
     [SCCPLUS_RAM]       = HandleSCCPlus,
