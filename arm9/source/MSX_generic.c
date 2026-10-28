@@ -1172,7 +1172,7 @@ static const GameTweak gameTweaks[] =
     {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"MEGA",            "CHASE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"TANNH",           "GATE",              TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
-    {"GHOSTLY",         "MANNOR",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"GHOSTLY",         "MANOR",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"LAYDOCK",         "LAST",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"SEA",             "SARDINE",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"GOONIES",         "ENOUGH",            TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
