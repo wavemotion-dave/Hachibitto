@@ -1532,6 +1532,83 @@ static inline __attribute__((always_inline)) int HScrollStart(void)   // used by
     return HScrollRaw() & 254;
 }
 
+// ---------------------------------------------------------------------
+// This handles the V9958 horizontal scroll register magic for Screen 4
+// ---------------------------------------------------------------------
+u8 *HandlePageScrollScreen4(u8 *T, u8 *P, uint8_t **Pbg, int *tiles, int *start)
+{
+    int page = 0;
+    
+    if (VDP[25] & 1)
+    {
+        // Separate the initial page from the offset within it.
+        page = (VDP[26] & 0x20) != 0;
+
+        int scroll = ((VDP[26] & 0x1F) << 3) - (VDP[27] & 7);
+
+        // R27 subtraction can borrow across the page boundary.
+        if (scroll < 0)
+        {
+            scroll += 256;
+            page ^= 1;
+        }
+
+        *start = scroll & 254;
+
+        // In SP2 mode, R26 bit 5 selects the page.
+        // Preserve the row address but replace its page bit.
+        uint32_t rowOffset = (uint32_t)(T - VDP_Memory);
+        rowOffset &= ~0x8000u;
+
+        if (page)
+            rowOffset ^= 0x8000u;
+
+        T = VDP_Memory + rowOffset;
+
+        if (*start)
+        {
+            int col = *start >> 3;
+            *Pbg = P - (*start & 7);
+
+            // Read across the page boundary when necessary.
+            for (int i = 0; i < 34; i++)
+            {
+                int c = col + i;
+                uint32_t addr = rowOffset + (c & 31);
+
+                if (c >= 32)
+                    addr ^= 0x8000u;
+
+                NameRow[i] = VDP_Memory[addr];
+            }
+
+            T = NameRow;
+            *tiles = 34;
+        }
+    }
+    else
+    {
+        *start = HScrollStart();
+
+        if (*start)
+        {
+            int col = *start >> 3;
+            *Pbg = P - (*start & 7);
+
+            for (int i = 0; i < 34; i++)
+            {
+                NameRow[i] = T[(col + i) & 31];
+            }
+
+            T = NameRow;
+            *tiles = 34;
+        }
+    }
+    
+    return T;
+
+}
+
 // Decode one Screen 4 (Graphic 3) tile row into two 32-bit words (p0 = left 4 pixels, p1 = right 4)
 // with a one-entry cache so runs of identical tiles are free.
 #define S4_DECODE(tv)                                                          \
@@ -1571,18 +1648,14 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
         T = ChrTab + ((int)(srcY & 0xF8) << 2);
         I = ((int)(srcY & 0xC0) << 5) + (srcY & 0x07);
 
-        // ---- Horizontal scroll: rotate the name row, start drawing left of P ----
-        uint8_t *Pbg  = P;       // where the background starts being written
-        int      tiles = 32;     // tiles to draw (34 when scrolled: 33 needed, rounded to even)
-        int      start = HScrollStart();
+        // ---- Horizontal Scroll handling of V9958
+        uint8_t *Pbg = P;
+        int tiles = 32;
+        int start = 0;
 
-        if (start)
+        if (myConfig.vdp & 4) // V9958 enabled?
         {
-            int col = start >> 3;
-            Pbg = P - (start & 7);
-            for (int i = 0; i < 34; i++) NameRow[i] = T[(col + i) & 31];
-            T = NameRow;
-            tiles = 34;
+            T = HandlePageScrollScreen4(T, P, &Pbg, &tiles, &start);
         }
 
         int misaligned = ((uintptr_t)Pbg & 3) != 0;
@@ -1645,40 +1718,62 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
     }
 }
 
-
-const u8 *HandleHorizontalScrollScreen5(const u8 *src)
+// ---------------------------------------------------------------------
+// This handles the V9958 horizontal scroll register magic for Screen 5
+// ---------------------------------------------------------------------
+const u8 *HandlePageScrollScreen5(const u8 *src)
 {
-    // R26 bit 5 selects the initial page.
-    int page = (VDP[26] & 0x20) != 0;
-
-    // Calculate the offset within the selected 256-pixel page.
-    int scroll = ((VDP[26] & 0x1F) << 3) - (VDP[27] & 7);
-
-    // Fine-scroll subtraction can borrow from the page bit.
-    if (scroll < 0)
+    if (VDP[25] & 1)
     {
-        scroll += 256;
-        page ^= 1;
+        if (VDP[2] & 0x20)  // Hack for Super Laydock II
+        {
+            // R26 bit 5 selects the initial page.
+            int page = (VDP[26] & 0x20) != 0;
+
+            // Calculate the offset within the selected 256-pixel page.
+            int scroll = ((VDP[26] & 0x1F) << 3) - (VDP[27] & 7);
+
+            // Fine-scroll subtraction can borrow from the page bit.
+            if (scroll < 0)
+            {
+                scroll += 256;
+                page ^= 1;
+            }
+
+            // Screen 5 stores two pixels per byte.
+            int off = (scroll & 254) >> 1;
+
+            // In SP2 mode, R2 bit 5 must not determine the display page.
+            // Preserve the upper VRAM bank and the row address.
+            u32 rowOffset = (u32)(src - VDP_Memory) & ~0x8000;
+
+            if (page)
+                rowOffset ^= 0x8000;
+
+            const u8 *a = VDP_Memory + rowOffset;
+            const u8 *b = VDP_Memory + (rowOffset ^ 0x8000);
+
+            // Draw from the selected page, then wrap to the other page.
+            memcpy(ScrollRow, a + off, 128 - off);
+            memcpy(ScrollRow + 128 - off, b, off);
+
+            src = ScrollRow;
+        }
     }
+    else
+    {
+        int start = HScrollStart();
 
-    // Screen 5 stores two pixels per byte.
-    int off = (scroll & 254) >> 1;
+        if (start)
+        {
+            int off = start >> 1;
 
-    // In SP2 mode, R2 bit 5 must not determine the display page.
-    // Preserve the upper VRAM bank and the row address.
-    u32 rowOffset = (u32)(src - VDP_Memory) & ~0x8000;
+            memcpy(ScrollRow, src + off, 128 - off);
+            memcpy(ScrollRow + 128 - off, src, off);
 
-    if (page)
-        rowOffset ^= 0x8000;
-
-    const u8 *a = VDP_Memory + rowOffset;
-    const u8 *b = VDP_Memory + (rowOffset ^ 0x8000);
-
-    // Draw from the selected page, then wrap to the other page.
-    memcpy(ScrollRow, a + off, 128 - off);
-    memcpy(ScrollRow + 128 - off, b, off);
-
-    src = ScrollRow;
+            src = ScrollRow;
+        }
+    }
     
     return src;
 }
@@ -1695,49 +1790,18 @@ ITCM_CODE void RefreshLine5(u8 uY)
     {
         uint8_t *P = RefreshBorder(uY);
 
-#if 0 // OLD CODE — WORKS, EXCEPT MULTI-PAGE SCROLL
-        const u8 *src = ChrTab + (((u32)(uY+VScroll) << 7) & ChrTabM & 0x7FFF);
-        if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000) src -= 0x8000;
-
-        // ---- Horizontal scroll: a 2-pixel step is exactly one source byte,
-        // so scrolling is just a rotation of the 128-byte row. No nibble shifting.
-        int start = HScrollStart();
-        if (start)
-        {
-            int off = start >> 1;                       // 1..127
-            memcpy(ScrollRow,             src + off, 128 - off);
-            memcpy(ScrollRow + 128 - off, src,       off);
-            src = ScrollRow;                            // 4-byte aligned
-        }
-#else // NEW CODE — PRESERVE ChrTab ADDRESSING, ENABLE SP2
         const u8 *src = ChrTab + (((u32)(uY + VScroll) << 7) & ChrTabM & 0x7FFF);
 
         if (FlipEvenOdd && OddPage && VDP_Memory <= src - 0x8000)
             src -= 0x8000;
 
-        // V9958 horizontal scrolling.
-        if (VDP[25] & 1)
+        // -------------------------------------------------------------
+        // V9958 horizontal scrolling... both single page and dual page.
+        // -------------------------------------------------------------
+        if (myConfig.vdp & 4) // Only if V9958 enabled
         {
-            if (VDP[2] & 0x20)  // Hack for Super Laydock II
-            {
-                src = HandleHorizontalScrollScreen5(src);
-            }
+            src = HandlePageScrollScreen5(src);
         }
-        else
-        {
-            int start = HScrollStart();
-
-            if (start)
-            {
-                int off = start >> 1;
-
-                memcpy(ScrollRow, src + off, 128 - off);
-                memcpy(ScrollRow + 128 - off, src, off);
-
-                src = ScrollRow;
-            }
-        }
-#endif
 
         // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
         // doesn't change mid-line), so check it once rather than per-pixel.

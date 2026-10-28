@@ -117,6 +117,10 @@ struct __attribute__((__packed__)) Config_t
 #define YM_BAL_HIGH                 2       // High YM volume mix
 #define YM_BAL_MAX                  3       // Max (normal) YM volume mix
 
+#define VDP_9938                    0
+#define VDP_9958                    4
+
+
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
 
