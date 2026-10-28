@@ -553,6 +553,73 @@ void ayPortBOutHandler(u8 value)
     }
 }
 
+u8 ReadJoystick(void)
+{
+    u8 joy1 = 0;
+    
+    if (myConfig.dpad == DPAD_DIAGONALS)
+    {
+        if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
+        if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
+        if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
+        if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
+   
+        if (JoyState & JST_FIRE1) joy1 |= 0x10;
+        if (JoyState & JST_FIRE2) joy1 |= 0x20;
+    }
+    else if (myConfig.dpad == DPAD_ARKANOID)
+    {
+        /*
+         * joy1 is active-high here because it gets inverted below:
+         *
+         *     myAY.ayPortAIn = ~joy1;
+         *
+         * Vaus:
+         *   pin 1 = serial data
+         *   pin 2 = fire, active LOW
+         */
+   
+        /*
+         * Pin 1 / serial data
+         *
+         * Actual PSG input is active-low, so:
+         *
+         *   serial bit = 1 -> joy1 bit 0 = 0
+         *   serial bit = 0 -> joy1 bit 0 = 1
+         */
+        if (!read_paddle_pin1(&myPaddle))
+            joy1 |= 0x01;
+   
+        /*
+         * Pin 2 / fire button
+         *
+         * Actual Vaus button:
+         *   0 = pressed
+         *   1 = released
+         *
+         * Since joy1 gets inverted later:
+         *   joy1 bit 1 = 0 -> PSG bit 1 = 1
+         *   joy1 bit 1 = 1 -> PSG bit 1 = 0
+         *
+         * Therefore we want joy1 bit 1 SET when NOT pressed.
+         */
+        if ((JoyState & JST_FIRE1))
+            joy1 |= 0x02;
+    }
+    else // DPAD_NORMAL or SLIDE-N-GLIDE
+    {
+        if (JoyState & JST_UP)    joy1 |= 0x01;
+        if (JoyState & JST_DOWN)  joy1 |= 0x02;
+        if (JoyState & JST_LEFT)  joy1 |= 0x04;
+        if (JoyState & JST_RIGHT) joy1 |= 0x08;
+   
+        if (JoyState & JST_FIRE1) joy1 |= 0x10;
+        if (JoyState & JST_FIRE2) joy1 |= 0x20;
+    }
+    
+    return joy1;
+}
+
 // --------------------------------------------------------------------
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
@@ -579,65 +646,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
           // -------------------------------------------------------------
           if ((myAY.ayPortBOut & 0x40) == 0)
           {
-              if (myConfig.dpad == DPAD_DIAGONALS)
-              {
-                  if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
-                  if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
-                  if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
-                  if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
-
-                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
-                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
-              }
-              else if (myConfig.dpad == DPAD_ARKANOID)
-              {
-                  /*
-                   * joy1 is active-high here because it gets inverted below:
-                   *
-                   *     myAY.ayPortAIn = ~joy1;
-                   *
-                   * Vaus:
-                   *   pin 1 = serial data
-                   *   pin 2 = fire, active LOW
-                   */
-
-                  /*
-                   * Pin 1 / serial data
-                   *
-                   * Actual PSG input is active-low, so:
-                   *
-                   *   serial bit = 1 -> joy1 bit 0 = 0
-                   *   serial bit = 0 -> joy1 bit 0 = 1
-                   */
-                  if (!read_paddle_pin1(&myPaddle))
-                      joy1 |= 0x01;
-
-                  /*
-                   * Pin 2 / fire button
-                   *
-                   * Actual Vaus button:
-                   *   0 = pressed
-                   *   1 = released
-                   *
-                   * Since joy1 gets inverted later:
-                   *   joy1 bit 1 = 0 -> PSG bit 1 = 1
-                   *   joy1 bit 1 = 1 -> PSG bit 1 = 0
-                   *
-                   * Therefore we want joy1 bit 1 SET when NOT pressed.
-                   */
-                  if ((JoyState & JST_FIRE1))
-                      joy1 |= 0x02;
-              }
-              else // DPAD_NORMAL or SLIDE-N-GLIDE
-              {
-                  if (JoyState & JST_UP)    joy1 |= 0x01;
-                  if (JoyState & JST_DOWN)  joy1 |= 0x02;
-                  if (JoyState & JST_LEFT)  joy1 |= 0x04;
-                  if (JoyState & JST_RIGHT) joy1 |= 0x08;
-
-                  if (JoyState & JST_FIRE1) joy1 |= 0x10;
-                  if (JoyState & JST_FIRE2) joy1 |= 0x20;
-              }
+              joy1 = ReadJoystick();
           }
 
           myAY.ayPortAIn = ~joy1;
@@ -1891,7 +1900,7 @@ void msx_restore_bios(void)
     {
         memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
     }
-
+    
     // Slot 0 - BIOS is mapped in to start...
     MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
     MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;

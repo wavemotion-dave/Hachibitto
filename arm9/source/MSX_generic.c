@@ -1089,6 +1089,7 @@ typedef struct
     u8 frameSkip;
     u8 maxSprites;
     u8 machineType;
+    u8 vdpType;
     u8 dpad;
     u8 ymScale;
 } GameTweak;
@@ -1099,81 +1100,94 @@ typedef struct
 // -------------------------------------------------------------------------------------------------------------
 static const GameTweak gameTweaks[] =
 {
-    // match1,          match2,              expansion,   frameSkip,      maxSprites, machineType,   dpad,               ymScale
-
-    // Sprite limit
-    {"QBIQS",           NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"URIDIUM",         NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ANTARCTIC",       "ADVENTURE",         TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ADVENTURES",      "PARK",              TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    // match1,          match2,              expansion,   frameSkip,      maxSprites, machineType,   vdpType,       dpad,               ymScale
+    
+    
+    {"QBIQS",           NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"URIDIUM",         NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ANTARCTIC",       "ADVENTURE",         TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ADVENTURES",      "PARK",              TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
 
     // SCC+
-    {"SNATCHER",        NULL,                EXP_SCC_PLUS, FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-
-    // Aggressive frame skip on DS-Lite
-    {"MANBOW",          NULL,                TWEAK_NONE,   FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SNATCHER",        NULL,                EXP_SCC_PLUS, FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
 
     // MSX-MUSIC
-    {"SINGULAR",        "STONE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
-    {"SLAYER",          "VI",                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ILLUSION",        "CITY",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"SUPER",           "COOKS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"PSYCH",           "WORLD",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MAD",             "HOUSE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"DEAD",            "BRAIN",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"EUROPE",          "WAR",               EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"FAMILY",          "STADIUM",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"FLEET",           "COMMANDER 2",       EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"GAMBLER",         "JIKICHUSHINPA",     EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"LILLY",           "SAGA",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MAISON",          "IKKOKU",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"EMERALD",         "DRAGON",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"PENGUIN",         "WARS",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"BLASTER",         "BURN",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"LAYDOCK",         "LAST",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"THEXDER",         "HAWK",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_HIGH},
-    {"LUBECK",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"XAK",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_LOW},
-    {"FAMICLE",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"FRAY",            NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MONOGATARI",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"GOLVELLIUS 2",    NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"GOLVELLIUS II",   NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"BUSHOUHUUNROKU",  NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"SENKOKUGUNYUDEN", NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"FARDRAUT",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"SUIKODEN",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"PAC-MANIA",       NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"GENCHOHISI",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"QUINPL",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"UNDEADLINE",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
-    {"FEEDBACK",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MASTER 3",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MASTER III",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"XEVIOUS",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"RANDAR",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"R-TYPE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SINGULAR",        "STONE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
+    {"SLAYER",          "VI",                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ILLUSION",        "CITY",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"PSYCH",           "WORLD",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MAD",             "HOUSE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"DEAD",            "BRAIN",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"EUROPE",          "WAR",               EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"FLEET",           "COMMANDER 2",       EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GAMBLER",         "JIKICHUSHINPA",     EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"LILLY",           "SAGA",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MAISON",          "IKKOKU",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"EMERALD",         "DRAGON",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"PENGUIN",         "WARS",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BLASTER",         "BURN",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"THEXDER",         "HAWK",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         YM_BAL_HIGH},
+    {"LUBECK",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"XAK",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         YM_BAL_LOW},
+    {"FAMICLE",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"FRAY",            NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MONOGATARI",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GOLVELLIUS 2",    NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GOLVELLIUS II",   NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BUSHOUHUUNROKU",  NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SENKOKUGUNYUDEN", NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"FARDRAUT",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SUIKODEN",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"PAC-MANIA",       NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GENCHOHISI",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"QUINPL",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"UNDEADLINE",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
+    {"FEEDBACK",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MASTER 3",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MASTER III",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"XEVIOUS",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"RANDAR",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"R-TYPE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
 
     // D-Pad
-    {"ARKANOID",        NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_ARKANOID,      TWEAK_NONE},
-    {"CHUCKIE",         NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_SLIDE_N_GLIDE, TWEAK_NONE},
-    {"QBERT",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
-    {"Q-BERT",          NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
+    {"ARKANOID",        NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    DPAD_ARKANOID,      TWEAK_NONE},
+    {"CHUCKIE",         NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    DPAD_SLIDE_N_GLIDE, TWEAK_NONE},
+    {"QBERT",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
+    {"Q-BERT",          NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
 
     // Machine type
-    {"KING",            "BALLOON",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, MACHINE_MSX1,  TWEAK_NONE,         TWEAK_NONE},
+    {"KING",            "BALLOON",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, MACHINE_MSX1,  TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    
+    // Aggressive frame skip on DS-Lite. V9958 on DSi.
+    {"MANBOW",          NULL,                TWEAK_NONE,   FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    
+    // V9958 Enhanced Games
+    {"SONYC",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"AHPARMYADOCK",    NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"G3LEGEND",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"MEGA",            "CHASE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"TANNH",           "GATE",              TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"GHOSTLY",         "MANNOR",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"LAYDOCK",         "LAST",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"SEA",             "SARDINE",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"GOONIES",         "ENOUGH",            TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"TWINKLE",         "STAR",              TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"SUPER",           "COOKS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"FAMILY",          "STADIUM",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"SPIRIT",          "3D",                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
 
     // Beeper
-    {"WAY",             "TIGER",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"JACK",            "NIPPER",            EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"MASTER",          "LAMPS",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"FUTURE",          "KNIGHT",            EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"AVENGER",         NULL,                EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"BOUNDER",         NULL,                EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"WAY",             "TIGER",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"JACK",            "NIPPER",            EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MASTER",          "LAMPS",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"FUTURE",          "KNIGHT",            EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"AVENGER",         NULL,                EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BOUNDER",         NULL,                EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
 };
 
 void ApplyDatabaseTweaks(void)
@@ -1222,6 +1236,14 @@ void ApplyDatabaseTweaks(void)
             myConfig.machineType = t->machineType;
         }
 
+        if (t->vdpType != TWEAK_NONE)
+        {
+            if (isDSiMode())
+            {
+                myConfig.vdp = t->vdpType;
+            }
+        }
+
         if (t->dpad != TWEAK_NONE)
         {
             myConfig.dpad = t->dpad;
@@ -1231,6 +1253,7 @@ void ApplyDatabaseTweaks(void)
         {
             myConfig.ymScale = t->ymScale;
         }
+
     }
 
     // ----------------------------------------------------------
@@ -1336,7 +1359,7 @@ void SetDefaultGameConfig(void)
     myConfig.cpuBoost = 0;                      // Run CPU at true speed (1 = boost 25%, 2 = boost 50%)
     myConfig.splitRefresh = 2;                  // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen = 0;                   // 0=No Screen Scale. 1=Vertical Compression (yuck!)
-    myConfig.maskBorders = 0;                   // No border masking by default
+    myConfig.vdp = 0;                           // Standard V9938, no border masking by default
     myConfig.frameSkip = (isDSiMode() ? 0 : 1); // Frame Skip is disabled on DSi and above
     myConfig.ymScale = YM_BAL_MAX;              // Normal YM is scaled to be the loudest
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
@@ -1460,7 +1483,7 @@ const struct options_t Option_Table[2][20] =
         {"CPU SPEED",       {"NORMAL", "BOOSTED 25%", "BOOSTED 50%"},                                                                                                   &myConfig.cpuBoost,          3},
         {"EXPANSION",       {"NONE", "FM-PAC", "SCC+ (SCC-I)", "2x PSG", "BEEPER", "MEGARAM MUSIC"},                                                                    &myConfig.expansion,         6},
         {"SCREEN SCALE",    {"NONE", "COMPRESSED"},                                                                                                                     &myConfig.scaleScreen,       2},
-        {"BORDER MASK",     {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                  &myConfig.maskBorders,       4},
+        {"VDP SETTING",     {"9938", "9938 MASK L", "9938 MASK R", "9938 MASK LR", "9958-LITE"},                                                                        &myConfig.vdp,               5},
         {"FRAMESKIP",       {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                            &myConfig.frameSkip,         3},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
         {"VDP OVERSCAN",    {"OFF", "ENABLED"},                                                                                                                         &myConfig.overscan,          2},
