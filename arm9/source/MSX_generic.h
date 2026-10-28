@@ -81,7 +81,7 @@ struct __attribute__((__packed__)) Config_t
     u8  cpuBoost;
     u8  splitRefresh;
     u8  scaleScreen;
-    u8  maskBorders;
+    u8  vdp;
     u8  frameSkip;
     u8  ymScale;
     u8  overscan;

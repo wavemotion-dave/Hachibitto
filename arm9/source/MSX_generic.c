@@ -1336,7 +1336,7 @@ void SetDefaultGameConfig(void)
     myConfig.cpuBoost = 0;                      // Run CPU at true speed (1 = boost 25%, 2 = boost 50%)
     myConfig.splitRefresh = 2;                  // 0=Strict, 1=Refresh a line, 2= Refresh two lines
     myConfig.scaleScreen = 0;                   // 0=No Screen Scale. 1=Vertical Compression (yuck!)
-    myConfig.maskBorders = 0;                   // No border masking by default
+    myConfig.vdp = 0;                           // Standard V9938, no border masking by default
     myConfig.frameSkip = (isDSiMode() ? 0 : 1); // Frame Skip is disabled on DSi and above
     myConfig.ymScale = YM_BAL_MAX;              // Normal YM is scaled to be the loudest
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
@@ -1460,7 +1460,7 @@ const struct options_t Option_Table[2][20] =
         {"CPU SPEED",       {"NORMAL", "BOOSTED 25%", "BOOSTED 50%"},                                                                                                   &myConfig.cpuBoost,          3},
         {"EXPANSION",       {"NONE", "FM-PAC", "SCC+ (SCC-I)", "2x PSG", "BEEPER", "MEGARAM MUSIC"},                                                                    &myConfig.expansion,         6},
         {"SCREEN SCALE",    {"NONE", "COMPRESSED"},                                                                                                                     &myConfig.scaleScreen,       2},
-        {"BORDER MASK",     {"NONE", "LEFT", "RIGHT", "LEFT + RIGHT"},                                                                                                  &myConfig.maskBorders,       4},
+        {"VDP SETTING",     {"9938", "9938 MASK L", "9938 MASK R", "9938 MASK LR", "9958"},                                                                             &myConfig.vdp,               5},
         {"FRAMESKIP",       {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                            &myConfig.frameSkip,         3},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
         {"VDP OVERSCAN",    {"OFF", "ENABLED"},                                                                                                                         &myConfig.overscan,          2},
