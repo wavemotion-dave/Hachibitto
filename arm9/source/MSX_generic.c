@@ -1168,6 +1168,7 @@ static const GameTweak gameTweaks[] =
     // V9958 Enhanced Games
     {"SONYC",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"AHPARMYADOCK",    NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"G3LEGEND",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"MEGA",            "CHASE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},

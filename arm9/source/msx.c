@@ -556,14 +556,14 @@ void ayPortBOutHandler(u8 value)
 u8 ReadJoystick(void)
 {
     u8 joy1 = 0;
-    
+
     if (myConfig.dpad == DPAD_DIAGONALS)
     {
         if (JoyState & JST_UP)    joy1 |= (0x01 | 0x08);
         if (JoyState & JST_DOWN)  joy1 |= (0x02 | 0x04);
         if (JoyState & JST_LEFT)  joy1 |= (0x04 | 0x01);
         if (JoyState & JST_RIGHT) joy1 |= (0x08 | 0x02);
-   
+
         if (JoyState & JST_FIRE1) joy1 |= 0x10;
         if (JoyState & JST_FIRE2) joy1 |= 0x20;
     }
@@ -578,7 +578,7 @@ u8 ReadJoystick(void)
          *   pin 1 = serial data
          *   pin 2 = fire, active LOW
          */
-   
+
         /*
          * Pin 1 / serial data
          *
@@ -589,7 +589,7 @@ u8 ReadJoystick(void)
          */
         if (!read_paddle_pin1(&myPaddle))
             joy1 |= 0x01;
-   
+
         /*
          * Pin 2 / fire button
          *
@@ -612,11 +612,11 @@ u8 ReadJoystick(void)
         if (JoyState & JST_DOWN)  joy1 |= 0x02;
         if (JoyState & JST_LEFT)  joy1 |= 0x04;
         if (JoyState & JST_RIGHT) joy1 |= 0x08;
-   
+
         if (JoyState & JST_FIRE1) joy1 |= 0x10;
         if (JoyState & JST_FIRE2) joy1 |= 0x20;
     }
-    
+
     return joy1;
 }
 
@@ -678,6 +678,10 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   else if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machine return this but we do.
   {
       return mirror_ram_bank[Port - 0xFC];
+  }
+  else if (Port == 0xBA) // Light Pen - need to clear bit 4 to let games like DIX boot
+  {
+      return 0x6F;
   }
   else // Unknown port read
   {
@@ -1820,7 +1824,7 @@ void MSX_InitialMemoryLayout(void)
             {
                 MyMedia[MEDIA_CART1].mapperType = MSX_GuessROMType(MyMedia[MEDIA_CART1].filesize); // We only bother if the game is 64K or larger
             }
-            
+
             // Still no idea... we just call it MIRRORED and push on
             if (MyMedia[MEDIA_CART1].mapperType == 0xFF)
             {
@@ -1900,7 +1904,7 @@ void msx_restore_bios(void)
     {
         memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
     }
-    
+
     // Slot 0 - BIOS is mapped in to start...
     MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
     MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;

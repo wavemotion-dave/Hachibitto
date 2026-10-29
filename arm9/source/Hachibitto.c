@@ -767,8 +767,9 @@ void ShowDebugZ80(void)
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "VDP: %02X %02X %02X %02X %02X %02X %02X %02X", VDP[16], VDP[17], VDP[18], VDP[19], VDP[20], VDP[21], VDP[22], VDP[23]);
     DSPrint(0, idx++, 7, tmpStr);
-
-    sprintf(tmpStr, "VStat %02X %02X %02X %02X Data=%02X", VDPStatus[0], VDPStatus[1], VDPStatus[2], VDPStatus[3], VDPDlatch);
+    sprintf(tmpStr, "VDP: %02X %02X %02X %02X DATA=%02X", VDP[24], VDP[25], VDP[26], VDP[27], VDPDlatch);
+    DSPrint(0, idx++, 7, tmpStr);
+    sprintf(tmpStr, "VStat %02X %02X %02X", VDPStatus[0], VDPStatus[1], VDPStatus[2]);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "VAddr %08X", (VDP[14] << 14) + (int)VAddr);
     DSPrint(0, idx++, 7, tmpStr);
@@ -794,11 +795,15 @@ void ShowDebugZ80(void)
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "AY:%02X %02X %02X %02X", myAY.ayRegs[8], myAY.ayRegs[9], myAY.ayRegs[10], myAY.ayRegs[11]);
     DSPrint(0, idx++, 7, tmpStr);
-    sprintf(tmpStr, "AY:%02X %02X %02X %02X", myAY.ayRegs[12], myAY.ayRegs[13], myAY.ayRegs[14], myAY.ayRegs[15]);
-    DSPrint(0, idx++, 7, tmpStr);
 
     idx++;
-    sprintf(tmpStr, "S%d  A8=%02X %02X", ScrMode, Port_PPI_A, msx_subslot);
+    int screen = ScrMode;
+    if (screen == 8)
+    {
+        if ((VDP[25] & 0x18) == 0x18) screen = 11;
+        else if ((VDP[25] & 0x18) == 0x08) screen = 12;
+    }
+    sprintf(tmpStr, "S%-2d A8=%02X %02X", screen, Port_PPI_A, msx_subslot);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "FD.ST=%02X CM=%02X", FDC.status, FDC.command);
     DSPrint(0, idx++, 7, tmpStr);
@@ -2653,7 +2658,7 @@ ITCM_CODE void irqVBlank(void)
     // Manage time and true vSync on display output to reduce tearing...
     vusCptVBL++;
     dsVSyncCount++;
-    
+
     if (!bMainMenuActive) // If main menu active, don't shift anything...
     {
         // ---------------------------------------------------------------------
@@ -2998,8 +3003,8 @@ void msxInit(void)
     REG_BG3X = 0;
     REG_BG3Y = 0;
 
-    memset((u8 *)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)    
-    
+    memset((u8 *)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)
+
     // Wipe RAM area for the MSX
     msxWipeRAM();
 

@@ -64,9 +64,9 @@ u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
       0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255
 };
 
-  /* Per-scanline "has a sprite already written here" mask, aligned 1:1
-     with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
-     widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
+/* Per-scanline "has a sprite already written here" mask, aligned 1:1
+   with ZBuf's addressing (P = ZBuf + AT[1] + 0/32, plus up to +31 for
+   widened sprites -> max index 255+32+31 = 318, so 320 bytes covers it). */
 u8  OccBuf[320]             __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]        __attribute__((section(".dtcm")));
 u32 Screen2NibbleMask[16]   __attribute__((section(".dtcm")));
@@ -1103,12 +1103,14 @@ void ColorSpritesScreen8(uint8_t Y, u8 *ZBuf)
             OrThem>>=1;
         }
 
+    // Screen 8: fixed sprite colors. Screens 10/11/12: sprite colors come from the palette.
+    const u8 *lut = (VDP[25] & 0x18) ? XPal : Screen8SpriteByteLUT;
+
     for (int x = spriteMinX; x < spriteMaxX; x++)
     {
         if (x >= 0 && x < 256 && OccBuf[32 + x] == CurrentEpoch)
-            ZBuf[32 + x] = Screen8SpriteByteLUT[ZBuf[32 + x]];
+            ZBuf[32 + x] = lut[ZBuf[32 + x]];
     }
-
 #undef SPR_SET
 #undef SPR_OR
 #undef SPR_SET16
@@ -2269,14 +2271,12 @@ ITCM_CODE void RefreshLine7(u8 uY)
 
 /** RefreshLine8() *******************************************/
 /** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap    **/
+/** This also handles the Screen 12 poor-man YJK handling.  **/
 /*************************************************************/
-/** RefreshLine8() *******************************************/
-/** Refresh VDP9938 Screen 8: 256x192, 256 colors bitmap    **/
-/*************************************************************/
-// ---------------------------------------------------------------------------------
-// MSX2+ Screen 12 (YJK, YAE=0) -> approximate Screen 8 GRB332. Title screens only,
-// so deliberately not in ITCM.
-// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// MSX2+ Screen 12 (YJK, YAE=0) -> approximate Screen 8 GRB332. Title screens
+// only, so deliberately not in ITCM and quite simplified. Good enough.
+// ---------------------------------------------------------------------------
 static u8 yjkClamp[96] __attribute__((section(".dtcm"))) =
 {
     // Input -32..-1 -> 0
@@ -2291,6 +2291,82 @@ static u8 yjkClamp[96] __attribute__((section(".dtcm"))) =
     31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,
     31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,31
 };
+
+
+/** Screen10_Line_InPlace() *********************************/
+/** Convert one Screen 10/11 line (YJK + YAE) in place.     **/
+/** YAE pixels use XPal[0..15]; other pixels use YJK.       **/
+/** Deliberately outside ITCM: this is a compatibility path. **/
+/*************************************************************/
+void Screen10_Line_InPlace(u8 *p)
+{
+    for (int x = 0; x < 256; x += 4, p += 4)
+    {
+        // Read all four pixels before overwriting them.
+        int a = p[0];
+        int c = p[1];
+        int d = p[2];
+        int e = p[3];
+
+        // Extract and sign-extend the shared 6-bit J/K values.
+        int K = (a & 7) | ((c & 7) << 3);
+        int J = (d & 7) | ((e & 7) << 3);
+
+        K = (K ^ 32) - 32;
+        J = (J ^ 32) - 32;
+
+        int bc = -2 * J - K;
+
+        // Extract Y values for YJK pixels.
+        int Y0 = a >> 3;
+        int Y1 = c >> 3;
+        int Y2 = d >> 3;
+        int Y3 = e >> 3;
+
+        // Convert YJK components using the existing clamp table.
+        int r0 = yjkClamp[Y0 + J + 32];
+        int g0 = yjkClamp[Y0 + K + 32];
+        int b0 = yjkClamp[((5 * Y0 + bc) >> 2) + 32];
+
+        int r1 = yjkClamp[Y1 + J + 32];
+        int g1 = yjkClamp[Y1 + K + 32];
+        int b1 = yjkClamp[((5 * Y1 + bc) >> 2) + 32];
+
+        int r2 = yjkClamp[Y2 + J + 32];
+        int g2 = yjkClamp[Y2 + K + 32];
+        int b2 = yjkClamp[((5 * Y2 + bc) >> 2) + 32];
+
+        int r3 = yjkClamp[Y3 + J + 32];
+        int g3 = yjkClamp[Y3 + K + 32];
+        int b3 = yjkClamp[((5 * Y3 + bc) >> 2) + 32];
+
+        // YAE: bit 3 selects palette mode; bits 7..4 are the index.
+        // Otherwise, use the approximate GRB332 YJK conversion.
+        if (a & 0x08)
+            p[0] = XPal[a >> 4];
+        else
+            p[0] = (u8)(((g0 >> 2) << 5) |
+                        ((r0 >> 2) << 2) | (b0 >> 3));
+
+        if (c & 0x08)
+            p[1] = XPal[c >> 4];
+        else
+            p[1] = (u8)(((g1 >> 2) << 5) |
+                        ((r1 >> 2) << 2) | (b1 >> 3));
+
+        if (d & 0x08)
+            p[2] = XPal[d >> 4];
+        else
+            p[2] = (u8)(((g2 >> 2) << 5) |
+                        ((r2 >> 2) << 2) | (b2 >> 3));
+
+        if (e & 0x08)
+            p[3] = XPal[e >> 4];
+        else
+            p[3] = (u8)(((g3 >> 2) << 5) |
+                        ((r3 >> 2) << 2) | (b3 >> 3));
+    }
+}
 
 
 void Screen12_Line_InPlace(u8 *p)
@@ -2390,13 +2466,17 @@ ITCM_CODE void RefreshLine8(u8 uY)
             out[2*i+1] = (A >> 16)    | (B & 0xFFFF0000);         // e2 o2 e3 o3
         }
 
-        // MSX2+ Screen 12 (YJK on, YAE off): convert the linear line to GRB332 before sprites
+        // MSX2+ Screen 10 (YJK on, YAE on) and Screen 12 (YJK on, YAE off): convert the linear line to GRB332 before sprites
         if (VDP[25] & 0x08)
         {
-            Screen12_Line_InPlace(P);
-            if (uY > 128) DC_FlushRange(P, 256); // Bottom half of screen can show glitches if not flushed
-        }
+            if (VDP[25] & 0x10)
+                Screen10_Line_InPlace(P);  // YJK + YAE
+            else
+                Screen12_Line_InPlace(P); // Pure YJK
 
+            if (uY > 128) DC_FlushRange(P, 256);
+        }
+        
         // ---------------------------------------------------------------------------------
         // Even games that are heavy with sprite use don't have sprites on every line.
         // To speed up this render, if there are no sprites on the line, we have rendered
