@@ -1169,6 +1169,7 @@ static const GameTweak gameTweaks[] =
     {"SONYC",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"AHPARMYADOCK",    NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"MKID",            NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"G3LEGEND",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"MEGA",            "CHASE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
@@ -1181,6 +1182,7 @@ static const GameTweak gameTweaks[] =
     {"SUPER",           "COOKS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"FAMILY",          "STADIUM",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
     {"SPIRIT",          "3D",                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
+    {"MSX",             "WINGS",             TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    VDP_9958,      TWEAK_NONE,         TWEAK_NONE},
 
     // Beeper
     {"WAY",             "TIGER",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},

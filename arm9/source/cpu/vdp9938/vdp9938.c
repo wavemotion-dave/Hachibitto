@@ -2300,77 +2300,73 @@ static u8 yjkClamp[96] __attribute__((section(".dtcm"))) =
 /*************************************************************/
 void Screen10_Line_InPlace(u8 *p)
 {
+    const u8 *clamp = yjkClamp;
+
     for (int x = 0; x < 256; x += 4, p += 4)
     {
-        // Read all four pixels before overwriting them.
         int a = p[0];
         int c = p[1];
         int d = p[2];
         int e = p[3];
 
-        // Extract and sign-extend the shared 6-bit J/K values.
-        int K = (a & 7) | ((c & 7) << 3);
-        int J = (d & 7) | ((e & 7) << 3);
+        int K = ((a & 7) | ((c & 7) << 3));
+        int J = ((d & 7) | ((e & 7) << 3));
 
         K = (K ^ 32) - 32;
         J = (J ^ 32) - 32;
 
-        int bc = -2 * J - K;
+        // Hoist shared lookup offsets.
+        const u8 *rBase = clamp + J + 32;
+        const u8 *gBase = clamp + K + 32;
+        int bc = -2 * J - K + 128;
 
-        // Extract Y values for YJK pixels.
-        int Y0 = a >> 3;
-        int Y1 = c >> 3;
-        int Y2 = d >> 3;
-        int Y3 = e >> 3;
+        // Pixel 0
+        int Y = a >> 3;
+        int r = rBase[Y];
+        int g = gBase[Y];
+        int b = clamp[((5 * Y + bc) >> 2)];
 
-        // Convert YJK components using the existing clamp table.
-        int r0 = yjkClamp[Y0 + J + 32];
-        int g0 = yjkClamp[Y0 + K + 32];
-        int b0 = yjkClamp[((5 * Y0 + bc) >> 2) + 32];
+        p[0] = (a & 8)
+            ? XPal[a >> 4]
+            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        int r1 = yjkClamp[Y1 + J + 32];
-        int g1 = yjkClamp[Y1 + K + 32];
-        int b1 = yjkClamp[((5 * Y1 + bc) >> 2) + 32];
+        // Pixel 1
+        Y = c >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[((5 * Y + bc) >> 2)];
 
-        int r2 = yjkClamp[Y2 + J + 32];
-        int g2 = yjkClamp[Y2 + K + 32];
-        int b2 = yjkClamp[((5 * Y2 + bc) >> 2) + 32];
+        p[1] = (c & 8)
+            ? XPal[c >> 4]
+            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        int r3 = yjkClamp[Y3 + J + 32];
-        int g3 = yjkClamp[Y3 + K + 32];
-        int b3 = yjkClamp[((5 * Y3 + bc) >> 2) + 32];
+        // Pixel 2
+        Y = d >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[((5 * Y + bc) >> 2)];
 
-        // YAE: bit 3 selects palette mode; bits 7..4 are the index.
-        // Otherwise, use the approximate GRB332 YJK conversion.
-        if (a & 0x08)
-            p[0] = XPal[a >> 4];
-        else
-            p[0] = (u8)(((g0 >> 2) << 5) |
-                        ((r0 >> 2) << 2) | (b0 >> 3));
+        p[2] = (d & 8)
+            ? XPal[d >> 4]
+            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
 
-        if (c & 0x08)
-            p[1] = XPal[c >> 4];
-        else
-            p[1] = (u8)(((g1 >> 2) << 5) |
-                        ((r1 >> 2) << 2) | (b1 >> 3));
+        // Pixel 3
+        Y = e >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[((5 * Y + bc) >> 2)];
 
-        if (d & 0x08)
-            p[2] = XPal[d >> 4];
-        else
-            p[2] = (u8)(((g2 >> 2) << 5) |
-                        ((r2 >> 2) << 2) | (b2 >> 3));
-
-        if (e & 0x08)
-            p[3] = XPal[e >> 4];
-        else
-            p[3] = (u8)(((g3 >> 2) << 5) |
-                        ((r3 >> 2) << 2) | (b3 >> 3));
+        p[3] = (e & 8)
+            ? XPal[e >> 4]
+            : (u8)(((g >> 2) << 5) | ((r >> 2) << 2) | (b >> 3));
     }
 }
 
 
 void Screen12_Line_InPlace(u8 *p)
 {
+    const u8 *clamp = yjkClamp;
+
     for (int x = 0; x < 256; x += 4, p += 4)
     {
         // Read all four pixels before overwriting them.
@@ -2379,40 +2375,53 @@ void Screen12_Line_InPlace(u8 *p)
         int d = p[2];
         int e = p[3];
 
-        // Extract and sign-extend the 6-bit J/K values.
+        // Extract and sign-extend J/K.
         int K = (a & 7) | ((c & 7) << 3);
         int J = (d & 7) | ((e & 7) << 3);
 
         K = (K ^ 32) - 32;
         J = (J ^ 32) - 32;
 
-        int bc = -2 * J - K;
+        // Precompute shared lookup bases.
+        const u8 *rBase = clamp + J + 32;
+        const u8 *gBase = clamp + K + 32;
+        int bc = -2 * J - K + 128;
 
-        int Y0 = a >> 3;
-        int Y1 = c >> 3;
-        int Y2 = d >> 3;
-        int Y3 = e >> 3;
+        // Pixel 0
+        int Y = a >> 3;
+        int r = rBase[Y];
+        int g = gBase[Y];
+        int b = clamp[(5 * Y + bc) >> 2];
 
-        int r0 = yjkClamp[Y0 + J + 32];
-        int g0 = yjkClamp[Y0 + K + 32];
-        int b0 = yjkClamp[((5 * Y0 + bc) >> 2) + 32];
+        p[0] = (u8)(((g >> 2) << 5) |
+                    ((r >> 2) << 2) | (b >> 3));
 
-        int r1 = yjkClamp[Y1 + J + 32];
-        int g1 = yjkClamp[Y1 + K + 32];
-        int b1 = yjkClamp[((5 * Y1 + bc) >> 2) + 32];
+        // Pixel 1
+        Y = c >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[(5 * Y + bc) >> 2];
 
-        int r2 = yjkClamp[Y2 + J + 32];
-        int g2 = yjkClamp[Y2 + K + 32];
-        int b2 = yjkClamp[((5 * Y2 + bc) >> 2) + 32];
+        p[1] = (u8)(((g >> 2) << 5) |
+                    ((r >> 2) << 2) | (b >> 3));
 
-        int r3 = yjkClamp[Y3 + J + 32];
-        int g3 = yjkClamp[Y3 + K + 32];
-        int b3 = yjkClamp[((5 * Y3 + bc) >> 2) + 32];
-        
-        p[0] = (u8)(((g0 >> 2) << 5) | ((r0 >> 2) << 2) | (b0 >> 3));
-        p[1] = (u8)(((g1 >> 2) << 5) | ((r1 >> 2) << 2) | (b1 >> 3));
-        p[2] = (u8)(((g2 >> 2) << 5) | ((r2 >> 2) << 2) | (b2 >> 3));
-        p[3] = (u8)(((g3 >> 2) << 5) | ((r3 >> 2) << 2) | (b3 >> 3));
+        // Pixel 2
+        Y = d >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[(5 * Y + bc) >> 2];
+
+        p[2] = (u8)(((g >> 2) << 5) |
+                    ((r >> 2) << 2) | (b >> 3));
+
+        // Pixel 3
+        Y = e >> 3;
+        r = rBase[Y];
+        g = gBase[Y];
+        b = clamp[(5 * Y + bc) >> 2];
+
+        p[3] = (u8)(((g >> 2) << 5) |
+                    ((r >> 2) << 2) | (b >> 3));
     }
 }
 
@@ -2428,12 +2437,15 @@ ITCM_CODE void RefreshLine8(u8 uY)
     {
         if ((VDP[25] & 0x08) && (timingFrames & 1))
         {
-            // --------------------------------------------------------------------------------
-            // Screen 12 is a bit too much for this emulation. Fortunately this is mainly
-            // used for static screen images / in-game pictures so we can safely 50% frameskip.
-            // --------------------------------------------------------------------------------
-            skip_render = 1;
-            return;
+            if (myConfig.frameSkip == 0)
+            {
+                // --------------------------------------------------------------------------------
+                // Screen 10/11/12 is a bit too much for this emulation. Fortunately this is mainly
+                // used for static screen images / in-game pictures so we can safely 50% frameskip.
+                // --------------------------------------------------------------------------------
+                skip_render = 1;
+                return;
+            }
         }
         
         u8 HasSprites = DoesScreen8LineHaveSprites(uY); // Sprite rendering on Screen 8 is expensive...

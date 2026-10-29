@@ -165,9 +165,9 @@ case IND:
 case INDR:
   I = InZ80(CPU.BC.W);
   WrZ80(CPU.HL.W--,I);
-  if(!--CPU.BC.B.h) { CPU.AF.B.l=N_FLAG; CPU.PC.W-=2; }  // N_FLAG is not correct here but will be corrected when loop exits below. Nothing relies on the intermediate value.
+  if(--CPU.BC.B.h) { CPU.AF.B.l=N_FLAG; CPU.PC.W-=2; }   // repeat while B != 0
   else             { CPU.AF.B.l=Z_FLAG|(I&0x80 ? N_FLAG:0); CPU.ICount+=5; }
-  break;
+  break;  
 
 case OUTI:
   --CPU.BC.B.h;

@@ -1903,6 +1903,11 @@ void msx_restore_bios(void)
     else
     {
         memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
+        
+        if (myConfig.vdp == VDP_9958)
+        {
+            BIOS_Memory[0x002D] = 2; // Report out as an MSX2+
+        }
     }
 
     // Slot 0 - BIOS is mapped in to start...
