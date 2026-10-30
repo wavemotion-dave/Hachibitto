@@ -56,7 +56,10 @@ u8  sccplus_mode        __attribute__((section(".dtcm"))) = 0x00;      // BFFE/B
 // --------------------------------------------------------------------------
 u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
+
 u8 mirror_ram_bank[4]   = {3,2,1,0}; // For port readback mostly... though not all MSX2 machines report it back.
+u8 cold_or_warm_boot    = 0x00;      // After boot, this will be 0x80 so system can warm-boot
+u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
 static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
 
@@ -620,18 +623,12 @@ u8 ReadJoystick(void)
     return joy1;
 }
 
-// --------------------------------------------------------------------
-// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
-// including Joystick, PSG, SCC, RTC, keyboard, etc.
-// --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
+// ---------------------------------------------------------------------
+// Pulled out to help with ITCM_CODE space pressure. 
+// This is likely only called once per frame or even less frequently...
+// ---------------------------------------------------------------------
+u8 read_joypad_data(void)
 {
-  //98h~9Bh   Access to the VDP I/O ports.
-  if      (Port == 0x98) return RdData9938();               // VDP Data
-  else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
-  else if (Port == 0xB5) {return read_port_RTC_data();}     // RTC Data
-  else if (Port == 0xA2)  // PSG Read... might be joypad data
-  {
       // -------------------------------------------
       // Only port 1 is used for the first Joystick
       // -------------------------------------------
@@ -657,6 +654,50 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
           myAY.ayPortBIn = myAY.ayPortBOut;
       }
       return ay38910DataR(&myAY);
+}
+
+uint8_t ReadPort_KanjiDriver(uint8_t port)
+{
+    switch (port) 
+    {
+        case 0xD9:
+        case 0xDB: 
+        {
+            int lvl = (port == 0xDB);
+            u32 a = KanjiAdr[lvl];
+            uint8_t data = KanjiFontBuffer[(lvl ? 0x20000 : 0) + a];
+            // increment only the low 5 bits (within the 32-byte glyph), no carry
+            KanjiAdr[lvl] = (a & ~0x1Fu) | ((a + 1) & 0x1F);
+            return data;
+        }
+    }
+    return 0xFF;
+}
+
+void WritePort_KanjiDriver(uint8_t port, uint8_t value)
+{
+    switch (port) 
+    {
+        case 0xD8: KanjiAdr[0] = (KanjiAdr[0] & 0x1F800) | ((value & 0x3F) << 5);  break;
+        case 0xD9: KanjiAdr[0] = (KanjiAdr[0] & 0x007E0) | ((value & 0x3F) << 11); break;
+        case 0xDA: KanjiAdr[1] = (KanjiAdr[1] & 0x1F800) | ((value & 0x3F) << 5);  break;
+        case 0xDB: KanjiAdr[1] = (KanjiAdr[1] & 0x007E0) | ((value & 0x3F) << 11); break;
+    }
+}
+
+// --------------------------------------------------------------------
+// MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
+// including Joystick, PSG, SCC, RTC, keyboard, etc.
+// --------------------------------------------------------------------
+ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
+{
+  //98h~9Bh   Access to the VDP I/O ports.
+  if      (Port == 0x98) return RdData9938();               // VDP Data
+  else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
+  else if (Port == 0xB5) {return read_port_RTC_data();}     // RTC Data
+  else if (Port == 0xA2)  // PSG Read... might be joypad data
+  {
+      return read_joypad_data();
   }
   else if (Port == 0x12)  // 2xPSG Read...
   {
@@ -682,6 +723,19 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   else if (Port == 0xBA) // Light Pen - need to clear bit 4 to let games like DIX boot
   {
       return 0x6F;
+  }
+  else if (Port >= 0xD8 && Port <= 0xDB) // Kanji Driver
+  {
+      return ReadPort_KanjiDriver(Port);
+  }
+  else if (Port == 0xF4) // Boot register... force cold boot
+  {
+      return cold_or_warm_boot;
+      cold_or_warm_boot = 0x80;
+  }
+  else if (Port == 0xF5)
+  {
+      return 0xDE; // Kanji installed
   }
   else // Unknown port read
   {
@@ -711,8 +765,8 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
-            MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
+            MemoryMap[0] = (u8*)MSXBios_MSX1 + 0x0000 - 0x0000;
+            MemoryMap[1] = (u8*)MSXBios_MSX1 + 0x2000 - 0x2000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
@@ -739,8 +793,8 @@ void msx_slot_map_msx1(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to BIOS Rom
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
+            MemoryMap[2] = (u8*)MSXBios_MSX1 + 0x4000 - 0x4000;
+            MemoryMap[3] = (u8*)MSXBios_MSX1 + 0x6000 - 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
@@ -847,8 +901,8 @@ void msx_slot_map_msx2(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
-            MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
+            MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
+            MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
@@ -867,8 +921,8 @@ void msx_slot_map_msx2(unsigned char Value)
             bRAMInPage[0] = 0;
             if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0 has Extended BIOS
             {
-                MemoryMap[0] = (u8 *)MSXBios_MSX2EXT+0x0000 - 0x0000;
-                MemoryMap[1] = (u8 *)MSXBios_MSX2EXT+0x2000 - 0x2000;
+                MemoryMap[0] = (u8 *)MSXBios_EXT2P+0x0000 - 0x0000;
+                MemoryMap[1] = (u8 *)MSXBios_EXT2P+0x2000 - 0x2000;
             }
             else if (((msx_subslot & 0x03) >> 0) == 3) // Subslot 3 has RAM Mapper
             {
@@ -890,8 +944,8 @@ void msx_slot_map_msx2(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
-            MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
+            MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
+            MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
@@ -908,8 +962,12 @@ void msx_slot_map_msx2(unsigned char Value)
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-
-            if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
+            if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 2 has Kanji Driver
+            {
+                MemoryMap[2] = (u8 *)MSXBios_KANJI + 0x0000 - 0x4000;
+                MemoryMap[3] = (u8 *)MSXBios_KANJI + 0x2000 - 0x6000;
+            }
+            else if (((msx_subslot & 0x0C) >> 2) == 1) // Subslot 1 has Disk Controller
             {
                 special_memory_access |= SPEC_MEM_DISK_CONTROLLER;
                 MemoryMap[2] = (u8 *)MSXBios_DISK + 0x0000 - 0x4000;
@@ -957,6 +1015,13 @@ void msx_slot_map_msx2(unsigned char Value)
                 bRAMInPage[2] = 1;
                 MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
                 MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
+            }
+            else if (((msx_subslot & 0x30) >> 4) == 0) // Subslot 2 has 2nd half of Kanji Driver
+            {
+                bCartInPage[2] = 0;
+                bRAMInPage[2] = 0;
+                MemoryMap[4] = (u8 *)MSXBios_KANJI + 0x4000 - 0x8000;
+                MemoryMap[5] = (u8 *)MSXBios_KANJI + 0x6000 - 0xA000;
             }
             else
             {
@@ -1007,6 +1072,7 @@ void msx_slot_map_msx2(unsigned char Value)
             break;
     }
 }
+
 
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
@@ -1107,6 +1173,10 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
         }
 
         YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
+    }
+    else if (Port >= 0xD8 && Port <= 0xDB)
+    {
+        WritePort_KanjiDriver(Port, Value);
     }
     else // Unhandled port write...
     {
@@ -1898,23 +1968,18 @@ void msx_restore_bios(void)
 {
     if (myConfig.machineType == MACHINE_MSX1)
     {
-        memcpy(BIOS_Memory, MSXBios_MSX1, 0x8000);
+        MemoryMap[0] = (u8*)MSXBios_MSX1 + 0x0000 - 0x0000;
+        MemoryMap[1] = (u8*)MSXBios_MSX1 + 0x2000 - 0x2000;
+        MemoryMap[2] = (u8*)MSXBios_MSX1 + 0x4000 - 0x4000;
+        MemoryMap[3] = (u8*)MSXBios_MSX1 + 0x6000 - 0x6000;
     }
-    else
+    else // Must be MSX2+
     {
-        memcpy(BIOS_Memory, MSXBios_MSX2, 0x8000);
-        
-        if (myConfig.vdp == VDP_9958)
-        {
-            BIOS_Memory[0x002D] = 2; // Report out as an MSX2+
-        }
+        MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
+        MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
+        MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
+        MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
     }
-
-    // Slot 0 - BIOS is mapped in to start...
-    MemoryMap[0] = BIOS_Memory + 0x0000 - 0x0000;
-    MemoryMap[1] = BIOS_Memory + 0x2000 - 0x2000;
-    MemoryMap[2] = BIOS_Memory + 0x4000 - 0x4000;
-    MemoryMap[3] = BIOS_Memory + 0x6000 - 0x6000;
 
     MemoryMap[4] = Unmapped_Memory - 0x8000;
     MemoryMap[5] = Unmapped_Memory - 0xA000;
@@ -1931,6 +1996,7 @@ void msx_reset(void)
 {
     msx_init = 0x4000;
     msx_basic = 0x0000;
+    cold_or_warm_boot = 0x00;
 
     MSX_InitialMemoryLayout();
 

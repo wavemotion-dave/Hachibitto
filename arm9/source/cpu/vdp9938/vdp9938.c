@@ -22,7 +22,7 @@
 #define DEBUG_REFRESH(x) //debug[x]++;
 
 volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
-u8 XBuf[2][256*224] ALIGN(32) = {0};    // VDP9938 screen is 256x224 (for overscan). We double-buffer the output.
+u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
 u8 XPal[256]                __attribute__((section(".dtcm"))) = {0};
@@ -101,6 +101,7 @@ inline void handle_transparency(void)
 
 void vdp_9938_write_palette(u8 index, u8 color_grb)
 {
+    debug_printf("PAL %02X=%2X\n", index, color_grb);
     if (index == 0)
     {
         XPalReal0 = color_grb;
@@ -231,15 +232,6 @@ u8 VDP9918A_palette[16 * 3] = {
     0xA0,    0xA0,    0xA0,    // 14: Gray
     0xE0,    0xE0,    0xE0,    // 15: White
 };
-
-u8 VDP9938_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x7e,0x7f,0x7f,0xff,0x3f,0xff,0x3f,0xff,
-                                                             0xfb,0xbf,0x07,0x03,0xff,0xff,0x07,0x0f,
-                                                             0x0f,0xbf,0xff,0xff,0x3f,0x3f,0x3f,0xff,
-                                                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, // V9958 only
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                                                             0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
 
 u8 VDP9958_RegisterMasks[] __attribute__((section(".dtcm"))) = { 0x7e,0x7f,0x7f,0xff,0x3f,0xff,0x3f,0xff,
                                                              0xfb,0xbf,0x07,0x03,0xff,0xff,0x07,0x0f,
@@ -649,6 +641,8 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
 
   u8 zeroNotTransparent = (VDP[8]&0x20); // Zero index is a real color.. we can use BG_PALETTE[16]
 
+  const u8 g5 = (ScrMode == 6);   // Screen 6: color code = even/odd dot pair
+  
   /* Draw all marked sprites */
   for(;M;M>>=1,AT-=4)
     if(M&1)
@@ -674,6 +668,7 @@ ITCM_CODE void ColorSprites(uint8_t Y, u8 *ZBuf)
         P=ZBuf+spriteX+(C&0x80? 0:32);
         O=OccBuf+spriteX+(C&0x80? 0:32);
         C&=0x0F;
+        if (g5) C = (C >> 2) & 3; // Screen 6 decimation
         J=PT[0];
 
         if(OrThem&0x20)
@@ -1501,19 +1496,19 @@ static __attribute__((noinline)) void ApplyLeftMask(void)
     // --------------------------------------------------
     // Did user specifically ask to mask L or R borders?
     // --------------------------------------------------
-    if (myConfig.vdp & 0x03)
+    if (myConfig.borderMask & 0x03)
     {
         u32 *src32 = (u32*)(LineScratch + LS_BASE);
 
         // We mask with index color 16 which is as close as we can get to black in the fixed part of the palette.
-        if (myConfig.vdp & 1)
+        if (myConfig.borderMask & 1)
         {
             // Mask Left side
             src32[0] = 0x10101010;
             src32[1] = 0x10101010;
         }
 
-        if (myConfig.vdp & 2)
+        if (myConfig.borderMask & 2)
         {
             // Mask Right side
             src32[62] = 0x10101010;
@@ -1608,7 +1603,6 @@ u8 *HandlePageScrollScreen4(u8 *T, u8 *P, uint8_t **Pbg, int *tiles, int *start)
     }
     
     return T;
-
 }
 
 // Decode one Screen 4 (Graphic 3) tile row into two 32-bit words (p0 = left 4 pixels, p1 = right 4)
@@ -1655,10 +1649,7 @@ ITCM_CODE void RefreshLine4(uint8_t Y)
         int tiles = 32;
         int start = 0;
 
-        if (myConfig.vdp & 4) // V9958 enabled?
-        {
-            T = HandlePageScrollScreen4(T, P, &Pbg, &tiles, &start);
-        }
+        T = HandlePageScrollScreen4(T, P, &Pbg, &tiles, &start);
 
         int misaligned = ((uintptr_t)Pbg & 3) != 0;
 
@@ -1800,10 +1791,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
         // -------------------------------------------------------------
         // V9958 horizontal scrolling... both single page and dual page.
         // -------------------------------------------------------------
-        if (myConfig.vdp & 4) // Only if V9958 enabled
-        {
-            src = HandlePageScrollScreen5(src);
-        }
+        src = HandlePageScrollScreen5(src);
 
         // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
         // doesn't change mid-line), so check it once rather than per-pixel.
@@ -1885,6 +1873,84 @@ ITCM_CODE void RefreshLine5(u8 uY)
 /** RefreshLine6() ******************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
 /************************************************************/
+const u8 *HandlePageScrollScreen6(const u8 *src)
+{
+    u32 tmp[32];                        // 128 bytes on the (DTCM) stack, word-aligned
+    int scroll;
+    const u8 *a, *b;
+
+    if (VDP[25] & 1)
+    {
+        int page = (VDP[26] & 0x20) != 0;
+
+        scroll = ((VDP[26] & 0x1F) << 4) - ((VDP[27] & 7) << 1);
+        if (scroll < 0)
+        {
+            scroll += 512;
+            page ^= 1;
+        }
+
+        u32 rowOffset = (u32)(src - VDP_Memory) & ~0x8000;
+        if (page)
+            rowOffset ^= 0x8000;
+
+        a = VDP_Memory + rowOffset;
+        b = VDP_Memory + (rowOffset ^ 0x8000);
+    }
+    else
+    {
+        scroll = (((VDP[26] & 0x1F) << 4) - ((VDP[27] & 7) << 1)) & 511;
+        a = b = src;
+    }
+
+    const int start = scroll >> 2;      // 0..127, first byte in page 'a'
+    const int n1    = 128 - start;      // bytes available from 'a'
+    u8 *dst = (u8 *)tmp;
+
+    if (!(scroll & 2))
+    {
+        // Both pixels come from the same byte: bits 7:6 and 3:2.
+        const u8 *p = a + start;
+        for (int i = 0; i < n1; i++)
+            *dst++ = *p++ & 0xCC;
+
+        p = b;
+        for (int i = n1; i < 128; i++)
+            *dst++ = *p++ & 0xCC;
+    }
+    else
+    {
+        // pixel0 = bits 3:2 of byte j, pixel1 = bits 7:6 of byte j+1.
+        const u8 *p = a + start;
+        u32 c0 = *p++;
+        for (int i = 0; i < n1 - 1; i++)
+        {
+            u32 c1 = *p++;
+            *dst++ = (u8)(((c0 << 4) & 0xC0) | ((c1 >> 4) & 0x0C));
+            c0 = c1;
+        }
+
+        // Boundary: last byte of 'a', then 'b'.
+        p = b;
+        for (int i = n1 - 1; i < 128; i++)
+        {
+            u32 c1 = *p++;
+            *dst++ = (u8)(((c0 << 4) & 0xC0) | ((c1 >> 4) & 0x0C));
+            c0 = c1;
+        }
+    }
+
+    // 32-bit copy out (ScrollRow must be 4-byte aligned).
+    u32 *d = (u32 *)ScrollRow;
+    for (int i = 0; i < 32; i++)
+        d[i] = tmp[i];
+
+    return ScrollRow;
+}
+
+/** RefreshLine6() ******************************************/
+/** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
+/************************************************************/
 ITCM_CODE void RefreshLine6(u8 uY)
 {
     DEBUG_REFRESH(6);
@@ -1898,15 +1964,18 @@ ITCM_CODE void RefreshLine6(u8 uY)
         uint8_t *P = RefreshBorder(uY);
 
         u32 * restrict dst32 = (u32*)P;
-        u32 addr = ((u32)((uY + VScroll) & 1023) << 7);
-        const u8 * restrict src = &ChrTab[addr & 0x7FFF];
 
-        // --------------------------------------------------------------------
-        // For Screen 6, we are only rendering the even (A) pixels.
-        // This decimation is okay as almost nothing uses Screen 6 except
-        // the main MSX logo screen which looks fine drawing every other pixel.
-        // We might alpha-blend someday... but that day is not today.
-        // --------------------------------------------------------------------
+        const u8 *src = ChrTab +
+            (((u32)(uY + VScroll) << 7) & ChrTabM & 0x7FFF);
+
+        // -------------------------------------------------------------
+        // V9958 horizontal scrolling.
+        // -------------------------------------------------------------
+        src = HandlePageScrollScreen6(src);
+
+        // -------------------------------------------------------------
+        // Original Screen 6 conversion, unchanged.
+        // -------------------------------------------------------------
         for (int i = 0; i < 128; i += 2)
         {
             u32 b0 = src[i];
@@ -1923,7 +1992,6 @@ ITCM_CODE void RefreshLine6(u8 uY)
         CommitLine(uY);
     }
 }
-
 
 /*
  * Screen 7 zoom-mode sprite renderer.
@@ -2425,6 +2493,134 @@ void Screen12_Line_InPlace(u8 *p)
     }
 }
 
+#define HScroll8 ((VDP[25] & 0x02) || (VDP[26] & 0x3F) || (VDP[27] & 7))
+#define BORDER_COLOR_SCREEN8 XPal[0]
+
+static inline __attribute__((always_inline)) void Interleave8LineTo(u32 *restrict out, u32 lineAddr)
+{
+    u32 bankOffset = (lineAddr >> 1) & 0xFFFF;
+    const u32 *restrict e32 = (const u32 *)(VDP_Memory + bankOffset);
+    const u32 *restrict o32 = (const u32 *)(VDP_Memory + 0x10000 + bankOffset);
+
+    for (u32 i = 0; i < 32; i++)
+    {
+        u32 e = e32[i];
+        u32 o = o32[i];
+        u32 A = (e & 0x00FF00FF) | ((o & 0x00FF00FF) << 8);
+        u32 B = ((e >> 8) & 0x00FF00FF) | (o & 0xFF00FF00);
+        out[2*i]   = (A & 0xFFFF) | (B << 16);
+        out[2*i+1] = (A >> 16)    | (B & 0xFFFF0000);
+    }
+}
+
+static inline __attribute__((always_inline)) u32 LdrRot(const u8 *p)
+{
+    u32 v;
+    __asm__("ldr %0, [%1]" : "=r"(v) : "r"(p), "m"(*(const u32 *)((uintptr_t)p & ~3u)));
+    return v;
+}
+
+__attribute__((noinline))
+static void RefreshLine8_HScrollFast(u8 *P, u32 sourceAddress)
+{
+    // 2-pixel quantised: hs is always even, so even/odd banks keep their natural order
+    u32 hs = (((VDP[26] & 0x3F) << 3) - (VDP[27] & 7)) & 0xFE;
+    u32 idx = hs >> 1;                                   // byte offset into each 128-byte bank line
+
+    u32 bankOffset = (sourceAddress >> 1) & 0xFFFF;
+    const u8 *ev = VDP_Memory + bankOffset;
+    const u8 *od = VDP_Memory + 0x10000 + bankOffset;
+
+    u32 m  = 0xFFFFFFFFu >> ((idx & 3) << 3);            // bytes kept from the previous word
+    u32 er = LdrRot(ev + idx);
+    u32 or_ = LdrRot(od + idx);
+    u32 *restrict out = (u32 *)P;
+
+    for (u32 k = 0; k < 32; k++)
+    {
+        idx = (idx + 4) & 127;                           // wraps the bank line, keeps low 2 bits
+        u32 en = LdrRot(ev + idx);
+        u32 on = LdrRot(od + idx);
+
+        u32 e = en ^ ((en ^ er) & m);
+        u32 o = on ^ ((on ^ or_) & m);
+        er = en; or_ = on;
+
+        u32 A = (e & 0x00FF00FF) | ((o & 0x00FF00FF) << 8);
+        u32 B = ((e >> 8) & 0x00FF00FF) | (o & 0xFF00FF00);
+
+        out[2*k]   = (A & 0xFFFF) | (B << 16);
+        out[2*k+1] = (A >> 16)    | (B & 0xFFFF0000);
+    }
+
+    if (VDP[25] & 0x02)
+        memset(P, BORDER_COLOR_SCREEN8, 8);
+}
+
+
+// Renders the scrolled/masked background for one line into P (256 bytes, word aligned)
+void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
+{
+    if (!(VDP[25] & 0x09))                    // SP2=0 and YJK off: fused fast path
+    {
+        RefreshLine8_HScrollFast(P, sourceAddress);
+        return;
+    }
+
+    u32 buf[128] __attribute__((aligned(4)));      // 512 px worst case (SP2), lives on the DTCM stack
+
+    u32 sp2 = VDP[25] & 0x01;
+    u32 hs  = (((VDP[26] & 0x3F) << 3) - (VDP[27] & 7)) & (sp2 ? 0x1FF : 0xFF);
+
+    u32 leftAddr = sp2 ? (sourceAddress & 0xFFFF) : sourceAddress;
+    Interleave8LineTo(buf, leftAddr);
+    if (sp2) Interleave8LineTo(buf + 64, leftAddr + 0x10000);
+
+    // YJK conversion on the unscrolled source (groups of 4 are tied to VRAM, not the screen)
+    if (VDP[25] & 0x08)
+    {
+        if (VDP[25] & 0x10)
+        {
+            Screen10_Line_InPlace((u8 *)buf);
+            if (sp2) Screen10_Line_InPlace((u8 *)(buf + 64));
+        }
+        else
+        {
+            Screen12_Line_InPlace((u8 *)buf);
+            if (sp2) Screen12_Line_InPlace((u8 *)(buf + 64));
+        }
+    }
+
+    // Scroll with word loads + funnel shift (little endian: low byte = leftmost pixel)
+    const u32 wmask = sp2 ? 127 : 63;
+    u32 wi = hs >> 2;
+    u32 r  = hs & 3;
+    u32 *restrict out = (u32 *)P;
+
+    if (r == 0)
+    {
+        for (u32 k = 0; k < 64; k++)
+            out[k] = buf[(wi + k) & wmask];
+    }
+    else
+    {
+        u32 sh  = r << 3;
+        u32 ish = 32 - sh;
+        u32 a = buf[wi];
+        for (u32 k = 0; k < 64; k++)
+        {
+            u32 b = buf[(wi + k + 1) & wmask];
+            out[k] = (a >> sh) | (b << ish);
+            a = b;
+        }
+    }
+
+    if (VDP[25] & 0x02)                            // MSK: blank leftmost 8 pixels
+        memset(P, BORDER_COLOR_SCREEN8, 8);
+
+    if ((VDP[25] & 0x08) && uY > 128) DC_FlushRange(P, 256);
+}
+
 ITCM_CODE void RefreshLine8(u8 uY)
 {    
     DEBUG_REFRESH(8);
@@ -2462,37 +2658,42 @@ ITCM_CODE void RefreshLine8(u8 uY)
 
         u32 bankOffset = (sourceAddress >> 1) & 0xFFFF;
 
-        const u32 *restrict e32 = (const u32 *)(VDP_Memory + bankOffset);
-        const u32 *restrict o32 = (const u32 *)(VDP_Memory + 0x10000 + bankOffset);
-        u32 *restrict out = (u32 *)P;
-
-        for (u32 i = 0; i < 32; i++)
+        if (HScroll8)
         {
-            u32 e = e32[i];                 // e0 e1 e2 e3
-            u32 o = o32[i];                 // o0 o1 o2 o3
-
-            u32 A = (e & 0x00FF00FF) | ((o & 0x00FF00FF) << 8);   // e0 o0 e2 o2
-            u32 B = ((e >> 8) & 0x00FF00FF) | (o & 0xFF00FF00);   // e1 o1 e3 o3
-
-            out[2*i]   = (A & 0xFFFF) | (B << 16);                // e0 o0 e1 o1
-            out[2*i+1] = (A >> 16)    | (B & 0xFFFF0000);         // e2 o2 e3 o3
+            RefreshLine8_HScroll(uY, P, sourceAddress);
         }
-
-        // MSX2+ Screen 10 (YJK on, YAE on) and Screen 12 (YJK on, YAE off): convert the linear line to GRB332 before sprites
-        if (VDP[25] & 0x08)
+        else
         {
-            if (VDP[25] & 0x10)
-                Screen10_Line_InPlace(P);  // YJK + YAE
-            else
-                Screen12_Line_InPlace(P); // Pure YJK
+            const u32 *restrict e32 = (const u32 *)(VDP_Memory + bankOffset);
+            const u32 *restrict o32 = (const u32 *)(VDP_Memory + 0x10000 + bankOffset);
+            u32 *restrict out = (u32 *)P;
 
-            if (uY > 128) DC_FlushRange(P, 256);
-        }
-        
+            for (u32 i = 0; i < 32; i++)
+            {
+                u32 e = e32[i];                 // e0 e1 e2 e3
+                u32 o = o32[i];                 // o0 o1 o2 o3
+
+                u32 A = (e & 0x00FF00FF) | ((o & 0x00FF00FF) << 8);   // e0 o0 e2 o2
+                u32 B = ((e >> 8) & 0x00FF00FF) | (o & 0xFF00FF00);   // e1 o1 e3 o3
+
+                out[2*i]   = (A & 0xFFFF) | (B << 16);                // e0 o0 e1 o1
+                out[2*i+1] = (A >> 16)    | (B & 0xFFFF0000);         // e2 o2 e3 o3
+            }
+
+            // MSX2+ Screen 10 / Screen 12: convert the linear line to GRB332 before sprites
+            if (VDP[25] & 0x08)
+            {
+                if (VDP[25] & 0x10)
+                    Screen10_Line_InPlace(P);  // YJK + YAE
+                else
+                    Screen12_Line_InPlace(P);  // Pure YJK
+
+                if (uY > 128) DC_FlushRange(P, 256);
+            }
+        }   // <-- end of the HScroll8 / normal split
+
         // ---------------------------------------------------------------------------------
-        // Even games that are heavy with sprite use don't have sprites on every line.
-        // To speed up this render, if there are no sprites on the line, we have rendered
-        // the background directly into the output XBuf[drawn_frame_number&1][] and don't need to process here.
+        // Runs for BOTH paths: background is already in P (scrolled or not)
         // ---------------------------------------------------------------------------------
         if (HasSprites)
         {
@@ -2854,14 +3055,7 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
   else
   {
     iReg &= 0x3f;
-    if (myConfig.vdp & 4)   // V9958 enabled?
-    {
-        value &= VDP9958_RegisterMasks[iReg];
-    }
-    else
-    {
-        value &= VDP9938_RegisterMasks[iReg];
-    }
+    value &= VDP9958_RegisterMasks[iReg];
   }
 
   // --------------------------------------------------------------------------
@@ -3028,7 +3222,7 @@ ITCM_CODE byte RdCtrl9938(void)
   {
       VDPStatus[1] &= 0xFE;  // Clear the LINE interrupt.
       SetVDPIRQ(VDP_IRQ_LINE, 0);
-      if (myConfig.vdp & 0x04) data |= 4;   // If we are faking the V9958 ...
+      data |= 4;             // Inform world we have a V9958 chip
   }
   else if (VDP[15] == 2) // Status register 2
   {

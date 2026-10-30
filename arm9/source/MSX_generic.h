@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0014
+#define CONFIG_VER                  0x0015
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -81,7 +81,7 @@ struct __attribute__((__packed__)) Config_t
     u8  cpuBoost;
     u8  splitRefresh;
     u8  scaleScreen;
-    u8  vdp;
+    u8  borderMask;
     u8  frameSkip;
     u8  ymScale;
     u8  overscan;
@@ -98,7 +98,7 @@ struct __attribute__((__packed__)) Config_t
 
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
 
-#define MACHINE_MSX2                0x00    // Standard MSX2 slot layout (slot 3 expanded with RAM in slot 3-3)
+#define MACHINE_MSX2P               0x00    // Standard MSX2+ slot layout (slot 3 expanded with RAM in slot 3-3)
 #define MACHINE_MSX1                0x01    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
 
 #define EXP_NONE                    0       // No special expansion
@@ -200,15 +200,19 @@ extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
 extern u8 RAM_Memory[0x40000];
-extern u8 BIOS_Memory[0x8000];
 extern u8 SRAM_Memory[0x8000];
 extern u8 *SCC_Memory;
+extern u8 *KanjiFontBuffer;
 
-extern const unsigned char MSXBios_DISK[0x4000];
-extern const unsigned char MSXBios_MSX2[0x8000];
-extern const unsigned char MSXBios_MSX2EXT[0x4000];
+extern const unsigned char MSXBios_MSX2P[0x8000];
+extern const unsigned char MSXBios_EXT2P[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];
+extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_FMPAC[0x4000];
+extern const unsigned char MSXBios_KANJI[0x8000];
+
+extern u8  cold_or_warm_boot;
+extern u32 KanjiAdr[2];
 
 typedef struct
 {

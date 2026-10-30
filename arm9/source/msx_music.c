@@ -663,7 +663,7 @@ static inline void YM_PrecomputeFMRates(YM *chip, int ch)
 /* One operator's envelope, advanced one output sample.
    keyEdge = fresh key-on this sample (computed once by the caller so both
    operators restart together). */
-ITCM_CODE static __attribute__((noinline)) void YM_EnvStep(
+static __attribute__((noinline)) void YM_EnvStep(
     u32 *env, u8 *state, u8 keyOn, u8 keyEdge,
     u8 arStep, u32 drInc, u32 slTarget, u32 susInc, u32 rrInc)
 {

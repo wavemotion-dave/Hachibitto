@@ -25,7 +25,7 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0010  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0011  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -44,9 +44,10 @@ struct RomOffset Offsets[8];
 #define TYPE_RAM        1
 #define TYPE_FDC        2
 #define TYPE_BIOS       3
-#define TYPE_EBIOS      4
-#define TYPE_FMPAC      5
-#define TYPE_SRAM       6
+#define TYPE_BIOS1      4
+#define TYPE_EBIOS      5
+#define TYPE_FMPAC      6
+#define TYPE_SRAM       7
 #define TYPE_OTHER      9
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
@@ -134,15 +135,20 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_SRAM;
                 Offsets[i].offset = shifted_offset - SRAM_Memory;
             }
-            else if ((shifted_offset >= BIOS_Memory) && (shifted_offset < BIOS_Memory+(sizeof(BIOS_Memory))))
+            else if ((shifted_offset >= MSXBios_MSX2P) && (shifted_offset < MSXBios_MSX2P+(sizeof(MSXBios_MSX2P))))
             {
                 Offsets[i].type = TYPE_BIOS;
-                Offsets[i].offset = shifted_offset - BIOS_Memory;
+                Offsets[i].offset = shifted_offset - MSXBios_MSX2P;
             }
-            else if ((shifted_offset >= MSXBios_MSX2EXT) && (shifted_offset < MSXBios_MSX2EXT+(sizeof(MSXBios_MSX2EXT))))
+            else if ((shifted_offset >= MSXBios_MSX1) && (shifted_offset < MSXBios_MSX1+(sizeof(MSXBios_MSX1))))
+            {
+                Offsets[i].type = TYPE_BIOS1;
+                Offsets[i].offset = shifted_offset - MSXBios_MSX1;
+            }
+            else if ((shifted_offset >= MSXBios_EXT2P) && (shifted_offset < MSXBios_EXT2P+(sizeof(MSXBios_EXT2P))))
             {
                 Offsets[i].type = TYPE_EBIOS;
-                Offsets[i].offset = shifted_offset - MSXBios_MSX2EXT;
+                Offsets[i].offset = shifted_offset - MSXBios_EXT2P;
             }
             else if ((shifted_offset >= MSXBios_FMPAC) && (shifted_offset < MSXBios_FMPAC+(sizeof(MSXBios_FMPAC))))
             {
@@ -293,10 +299,15 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
         if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);
         if (retVal) retVal = fwrite(&render_blended,        sizeof(render_blended),         1, handle);
+        if (retVal) retVal = fwrite(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
+        if (retVal) retVal = fwrite(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
+
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
+
+
 
         // --------------------------------------------------------------------------------------------
         // Compress the 256K RAM data using 'high' compression ratio... We do this in two 128K chunks.
@@ -412,11 +423,15 @@ void msxLoadState(void)
                 }
                 else if (Offsets[i].type == TYPE_BIOS)
                 {
-                    MemoryMap[i] = (u8 *) (BIOS_Memory + Offsets[i].offset) - (0x2000 * i);
+                    MemoryMap[i] = (u8 *) (MSXBios_MSX2P + Offsets[i].offset) - (0x2000 * i);
+                }
+                else if (Offsets[i].type == TYPE_BIOS1)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_MSX1 + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_EBIOS)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_MSX2EXT + Offsets[i].offset) - (0x2000 * i);
+                    MemoryMap[i] = (u8 *) (MSXBios_EXT2P + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_FMPAC)
                 {
@@ -552,6 +567,9 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
             if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);
             if (retVal) retVal = fread(&render_blended,        sizeof(render_blended),         1, handle);
+            if (retVal) retVal = fread(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
+            if (retVal) retVal = fread(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
+
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
