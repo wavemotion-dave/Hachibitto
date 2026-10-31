@@ -1108,7 +1108,7 @@ static const GameTweak gameTweaks[] =
     {"ADVENTURES",      "PARK",              TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
                                                                                                      
     // SCC+                                                                                          
-    {"SNATCHER",        NULL,                EXP_SCC_PLUS, FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SNATCHER",        NULL,                EXP_SCC_PLUS, 0x80|FS_HEAVY, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
                                                                                                      
     // MSX-MUSIC                                                                                     
     {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1158,7 +1158,7 @@ static const GameTweak gameTweaks[] =
     {"SONYC",           NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SUIKODEN",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SUPER",           "COOKS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    //{"TANNH",           "GATE",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},  A bit too slow with MSX-MUSIC enabled
+    {"TANNH",           "GATE",              EXP_FM_PAC,  FS_LIGHT,       TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"THEXDER",         "HAWK",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"UNDEADLINE",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"XAK",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_LOW},
@@ -1174,7 +1174,7 @@ static const GameTweak gameTweaks[] =
     {"KING",            "BALLOON",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, MACHINE_MSX1,  TWEAK_NONE,         TWEAK_NONE},
                                                                                                      
     // Aggressive frame skip on DS-Lite. V9958 on DSi.                                               
-    {"MANBOW",          NULL,                TWEAK_NONE,   FS_AGGRESSIVE, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"MANBOW",          NULL,                TWEAK_NONE,  0x80|FS_HEAVY,  TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
                                                                                                      
     // Beeper                                                                                        
     {"WAY",             "TIGER",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1216,9 +1216,19 @@ void ApplyDatabaseTweaks(void)
         }
 
         // Frame skip is ALWAYS DS-Lite only.
-        if (t->frameSkip != TWEAK_NONE && !isDSiMode())
+        if (t->frameSkip != TWEAK_NONE)
         {
-            myConfig.frameSkip = t->frameSkip;
+            if (t->frameSkip & 0x80)    // High bit set means DS-Lite needs the frameskip only
+            {
+                if (!isDSiMode())
+                {
+                    myConfig.frameSkip = t->frameSkip & 0x7F;
+                }
+            }
+            else // This one applies to all DS models...
+            {
+                myConfig.frameSkip = t->frameSkip;
+            }
         }
 
         if (t->maxSprites != TWEAK_NONE)

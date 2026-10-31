@@ -25,7 +25,7 @@ volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (
 u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
-u8 XPal[256]                __attribute__((section(".dtcm"))) = {0};
+u8 XPal[256]                __attribute__((aligned(4), section(".dtcm"))) = {0};
 u8 XPalReal0                __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 u8 ALatch                   __attribute__((section(".dtcm"))) = 0;
 u8 OH                       __attribute__((section(".dtcm"))) = 0;
@@ -37,6 +37,7 @@ u8 msx_irq_pending          __attribute__((section(".dtcm"))) = 0;   // Bitmask,
 u8 palette_latch            __attribute__((section(".dtcm"))) = 0;
 u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizontal pan in output pixels: 0, 2, 4, ... 256
 u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be set to 1 if game tries to bypass the VSYNC
+u8 vdp_type                 __attribute__((section(".dtcm"))) = VDP_9958;
 
 u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
@@ -71,6 +72,32 @@ u8  OccBuf[320]             __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]        __attribute__((section(".dtcm")));
 u32 Screen2NibbleMask[16]   __attribute__((section(".dtcm")));
 
+u16 nibbleLUTPal[256] __attribute__((section(".dtcm")));
+
+// Full build: call once after XPal is initialised.
+void RebuildPalLUT(void)
+{
+    for (int i = 0; i < 256; i++)
+    {
+        nibbleLUTPal[i] = (u16)(XPal[i >> 4] | ((u16)XPal[i & 15] << 8));
+    }
+}
+
+// Call after any store to XPal[idx] where idx is 0..15.
+// Only the 31 entries that use that color change.
+void PalLutUpdate(u8 idx)
+{
+    if (idx > 15) return;
+
+    u16 v = XPal[idx];
+    for (int j = 0; j < 16; j++)
+    {
+        u16 c = XPal[j];
+        nibbleLUTPal[(idx << 4) | j] = v | (c << 8);   // idx is the left pixel
+        nibbleLUTPal[(j << 4) | idx] = c | (v << 8);   // idx is the right pixel
+    }
+}
+
 
 inline void handle_transparency(void)
 {
@@ -97,6 +124,8 @@ inline void handle_transparency(void)
         u8 new_bg_color = (!BGColor || (VDP[8] & 0x20)) ? XPalReal0 : XPal[BGColor];
         XPal[0] = new_bg_color;
     }
+    
+    PalLutUpdate(0);
 }
 
 void vdp_9938_write_palette(u8 index, u8 color_grb)
@@ -111,6 +140,7 @@ void vdp_9938_write_palette(u8 index, u8 color_grb)
     {
         u8 new_color = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
         XPal[index] = new_color;
+        PalLutUpdate(index);
     }
 }
 
@@ -1481,7 +1511,7 @@ ITCM_CODE void CommitLine(u8 Y)
 static u8 ScrollRow[128] ALIGN(4) __attribute__((section(".dtcm")));   // Screen 5: rotated source row
 static u8 NameRow[36]    ALIGN(4) __attribute__((section(".dtcm")));   // Screen 4: rotated name table row
 
-// R#25 bit 1 (MSK): leftmost 8 pixels show the backdrop colour.
+// R#25 bit 1 (MSK): leftmost 8 pixels show the backdrop color.
 // Called after sprites so the sprites are masked too.
 static __attribute__((noinline)) void ApplyLeftMask(void)
 {
@@ -1718,40 +1748,37 @@ const u8 *HandlePageScrollScreen5(const u8 *src)
 {
     if (VDP[25] & 1)
     {
-        if (VDP[2] & 0x20)  // Hack for Super Laydock II
+        // R26 bit 5 selects the initial page.
+        int page = (VDP[26] & 0x20) != 0;
+
+        // Calculate the offset within the selected 256-pixel page.
+        int scroll = ((VDP[26] & 0x1F) << 3) - (VDP[27] & 7);
+
+        // Fine-scroll subtraction can borrow from the page bit.
+        if (scroll < 0)
         {
-            // R26 bit 5 selects the initial page.
-            int page = (VDP[26] & 0x20) != 0;
-
-            // Calculate the offset within the selected 256-pixel page.
-            int scroll = ((VDP[26] & 0x1F) << 3) - (VDP[27] & 7);
-
-            // Fine-scroll subtraction can borrow from the page bit.
-            if (scroll < 0)
-            {
-                scroll += 256;
-                page ^= 1;
-            }
-
-            // Screen 5 stores two pixels per byte.
-            int off = (scroll & 254) >> 1;
-
-            // In SP2 mode, R2 bit 5 must not determine the display page.
-            // Preserve the upper VRAM bank and the row address.
-            u32 rowOffset = (u32)(src - VDP_Memory) & ~0x8000;
-
-            if (page)
-                rowOffset ^= 0x8000;
-
-            const u8 *a = VDP_Memory + rowOffset;
-            const u8 *b = VDP_Memory + (rowOffset ^ 0x8000);
-
-            // Draw from the selected page, then wrap to the other page.
-            memcpy(ScrollRow, a + off, 128 - off);
-            memcpy(ScrollRow + 128 - off, b, off);
-
-            src = ScrollRow;
+            scroll += 256;
+            page ^= 1;
         }
+
+        // Screen 5 stores two pixels per byte.
+        int off = (scroll & 254) >> 1;
+
+        // In SP2 mode, R2 bit 5 must not determine the display page.
+        // Preserve the upper VRAM bank and the row address.
+        u32 rowOffset = (u32)(src - VDP_Memory) & ~0x8000;
+
+        if (page)
+            rowOffset ^= 0x8000;
+
+        const u8 *a = VDP_Memory + rowOffset;
+        const u8 *b = VDP_Memory + (rowOffset ^ 0x8000);
+
+        // Draw from the selected page, then wrap to the other page.
+        memcpy(ScrollRow, a + off, 128 - off);
+        memcpy(ScrollRow + 128 - off, b, off);
+
+        src = ScrollRow;
     }
     else
     {
@@ -1771,6 +1798,45 @@ const u8 *HandlePageScrollScreen5(const u8 *src)
     return src;
 }
 
+// ---------------------------------------------------------------------
+// MODEL: palette-baked LUT. Same layout as nibbleLUT16 (leftmost pixel in
+// the low byte) but the entries are already XPal-translated, so lines with
+// no sprites can be expanded straight into XBuf with no CommitLine pass.
+// Costs 512 bytes of DTCM.
+// ---------------------------------------------------------------------
+//zzzzTODO
+// ---------------------------------------------------------------------
+// Returns 1 if any sprite is on line Y (caller must then run ColorSprites).
+// If there is none, this does exactly what ColorSprites would have done to
+// VDPStatus[0] on an empty line, so skipping ColorSprites changes nothing.
+// Same Y math and loop as ColorSprites(). Not in ITCM on purpose.
+// ---------------------------------------------------------------------
+static __attribute__((noinline)) int Screen5LineHasSprites(uint8_t Y)
+{
+    static const uint8_t SprHeights[4] = { 8,16,16,32 };
+
+    VDPStatus[0] &= ~0x5F;
+    if (SpritesOFF) return 0;
+
+    const uint8_t OH = SprHeights[VDP[1]&0x03];
+    const uint8_t IH = SprHeights[VDP[1]&0x02];
+    const uint8_t *AT = SprTab;
+    int L;
+
+    for (L = 0; L < 32; ++L, AT += 4)
+    {
+        int K = AT[0];
+        if (K == 216) break;
+        K = (uint8_t)(K - VScroll);
+        if (K > 256 - IH) K -= 256;
+        if ((Y > K) && (Y <= K + OH)) return 1;     // sprite here: ColorSprites takes over
+    }
+
+    VDPStatus[0] |= (L < 32) ? L : 31;
+    return 0;
+}
+
+
 ITCM_CODE void RefreshLine5(u8 uY)
 {
     DEBUG_REFRESH(5);
@@ -1781,7 +1847,25 @@ ITCM_CODE void RefreshLine5(u8 uY)
     }
     else
     {
-        uint8_t *P = RefreshBorder(uY);
+        // Direct path: nothing shifts the line, nothing masks it, no sprites on it.
+        // (Screen5LineHasSprites is only called when the cheap tests pass, so on
+        // every other line ColorSprites keeps doing the status update itself.)
+        int direct = 0;
+        if (!(HAdjust & ~1) && !(VDP[25] & 0x02) && !(myConfig.borderMask & 0x03))
+            direct = !Screen5LineHasSprites(uY);
+
+        uint8_t *P;
+        const u16 *lut = nibbleLUT16;
+
+        if (direct)
+        {
+            lut = nibbleLUTPal;
+            P = XBuf[drawn_frame_number&1] + ((u32)uY << 8);
+        }
+        else
+        {
+            P = RefreshBorder(uY);
+        }
 
         const u8 *src = ChrTab + (((u32)(uY + VScroll) << 7) & ChrTabM & 0x7FFF);
 
@@ -1795,6 +1879,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
 
         // Alignment is CONSTANT for the whole scanline (RefreshBorder's shift
         // doesn't change mid-line), so check it once rather than per-pixel.
+        // (A direct line is always aligned: XBuf rows are 256 bytes.)
         int misaligned = ((uintptr_t)P & 3) != 0;
 
         if (!misaligned)
@@ -1807,40 +1892,41 @@ ITCM_CODE void RefreshLine5(u8 uY)
                 u32 s0 = src32[0];
                 u32 s1 = src32[1];
 
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s0 & 0xFF]         | (lut[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s0 >> 16) & 0xFF] | (lut[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s1 & 0xFF]         | (lut[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s1 >> 16) & 0xFF] | (lut[(s1 >> 24) & 0xFF] << 16);
 
                 s0 = src32[2];
                 s1 = src32[3];
 
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s0 & 0xFF]         | (lut[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s0 >> 16) & 0xFF] | (lut[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s1 & 0xFF]         | (lut[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s1 >> 16) & 0xFF] | (lut[(s1 >> 24) & 0xFF] << 16);
 
                 s0 = src32[4];
                 s1 = src32[5];
 
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s0 & 0xFF]         | (lut[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s0 >> 16) & 0xFF] | (lut[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s1 & 0xFF]         | (lut[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s1 >> 16) & 0xFF] | (lut[(s1 >> 24) & 0xFF] << 16);
 
                 s0 = src32[6];
                 s1 = src32[7];
 
-                *dst32++ = nibbleLUT16[s0 & 0xFF]         | (nibbleLUT16[(s0 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s0 >> 16) & 0xFF] | (nibbleLUT16[(s0 >> 24) & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[s1 & 0xFF]         | (nibbleLUT16[(s1 >> 8)  & 0xFF] << 16);
-                *dst32++ = nibbleLUT16[(s1 >> 16) & 0xFF] | (nibbleLUT16[(s1 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s0 & 0xFF]         | (lut[(s0 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s0 >> 16) & 0xFF] | (lut[(s0 >> 24) & 0xFF] << 16);
+                *dst32++ = lut[s1 & 0xFF]         | (lut[(s1 >> 8)  & 0xFF] << 16);
+                *dst32++ = lut[(s1 >> 16) & 0xFF] | (lut[(s1 >> 24) & 0xFF] << 16);
 
                 src32 += 8;
             }
         }
         else
         {
+            // Never a direct line, so this always uses the raw LUT.
             u16 *dst16 = (u16*)P;
 
             for (int i = 0; i < 128; i += 8)
@@ -1861,12 +1947,17 @@ ITCM_CODE void RefreshLine5(u8 uY)
             }
         }
 
-        // P was never moved by the scroll, so sprites land where they always did.
-        ColorSprites(uY, P-32);
+        if (!direct)
+        {
+            // P was never moved by the scroll, so sprites land where they always did.
+            ColorSprites(uY, P-32);
 
-        ApplyLeftMask();
+            // Apply any masking if needed
+            ApplyLeftMask();
 
-        CommitLine(uY);
+            // And commit the line (if not already directly rendered)
+            CommitLine(uY);
+        }
     }
 }
 
@@ -2319,7 +2410,7 @@ ITCM_CODE void RefreshLine7(u8 uY)
         {
             u32 chunk0 = *s32++;
             u32 chunk1 = *s32++;
-            if ((drawn_frame_number & 1) && (myConfig.frameSkip != FS_AGGRESSIVE)) // Render the B pixels
+            if ((drawn_frame_number & 1) && (myConfig.frameSkip != FS_HEAVY)) // Render the B pixels
             {
                 *dst32++ = (chunk0 & 0x0F0F0F0F);
                 *dst32++ = (chunk1 & 0x0F0F0F0F);
@@ -2976,13 +3067,13 @@ void RefreshLine80(u8 Y)
 //  1  0  0  0  0   Text       40x24             (BASIC SCREEN 0)
 //  0  0  0  0  0   Half text  32x24             (BASIC SCREEN 1)
 //  0  0  0  0  1   Hi resolution 256x192        (BASIC SCREEN 2)
-//  0  1  0  0  0   Multicolour  4x4pix blocks   (BASIC SCREEN 3)
+//  0  1  0  0  0   Multicolor   4x4pix blocks   (BASIC SCREEN 3)
 //  ----Below MSX2 only----
 //  0  0  0  1  0   Screen2 with 8 Sprites/Line  (BASIC SCREEN 4)
-//  0  0  0  1  1   256*212, 16  colours/pixel   (BASIC SCREEN 5)
-//  0  0  1  0  0   512*212, 4   colours/pixel   (BASIC SCREEN 6)
-//  0  0  1  0  1   512*212, 16  colours/pixel   (BASIC SCREEN 7)
-//  0  0  1  1  1   256*212, 256 colours/pixel   (BASIC SCREEN 8)
+//  0  0  0  1  1   256*212, 16  colors/pixel    (BASIC SCREEN 5)
+//  0  0  1  0  0   512*212, 4   colors/pixel    (BASIC SCREEN 6)
+//  0  0  1  0  1   512*212, 16  colors/pixel    (BASIC SCREEN 7)
+//  0  0  1  1  1   256*212, 256 colors/pixel    (BASIC SCREEN 8)
 //  1  0  0  1  0   Text 80x24                   (BASIC SCREEN 0, WIDTH 80)
 void CheckNewMode(void)
 {
@@ -3108,11 +3199,11 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
     case 44: VDPWrite(value); break;
     case 46: VDPDraw(value);break;
   }
-
+  
   // ---------------------------------------------------------------------------------------
   // If any of the base registers change... check for new mode and recompute VRAM pointers.
   // ---------------------------------------------------------------------------------------
-  if (iReg <= 8) CheckNewMode();
+  if (iReg <= 11) CheckNewMode();
 }
 
 
@@ -3222,10 +3313,7 @@ ITCM_CODE byte RdCtrl9938(void)
   {
       VDPStatus[1] &= 0xFE;  // Clear the LINE interrupt.
       SetVDPIRQ(VDP_IRQ_LINE, 0);
-      if (isDSiMode())
-      {
-        data |= 4;             // Inform world we have a V9958 chip for DSi and above... DS-Lite gets 9938
-      }
+      data |= vdp_type;
   }
   else if (VDP[15] == 2) // Status register 2
   {
@@ -3447,6 +3535,9 @@ void Reset9938(void)
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
     CurrentEpochSaved = 0;                           // Will be immediately incremented to 1 and so not match our cleared OccBuf[]
 
+    // Set VDP type based on DS machine - we can't handle the faster 
+    vdp_type = (isDSiMode() ? VDP_9958 : VDP_9938);
+
     if (myConfig.machineType == MACHINE_MSX1)
     {
         VDP[0] = 0x00;                      // Control Bits I:  Graphics Mode 1 (M3... M1,M2 in VDP[1])
@@ -3499,6 +3590,7 @@ void Reset9938(void)
     // ---------------------------------------------------------------
     BuildLutTablehh();
     BuildNibbleLUT();
+    RebuildPalLUT();
 }
 
 // End of file

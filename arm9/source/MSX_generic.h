@@ -110,16 +110,15 @@ struct __attribute__((__packed__)) Config_t
 
 #define FS_NONE                     0       // No Frame Skip
 #define FS_LIGHT                    1       // Light Frame Skip
-#define FS_AGGRESSIVE               2       // Aggressive Frame Skip
+#define FS_HEAVY                    2       // Aggressive Frame Skip
 
 #define YM_BAL_LOW                  0       // Low YM volume mix
 #define YM_BAL_MED                  1       // Medium YM volume mix
 #define YM_BAL_HIGH                 2       // High YM volume mix
 #define YM_BAL_MAX                  3       // Max (normal) YM volume mix
 
-#define VDP_9938                    0
-#define VDP_9958                    4
-
+#define VDP_9938                    0       // For the status feedback - DS-Lite will report as V9938
+#define VDP_9958                    4       // but the DSi or above will report as V9958
 
 extern struct Config_t       myConfig;
 extern struct GlobalConfig_t myGlobalConfig;
@@ -151,6 +150,7 @@ extern u8 mirror_ram_bank[4];
 
 extern u8 zanac_glitch_patch;
 extern u8 dix_patch;
+extern u8 vdp_type;
 
 // Mapper Types
 #define GUESS           0

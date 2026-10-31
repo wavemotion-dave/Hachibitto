@@ -484,7 +484,11 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
             }
         }
 
-        // If we need to mix in MSX-MUSIC, we grab those samples now and mix directly on top of the output
+        // -------------------------------------------------------------------------------------------------
+        // If we need to mix in MSX-MUSIC, we grab those samples now and mix directly on top of the output.
+        // Originally I tried to grab these samples in ProcessDirectAudio() but the overhead was too great
+        // and I've opted instead to just mix this in on top of the direct samples. It works well enough.
+        // -------------------------------------------------------------------------------------------------
         if (msx_music_capable_game)
         {
             YMMixer(len, dest, &myYM);
@@ -2763,11 +2767,19 @@ int main(int argc, char **argv)
         BoxArtBuffer = malloc(512 * 1024);
         KanjiFontBuffer = malloc(256 * 1024);
         
-        FILE *fp = fopen("/roms/bios/kanjifont.rom", "rb");
+        // -------------------------------------------------------------
+        // Try to load up the 256K Kanji Font data. Almost nothing uses
+        // this so it's optional and probably won't impact anything.
+        // -------------------------------------------------------------
+        FILE *fp = fopen("/roms/bios/hb-f1xdj_kanjifont.rom", "rb");
+        if (!fp) fp = fopen("/roms/hb-f1xdj_kanjifont.rom", "rb");
+        if (!fp) fp = fopen("/roms/msx/hb-f1xdj_kanjifont.rom", "rb");
+
+        if (!fp) fp = fopen("/roms/bios/kanjifont.rom", "rb");
         if (!fp) fp = fopen("/roms/kanjifont.rom", "rb");
         if (!fp) fp = fopen("/roms/msx/kanjifont.rom", "rb");
         
-        if (fp)
+        if (fp) // If file was found, read it in...
         {
             fread(KanjiFontBuffer, 256*1024, 1, fp);
             fclose(fp);

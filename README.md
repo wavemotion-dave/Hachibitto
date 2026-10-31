@@ -111,6 +111,12 @@ Pressing the X button will halt the auto-scroll so you can more closely inspect 
 
 If no artwork is found for a game, it shows the legacy loading screen with the preview snaps cycling.
 
+Optional Kanji Data :
+-----------------------
+The MSX2+ Kanji driver is built into the emulation but if you actually want to use anything that has support for the Kanji data, you will need the Kanji Font.
+This file is 256K and in an emulator like OpenMSX, it would be named hb-f1xdj_kanjifont.rom
+Place this file into /roms/bios or into /roms/msx or into /roms so that the emulator can read it. Not having this font data will have almost no impact on your typical game-play enjoyment.
+
 
 Known Issues :
 -----------------------

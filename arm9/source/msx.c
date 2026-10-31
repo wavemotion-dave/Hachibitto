@@ -731,7 +731,6 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   else if (Port == 0xF4) // Boot register... force cold boot
   {
       return cold_or_warm_boot;
-      cold_or_warm_boot = 0x80;
   }
   else if (Port == 0xF5)
   {
@@ -1074,6 +1073,16 @@ void msx_slot_map_msx2(unsigned char Value)
 }
 
 
+__attribute__((noinline)) void CheckEnableFM_PAC(void)
+{
+    if ((myConfig.expansion == EXP_FM_PAC) || (myConfig.expansion == EXP_MEGARAM))
+    {
+        msx_music_capable_game = 1;
+        bClickRemoveNeeded = 1;
+    }
+}
+
+
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
 // -----------------------------------------------------------------------------------------------
@@ -1165,13 +1174,8 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         if (++msx_music_writes == 10) // Arbitrary... if we hit it at least 10 times, we turn on MSX MUSIC output
         {
-            if ((myConfig.expansion == EXP_FM_PAC) || (myConfig.expansion == EXP_MEGARAM))
-            {
-                msx_music_capable_game = 1;
-                bClickRemoveNeeded = 1;
-            }
+            CheckEnableFM_PAC();
         }
-
         YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
     }
     else if (Port >= 0xD8 && Port <= 0xDB)
@@ -1871,6 +1875,9 @@ void MSX_InitialMemoryLayout(void)
     }
     if (myConfig.expansion == EXP_MEGARAM) // MEGARAM has both system RAM and SCC + MSX-MUSIC capable mapping
     {
+        // Clear out the cart space that will house expanded RAM
+        memset(ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024), 0x00, ((MAX_CART_SIZE_KB/2) * 1024));
+        
         MyMedia[MEDIA_CART2].mapperMask = 0;
         MyMedia[MEDIA_CART2].blockSize = 0x2000;
         MyMedia[MEDIA_CART2].mapperType = MEGA_SCC;
