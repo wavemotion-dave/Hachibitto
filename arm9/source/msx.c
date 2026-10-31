@@ -720,9 +720,9 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   {
       return mirror_ram_bank[Port - 0xFC];
   }
-  else if (Port == 0xBA) // Light Pen - need to clear bit 4 to let games like DIX boot
+  else if (Port == 0xBA) // Light Pen - normally 0xFF but need to clear bit 4 to let games like DIX boot (unsure why)
   {
-      return 0x6F;
+      if (dix_patch) return 0x6F;
   }
   else if (Port >= 0xD8 && Port <= 0xDB) // Kanji Driver
   {
@@ -887,8 +887,8 @@ void msx_slot_map_msx1(unsigned char Value)
 //--------------------------------------------------------------------------------------------------
 // Memory          Slot 0       Slot 1      Slot 2      Slot 3-0   Slot 3-1    Slot 3-2    Slot 3-3
 // C000h~FFFFh      ---         Cart1       Cart2       ---        ---         ---         16K RAM
-// 8000h~BFFFh      ---         Cart1       Cart2       ---        ---         ---         16K RAM
-// 4000h~7FFFh    Main-ROM      Cart1       Cart2       ---        Disk-ROM    MSX-Music   16K RAM
+// 8000h~BFFFh      ---         Cart1       Cart2       Kanji 2    ---         ---         16K RAM
+// 4000h~7FFFh    Main-ROM      Cart1       Cart2       Kanji 1    Disk-ROM    ---         16K RAM
 // 0000h~3FFFh    Main-ROM      Cart1       Cart2       Ext-ROM    ---         ---         16K RAM
 //--------------------------------------------------------------------------------------------------
 void msx_slot_map_msx2(unsigned char Value)
@@ -962,7 +962,7 @@ void msx_slot_map_msx2(unsigned char Value)
         case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 2 has Kanji Driver
+            if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 0 has Kanji Driver
             {
                 MemoryMap[2] = (u8 *)MSXBios_KANJI + 0x0000 - 0x4000;
                 MemoryMap[3] = (u8 *)MSXBios_KANJI + 0x2000 - 0x6000;
@@ -1016,7 +1016,7 @@ void msx_slot_map_msx2(unsigned char Value)
                 MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
                 MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             }
-            else if (((msx_subslot & 0x30) >> 4) == 0) // Subslot 2 has 2nd half of Kanji Driver
+            else if (((msx_subslot & 0x30) >> 4) == 0) // Subslot 0 has 2nd half of Kanji Driver
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 0;

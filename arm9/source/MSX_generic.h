@@ -150,6 +150,7 @@ extern u8 msx_kana_lock;
 extern u8 mirror_ram_bank[4];
 
 extern u8 zanac_glitch_patch;
+extern u8 dix_patch;
 
 // Mapper Types
 #define GUESS           0

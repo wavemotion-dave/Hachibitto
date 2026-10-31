@@ -3437,6 +3437,7 @@ void Reset9938(void)
 
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start
 
+    memset(XBuf,        0x00, sizeof(XBuf));         // Ensure the A:B buffers are clear
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers

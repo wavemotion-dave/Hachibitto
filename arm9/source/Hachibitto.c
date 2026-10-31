@@ -86,6 +86,7 @@ u8 io_show_status = 0;     // Used to indicate a disk activity icons
 u8 sram_show_status = 0;   // Used to show SRAM icon for SRAM-based carts
 u8 flash_show_status = 0;  // Used to show Flash (lightning bolt) icon for Flash-based carts
 u8 zanac_glitch_patch = 0; // Only when Zanac EX is loaded to fix corrupt return to menu
+u8 dix_patch = 0;          // Only for DIX to allow game to boot
 u8 bMainMenuActive = 0;    // Set to 1 when main menu is active
 
 Media_t MyMedia[3];        // Covering CART1, CART2 and DISK
@@ -124,6 +125,7 @@ u8 touch_debounce = 0;         // A bit of touch-screen debounce
 u8 key_debounce = 0;           // A bit of key debounce
 u8 msx_caps_lock = 0;          // Set to 1 when MSX caps lock is active
 u8 msx_kana_lock = 0;          // Set to 1 when MSX kana lock is active
+u8 old_blended = 99;
 
 // The DS/DSi has 12 keys that can be mapped
 u16 NDS_keyMap[12] __attribute__((section(".dtcm"))) = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_A, KEY_B, KEY_X, KEY_Y, KEY_R, KEY_L, KEY_START, KEY_SELECT};
@@ -706,6 +708,8 @@ void ResetMSX(void)
     msx_kana_lock = 0; // MSX KANA lock off
 
     zoom_screen = 0; // Assume no zoom to start
+    
+    old_blended = 99; // Ensure we clear VRAM_B
 
     msxWipeRAM();       // Wipe main RAM area (config chooses zero or random)
     msx_restore_bios(); // Put the BIOS back in place and point to it
@@ -1769,6 +1773,21 @@ void HachibittoRunEmu(void)
             else
             {
                 zoom_screen = 0;
+            }
+            
+            // ------------------------------------------------------------------------------------------------------------
+            // With a compressed screen, we use the A/B buffers to blur the display so compressed text is a bit cleaner...
+            // ------------------------------------------------------------------------------------------------------------
+            if (myConfig.scaleScreen)
+            {
+                render_blended = 1;
+            }
+            
+            // If we've switched our blending... clear VRAM_B
+            if (old_blended != render_blended)
+            {
+                old_blended = render_blended;
+                memset(DS_LCD_VRAM_2, 0x00, 64*1024);
             }
 
             // ---------------------------------------------------------------------------------

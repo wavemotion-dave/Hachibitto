@@ -1251,6 +1251,15 @@ void ApplyDatabaseTweaks(void)
         zanac_glitch_patch = 1;
     }
 
+    // ----------------------------------------------------------
+    // DIX for some reason needs 0x6F returned from port BAh.
+    // ----------------------------------------------------------
+    dix_patch = 0;
+    if (strstr(filename, "DIX"))
+    {
+        dix_patch = 1;
+    }
+
     if (strstr(filename, "FIX") && strstr(filename, "FELIX"))
     {
         myConfig.overscan = 1;
