@@ -3222,7 +3222,10 @@ ITCM_CODE byte RdCtrl9938(void)
   {
       VDPStatus[1] &= 0xFE;  // Clear the LINE interrupt.
       SetVDPIRQ(VDP_IRQ_LINE, 0);
-      data |= 4;             // Inform world we have a V9958 chip
+      if (isDSiMode())
+      {
+        data |= 4;             // Inform world we have a V9958 chip for DSi and above... DS-Lite gets 9938
+      }
   }
   else if (VDP[15] == 2) // Status register 2
   {

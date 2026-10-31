@@ -1,6 +1,6 @@
 # Hachibitto - MSX2 Emulator
 
-Welcome to Hachibitto (pronounced Ha-Chi-Bee-Toe). A Fantasy MSX/MSX2 Console for your DS/DSi/XL/LL handheld.
+Welcome to Hachibitto (pronounced Ha-Chi-Bee-Toe). A Fantasy MSX/MSX2+ Console for your DS/DSi/XL/LL handheld.
 
 ![Loading Screen](arm9/gfx_data/pdev_bg0.png)
 
@@ -48,7 +48,7 @@ and those copyrights remain his.
 lzav compression (for save states) is Copyright (c) 2023-2025 Aleksey 
 Vaneev and used by permission of the generous MIT license.
 
-The MSX/MSX2 logos are used without permission but with the maximum
+The MSX logos are used without permission but with the maximum
 of respect and love.
 
 The Hachibitto emulator is offered as-is, without any warranty.
@@ -68,9 +68,9 @@ Options :
 ![Hachibitto Options](images/Options.png)
 
 * MSX Mapper - Generally leave as 'GUESS' as it will search the internal database (10,000 games) and if not found will attempt to determine the mapper from the ROM size/contents. 
-* Machine Type - Usually leave this as the normal MSX2 machine type. Switch to MSX1 Legacy if you want to force the MSX1 VDP handling for a few games that don't play well with MSX2.
+* Machine Type - Usually leave this as the normal MSX2+ machine type. Switch to MSX1 Legacy if you want to force the MSX1 VDP handling for a few games that don't play well with MSX2+.
 * Keyboard Type - Usually full keyboard layout but you can select the simplified Alpha keyboard which helps when playing text-heavy games that need a lot of key input.
-* Max Sprites - Normally real hardware can only render 4/8 sprites per line (MSX1 legacy vs MSX2) but the emulation allows all 32 to be displayed without flicker.
+* Max Sprites - Normally real hardware can only render 4/8 sprites per line (MSX1 legacy vs MSX2+) but the emulation allows all 32 to be displayed without flicker.
 * Auto Fire - can be set for Button 1 and/or Button 2.
 * Joystick - Generally leave at 'Normal' but can be set to 'Diagonals' for Q-Bert games or 'Slilde-n-Glide' to help make turns onto ladders easier for games like Chuckie Egg. 
 * Split Timing - The horizontal line interrupt split is tricky in emulation. To help avoid visual artifacts, this can be set to smooth over 1 or 2 lines. Play with it if you see visual artifacts on the split between static/score area and scrolling area on any game.
@@ -90,6 +90,14 @@ To that end, when those modes are active, the not-often-needed Graph (GR) button
 When zoomed, use the Left/Right shoulder buttons to pan the screen left and right.
 
 ![Screen Zoom](images/zoom.jpg)
+
+
+V9938 vs V9958 :
+-----------------------
+The base emulation is for MSX2+ which works quite well on the DSi/XL/LL or above running at 2x CPU. The DS-Lite/Phat (or when running in 'compatibility mode' 
+via an R4 or similar cart) is just not fast enough with this emulator for the advanced V9958 processing (Screen 10+, smooth Horizontal scroll). To that end, the
+older hardware will report out as a V9938 and default to MSX2-like video handling.
+
 
 Box Artwork :
 -----------------------
@@ -122,6 +130,12 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.8 - 01-Nov-2026 by wavemotion-dave
+* Reworked emulation to use MSX2+ with V9958 video chip as the backbone.
+* V9958 emulation added including Screen 10/11/12 and new VDP horizontal scrolling registers.
+* Screen Scale fixed so it properly alpha blends to make text look better (broken since 1.1d).
+* Many cleanups and accuracy improvements under the hood.
+
 Version 1.7 - 27-Oct-2026 by wavemotion-dave
 * Fix for save state not loading back properly when new versions come out
 * Fix for artwork not showing properly (wrong colors and image jittering) after playing some games.
