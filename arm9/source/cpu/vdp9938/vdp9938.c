@@ -130,7 +130,6 @@ inline void handle_transparency(void)
 
 void vdp_9938_write_palette(u8 index, u8 color_grb)
 {
-    debug_printf("PAL %02X=%2X\n", index, color_grb);
     if (index == 0)
     {
         XPalReal0 = color_grb;

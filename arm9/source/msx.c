@@ -1073,6 +1073,9 @@ void msx_slot_map_msx2(unsigned char Value)
 }
 
 
+// --------------------------------------------------------------
+// Happens only once per game so put into a non-ITCM function...
+// --------------------------------------------------------------
 __attribute__((noinline)) void CheckEnableFM_PAC(void)
 {
     if ((myConfig.expansion == EXP_FM_PAC) || (myConfig.expansion == EXP_MEGARAM))
@@ -1182,6 +1185,10 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         WritePort_KanjiDriver(Port, Value);
     }
+    else if (Port == 0xF4) // System boot status
+    {
+        cold_or_warm_boot = Value;
+    }
     else // Unhandled port write...
     {
         //debug[DX++ & 0xF] = Port;
@@ -1243,6 +1250,7 @@ u8 MSX_GuessROMType(u32 size)
     else type = KON8;
 
     if (size == (64 * 1024)) type = ASC16;      // Big percentage of 64K mapper ROMs are ASCII16 so default to that and override below
+    if (size >  (2048 * 1024)) type = ASC16;    // Anything this big has to be ASC16 or some mapper we don't handle yet
 
     return type;
 }

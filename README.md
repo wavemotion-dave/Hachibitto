@@ -137,9 +137,13 @@ The Hachibitto HB-8 Fantasy Console :
 Version History :
 -----------------------
 Version 1.8 - 01-Nov-2026 by wavemotion-dave
-* Reworked emulation to use MSX2+ with V9958 video chip as the backbone.
+* Reworked emulation to use MSX2+ with V9958 video chip as the backbone. DS-Lite drops back to V9938 handling.
 * V9958 emulation added including Screen 10/11/12 and new VDP horizontal scrolling registers.
 * Screen Scale fixed so it properly alpha blends to make text look better (broken since 1.1d).
+* Fixed MSX-MUSIC as some of the FM channels were rendering one octave too high.
+* Fixed POP when MSX-MUSIC is enabled.
+* Fixed MSX Mapper selection so picking a mapper (like ASC8 with SRAM) now works.
+* Improved Screen 5 speed by 8% to help DS-Lite users with heavy-hitting games.
 * Many cleanups and accuracy improvements under the hood.
 
 Version 1.7 - 27-Oct-2026 by wavemotion-dave

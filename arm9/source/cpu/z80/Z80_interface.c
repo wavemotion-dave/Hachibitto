@@ -227,220 +227,144 @@ void __attribute__((noinline)) HandleRType(u8 media_id, u16 address, u8 value)
     }
 }
 
-#define SRAM_ENABLE_BIT     (MyMedia[media_id].mapperMask+1)      // SRAM Enable is the bit right after the rom selection bits...
+// ---------------------------------------------
+// Various ASCII mappers with SRAM (2K or 8K)
+// ---------------------------------------------
+#define SRAM_ENABLE_BIT     (MyMedia[media_id].mapperMask+1)      // SRAM Enable is normally the bit right after the rom selection bits...
 
-void __attribute__((noinline)) HandleAscii8_SRAM2(u8 media_id, u16 address, u8 value)
+void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
     u32 msx_offset = block * MyMedia[media_id].blockSize;
     u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
 
-    if ((address & 0xF800) == 0x6000)
+    if ((address & 0xF800) == 0x6000) // Bank 1
     {
-        MSXCartPtr[media_id][2] = (u8*)src;  // Main ROM
-        MSXCartPtr[media_id][6] = (u8*)src;  // Mirror
-        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
-        if (bCartInPage[3])
+        if (value & SRAM_ENABLE_BIT) // Is SRAM requested? No write support.
         {
-            MemoryMap[6] = MSXCartPtr[media_id][6] - 0xC000;
+            MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000;
+        }
+        else
+        {
+            MSXCartPtr[media_id][2] = (u8*)src;  // Map ROM segment
+        }
+        // If the cart is mapped into this page, reflect that immediately...
+        if (bCartInPage[1] == (media_id+1))
+        {
+            MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
         }
     }
-    else if ((address & 0xF800) == 0x6800)
+    else if ((address & 0xF800) == 0x6800) // Bank 2
     {
-        MSXCartPtr[media_id][3] = (u8*)src;  // Main ROM
-        MSXCartPtr[media_id][7] = (u8*)src;  // Mirror
-        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
-        if (bCartInPage[3] == (media_id+1))
+        if (value & SRAM_ENABLE_BIT) // Is SRAM requested? No write support.
         {
-            MemoryMap[7] = MSXCartPtr[media_id][7] - 0xE000;
+            MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+0x0000;
+        }
+        else
+        {
+            MSXCartPtr[media_id][3] = (u8*)src;  // Map ROM segment
+        }
+        // If the cart is mapped into this page, reflect that immediately...
+        if (bCartInPage[1] == (media_id+1))
+        {
+            MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
         }
     }
-    else if ((address & 0xF800) == 0x7000)
+    else if ((address & 0xF800) == 0x7000) // Bank 3
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
+        if (value & SRAM_ENABLE_BIT) // Is SRAM requested?
         {
-            sram_write_enabled_a = 1;
+            sram_write_enabled_a = 1; // Allow writing on Bank 3
             MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
         }
         else // SRAM disabled, normal ROM banking
         {
             sram_write_enabled_a = 0;
-            MSXCartPtr[media_id][4] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][0] = (u8*)src;  // Mirror
+            MSXCartPtr[media_id][4] = (u8*)src;  // Map ROM segment
         }
-
+        // If the cart is mapped into this page, reflect that immediately...
         if (bCartInPage[2] == (media_id+1))
         {
             MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
         }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[0] = MSXCartPtr[media_id][0] - 0x0000;
-        }
     }
-    else if ((address & 0xF800) == 0x7800)
+    else if ((address & 0xF800) == 0x7800) // Bank 4
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
+        if (value & SRAM_ENABLE_BIT) // Is SRAM requested?
         {
-            sram_write_enabled_b = 1;
+            sram_write_enabled_b = 1;   // Allow writing on Bank 4
             MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000;
         }
         else // SRAM disabled, normal ROM banking
         {
             sram_write_enabled_b = 0;
-            MSXCartPtr[media_id][5] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][1] = (u8*)src;  // Mirror
+            MSXCartPtr[media_id][5] = (u8*)src;  // Map ROM segment
         }
-
+        // If the cart is mapped into this page, reflect that immediately...
         if (bCartInPage[2] == (media_id+1))
         {
             MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
         }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[1] = MSXCartPtr[media_id][1] - 0x2000;
-        }
-    }
-    else if (((address & 0xF000) == 0x8000) && sram_write_enabled_a)
+    } // Otherwise check if we are actually writing to either enabled SRAM bank
+    else if (((address & 0xE000) == 0x8000) && sram_write_enabled_a)
     {
         // We are writing to SRAM! Write all the mirrors...
-        SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-        sram_show_status = 6;
-    }
-    else if (((address & 0xF000) == 0xA000) && sram_write_enabled_b)
-    {
-        // We are writing to SRAM! Write all the mirrors...
-        SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-        sram_show_status = 6;
-    }
-}
-
-
-void __attribute__((noinline)) HandleAscii8_SRAM8(u8 media_id, u16 address, u8 value)
-{
-    u32 block = (value & MyMedia[media_id].mapperMask);
-    u32 msx_offset = block * MyMedia[media_id].blockSize;
-    u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
-
-    if ((address & 0xF800) == 0x6000)
-    {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
+        if (SRAM_Mask == 0x7FF)
         {
-            // No write support here...
-            MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            MSXCartPtr[media_id][2] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][6] = (u8*)src;  // Mirror
-        }
-
-        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
-        if (bCartInPage[3] == (media_id+1))
-        {
-            MemoryMap[6] = MSXCartPtr[media_id][6] - 0xC000;
-        }
-    }
-    else if ((address & 0xF800) == 0x6800)
-    {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
-        {
-            // No write support here...
-            MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
+            SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
         }
         else
         {
-            MSXCartPtr[media_id][3] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][7] = (u8*)src;  // Mirror
+            SRAM_Memory[(address & 0x1FFF)] = value;
         }
-
-        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
-        if (bCartInPage[3] == (media_id+1))
-        {
-            MemoryMap[7] = MSXCartPtr[media_id][7] - 0xE000;
-        }
-    }
-    else if ((address & 0xF800) == 0x7000)
-    {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
-        {
-            sram_write_enabled_a = 1;
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            sram_write_enabled_a = 0;
-            MSXCartPtr[media_id][4] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][0] = (u8*)src;  // Mirror
-        }
-
-        if (bCartInPage[2] == (media_id+1))
-        {
-            MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
-        }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[0] = MSXCartPtr[media_id][0] - 0x0000;
-        }
-    }
-    else if ((address & 0xF800) == 0x7800)
-    {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM enabled?
-        {
-            sram_write_enabled_b = 1;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            sram_write_enabled_b = 0;
-            MSXCartPtr[media_id][5] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][1] = (u8*)src;  // Mirror
-        }
-
-        if (bCartInPage[2] == (media_id+1))
-        {
-            MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
-        }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[1] = MSXCartPtr[media_id][1] - 0x2000;
-        }
-    }
-    else if (((address & 0xE000) == 0x8000) && sram_write_enabled_a)
-    {
-        SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 6;
+        sram_show_status = 4;
     }
     else if (((address & 0xE000) == 0xA000) && sram_write_enabled_b)
     {
-        SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 6;
+        // We are writing to SRAM! Write all the mirrors...
+        if (SRAM_Mask == 0x7FF)
+        {
+            SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
+        }
+        else
+        {
+            SRAM_Memory[(address & 0x1FFF)] = value;
+        }
+        sram_show_status = 4;
     }
 }
 
 
-// ----------------------------------------------
-// ASCII 16K with 2K of SRAM (Hydlide II, etc).
-// ----------------------------------------------
-void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 value)
+void __attribute__((noinline)) HandleAscii8_SRAM2(u8 media_id, u16 address, u8 value)
+{
+    HandleAscii8_SRAM(media_id, address, value, 0x7FF); // 2K SRAM Mask
+}
+
+void __attribute__((noinline)) HandleAscii8_SRAM8(u8 media_id, u16 address, u8 value)
+{
+    HandleAscii8_SRAM(media_id, address, value, 0x1FFF); // 8K SRAM Mask
+}
+
+
+void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
     u32 msx_offset = block * MyMedia[media_id].blockSize;
     u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
-
+    
     if ((address & 0xF800) == 0x6000)
     {
         if (value &  0x10) // Is SRAM enabled?
         {
             // Read-only access
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Mirrored
+            MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000;
+            MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+0x0000;  // SRAM Mirror
         }
         else // SRAM disabled, normal ROM banking
         {
@@ -457,7 +381,7 @@ void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 
         {
             sram_write_enabled_a = 1;
             MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Mirrored
+            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // SRAM Mirror
         }
         else // SRAM disabled, normal ROM banking
         {
@@ -472,15 +396,37 @@ void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 
             MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
         }
     }
-    else if (((address & 0xF000) == 0x8000) && sram_write_enabled_a)
+    else if (((address & 0xC000) == 0x8000) && sram_write_enabled_a)
     {
-        // We are writing to SRAM! Write all the mirrors...
-        SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
-        SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-        sram_show_status = 6;
+        if (SRAM_Mask == 0x7FF)
+        {
+            // We are writing to SRAM! Write all the 2K mirrors...
+            SRAM_Memory[(address & 0x7FF) + 0x0000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
+
+            SRAM_Memory[(address & 0x7FF) + 0x2000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x2800] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x3000] = value;
+            SRAM_Memory[(address & 0x7FF) + 0x3800] = value;
+        }
+        else
+        {
+            // We are writing to SRAM! Write all the 8K mirrors...
+            SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
+            SRAM_Memory[(address & 0x1FFF) + 0x2000] = value;
+        }
+        sram_show_status = 4;
     }
+}
+
+// ----------------------------------------------
+// ASCII 16K with 2K of SRAM (Hydlide II, etc).
+// ----------------------------------------------
+void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 value)
+{
+    HandleAscii16_SRAM(media_id, address, value, 0x7FF); // 2K SRAM
 }
 
 // ------------------------------------------------------------
@@ -488,54 +434,9 @@ void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 
 // ------------------------------------------------------------
 void __attribute__((noinline)) HandleAscii16_SRAM8(u8 media_id, u16 address, u8 value)
 {
-    u32 block = (value & MyMedia[media_id].mapperMask);
-    u32 msx_offset = block * MyMedia[media_id].blockSize;
-    u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
-
-    if ((address & 0xF800) == 0x6000)
-    {
-        if (value &  0x10) // Is SRAM enabled?
-        {
-            // Read-only access
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Mirrored
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            MSXCartPtr[media_id][2] = (u8*)src;
-            MSXCartPtr[media_id][3] = (u8*)src+0x2000;
-        }
-        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
-        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
-    }
-    else if ((address & 0xF800) == 0x7000)
-    {
-        if (value &  0x10) // Is SRAM enabled?
-        {
-            sram_write_enabled_a = 1;
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Mirrored
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            sram_write_enabled_a = 0;
-            MSXCartPtr[media_id][4] = (u8*)src;
-            MSXCartPtr[media_id][5] = (u8*)src+0x2000;
-        }
-
-        if (bCartInPage[2] == (media_id+1))
-        {
-            MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
-            MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
-        }
-    }
-    else if (((address & 0xF000) == 0x8000) && sram_write_enabled_a)
-    {
-        // We are writing to SRAM!
-        SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 6;
-    }
+    HandleAscii16_SRAM(media_id, address, value, 0x1FFF); // 8K SRAM
 }
+
 
 void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 value)
 {
@@ -633,7 +534,7 @@ void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 v
     else if (((address & 0xE000) == 0x8000) && sram_write_enabled_a) // KOEI 32K SRAM only writable on Page 3
     {
         MSXCartPtr[media_id][4][address & 0x1FFF] = value;
-        sram_show_status = 6;
+        sram_show_status = 4;
     }
 }
 
@@ -1260,7 +1161,7 @@ void __attribute__((noinline)) HandleGameMaster2(u8 media_id, u16 address, u8 va
             int sram_offset = (sram_write_enabled_a & 0x20) ? 0x2000 : 0x0000; // SRAM Page 1 or 2
             SRAM_Memory[(address & 0x0FFF) + 0x0000 + sram_offset] = value;    // Main SRAM
             SRAM_Memory[(address & 0x0FFF) + 0x1000 + sram_offset] = value;    // Mirror (only 4K presents itself)
-            sram_show_status = 6; // Show SRAM icon and persist to SD card...
+            sram_show_status = 4; // Show SRAM icon and persist to SD card...
         }
         else
         {
@@ -1401,12 +1302,12 @@ void __attribute__((noinline)) HandleWizardry(u8 media_id, u16 address, u8 value
     else if (((address & 0xE000) == 0x8000) && sram_write_enabled_a)
     {
         SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 6;
+        sram_show_status = 4;
     }
     else if (((address & 0xE000) == 0xA000) && sram_write_enabled_b)
     {
         SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 6;
+        sram_show_status = 4;
     }
 }
 
@@ -1462,7 +1363,7 @@ void __attribute__((noinline)) HandleFMPAC(u8 media_id, u16 address, u8 value)
     if (FMPAC_SRAM_in_view && (address >= 0x4000) && (address < 0x5FFE))
     {
         SRAM_Memory[address & 0x1FFF] = value;
-        sram_show_status = 5;
+        sram_show_status = 4;
     }
 }
 

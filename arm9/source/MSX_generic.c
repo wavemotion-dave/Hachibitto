@@ -1479,7 +1479,7 @@ const struct options_t Option_Table[2][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "MIRRORED", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "GENERIC 8K", "GENERIC 16K", "ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
-                             "ASC16 SRAM 8K", "CROSSBLAIM", "LODERUNNER", "XEVIOUS", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K"},      &myConfig.msxMapper,         21},
+                             "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K"},                                             &myConfig.msxMapper,         18},
         {"MACHINE TYPE",    {"MSX2+ - NORMAL", "MSX1 - LEGACY"},                                                                                                        &myConfig.machineType,       2},
         {"KEYBOARD",        {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                        &myConfig.keyboard,          2},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},

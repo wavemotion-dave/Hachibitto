@@ -404,29 +404,24 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
     {
         SCCMixer(16, mix2, &mySCC);       // Get SCC samples
         s32 sample = mix1[15] + mix2[15]; // And mix them together...
-        if (sample > 32767)
-        {
-            sample = 32767;
-        }
-        if (sample < -32767)
-        {
-            sample = -32767;
-        }
+        if (sample > 32767) sample = 32767;
+        else if (sample < -32767) sample = -32767;
         mix1[15] = sample;
     }
 
     int target = mix1[15]; // This is what we are smoothing towards
 
     s16 *p = (s16 *)dest;
+    int step = abs(target - last_sample) / len;
     for (int i = 0; i < len; i++)
     {
-        if (last_sample < (target - 16))
+        if (last_sample < (target - step))
         {
-            last_sample += 8;
+            last_sample += step;
         }
-        if (last_sample > (target + 16))
+        if (last_sample > (target + step))
         {
-            last_sample -= 8;
+            last_sample -= step;
         }
         *p++ = last_sample;
     }

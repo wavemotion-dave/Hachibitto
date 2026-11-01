@@ -161,22 +161,22 @@ extern u8 vdp_type;
 #define ASC16           5
 #define GENERIC_8K      6
 #define GENERIC_16K     7
-#define XBLAM           8
-#define SUPERLR         9
-#define XEVIOUS         10
-#define ASC8SRAM8       11
-#define ASC8SRAM2       12
-#define ASC16SRAM2      13
-#define ASC16SRAM8      14
-#define AT0K            15
-#define AT4K            16
-#define AT8K            17
-#define LIN64           18
-#define PAGE2           19
-#define ROM_NORMAL      20
-#define RESERVED_1      21
-#define RESERVED_2      22
-#define RESERVED_3      23
+#define ASC8SRAM8       8
+#define ASC8SRAM2       9
+#define ASC16SRAM2      10
+#define ASC16SRAM8      11
+#define AT0K            12
+#define AT4K            13
+#define AT8K            14
+#define LIN64           15
+#define PAGE2           16
+#define ROM_NORMAL      17
+#define RESERVED_1      18
+#define RESERVED_2      19
+#define RESERVED_3      20
+#define XBLAM           21  // Not one of the general mappers a user can pick
+#define SUPERLR         22  // Not one of the general mappers a user can pick
+#define XEVIOUS         23  // Not one of the general mappers a user can pick
 #define RTYPE           24  // Not one of the general mappers a user can pick
 #define GAME_MASTER2    25  // Not one of the general mappers a user can pick
 #define MAJUT           26  // Not one of the general mappers a user can pick
