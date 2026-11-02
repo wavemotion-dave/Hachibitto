@@ -91,6 +91,7 @@ u8 dix_patch = 0;          // Only for DIX to allow game to boot
 u8 bMainMenuActive = 0;    // Set to 1 when main menu is active
 
 Media_t MyMedia[3];        // Covering CART1, CART2 and DISK
+u8 flashDirtyBlocks[2][FLASH_DIRTY_BLOCK_COUNT] = {{0}};
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -3163,6 +3164,11 @@ void LoadGameIntoMedia(u8 media_id, char *filename)
 {
     ShowLoading(); // Put up a loading screen so user is aware...
 
+    if (media_id <= MEDIA_CART2)
+    {
+        memset(flashDirtyBlocks[media_id], 0, sizeof(flashDirtyBlocks[media_id]));
+    }
+
     // Save the directory in which this file was found...
     getcwd(MyMedia[media_id].filepath, MAX_PATH_NAME_LEN);
 
@@ -3292,7 +3298,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE 128
-#define MAX_DEBUG_BUF_SIZE (2 * 1024)
+#define MAX_DEBUG_BUF_SIZE (128 * 1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32 debug_len = 0;
