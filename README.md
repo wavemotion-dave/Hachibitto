@@ -137,7 +137,7 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
-Version 1.8a - 02-Nov-2026 by wavemotion-dave
+Version 1.8b - 02-Nov-2026 by wavemotion-dave
 * Improved Save State handling so future changes don't break the format.
 * DSi expanded to 512K User RAM by default and up to 8MB of ROM.
 * ASCII16-X Preliminary support for 4+MB games. No flash save yet.
