@@ -34,7 +34,6 @@ typedef struct {
 // ---------------------------------------------------------------------------
 // Below are the mappers not yet implemented... and a few comments as to why.
 // ---------------------------------------------------------------------------
-#define ASC16X              0xFF        // 8MB+ carts. Very few games use this currently (more likely coming) but those that do often use other unemulated features (e.g. OPL4 FM).
 #define PAGE23              0xFF        // Strictly needed to play Colecovision carts in their native form. Not supported.
 #define Zemina80in1         0xFF        // Zemina compilation cart - all of which are available in other formats.
 #define Zemina90in1         0xFF        // Zemina compilation cart - all of which are available in other formats.

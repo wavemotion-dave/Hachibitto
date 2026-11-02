@@ -22,6 +22,10 @@
 #include "printf.h"
 #include "MSX_generic.h"
 
+#pragma GCC push_options
+#pragma GCC optimize ("Os")
+// All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
+
 void write16(void *address, u16 value) {
 
     u8* first = (u8*)address;
@@ -53,12 +57,11 @@ bool screenshotbmp(const char* filename) {
     REG_DISPCAPCNT = DCAP_BANK(DCAP_BANK_VRAM_D) | DCAP_SIZE(DCAP_SIZE_256x192) | DCAP_ENABLE;
     while(REG_DISPCAPCNT & DCAP_ENABLE);
 
-    // ----------------------------------------------------------------------------------------------
-    // Use the back-end of the large cart buffer. In theory this might be used by some massive
-    // game - and screenshot of such a game would break. In the future we should probably just
-    // move out the 128K to VRAM and then move it back. Good enough for now...
-    // ----------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------
+    // Use the back-end of the large cart buffer. We save off 128K into LCD ram temporarily and use it.
+    // -------------------------------------------------------------------------------------------------
     u8 *temp = (u8*)ROM_Memory+(MAX_CART_SIZE_KB*1024) - (128*1024);
+    memcpy((u8*)0x06860000, temp, 128*1024);
 
     HEADER *header= (HEADER*)temp;
     INFOHEADER *infoheader = (INFOHEADER*)(temp + sizeof(HEADER));
@@ -96,13 +99,17 @@ bool screenshotbmp(const char* filename) {
     DC_FlushAll();
     fwrite(temp, 1, 256 * 192 * 2 + sizeof(INFOHEADER) + sizeof(HEADER), file);
     fclose(file);
+    
+    // Restore the memory used...
+    memcpy(temp, (u8*)0x06860000, 128*1024);
+    
     return true;
 }
-
     
-char snapPath[64];
 bool screenshot(void) 
 {
+    char snapPath[64];
+    
     time_t unixTime = time(NULL);    
     struct tm* timeStruct = gmtime((const time_t *)&unixTime);
 
@@ -114,5 +121,7 @@ bool screenshot(void)
 
     return true;
 }
+
+#pragma GCC pop_options
 
 // End of file

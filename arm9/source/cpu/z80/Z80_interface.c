@@ -192,6 +192,67 @@ void __attribute__((noinline)) HandleAscii16(u8 media_id, u16 address, u8 value)
     }
 }
 
+// -------------------------------------------------------------------------
+// The ASCII 16K Mapper on steroids... has mirrors and can allow 4MB+ ROMs.
+// -------------------------------------------------------------------------
+void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value)
+{
+    // ASCII-16X: bank number uses address bits A11-A8 plus the data byte.
+    // The mapper mask limits this to the ROM size supported by this cartridge.
+    // We support 4MB and 8MB here only...
+    u32 block = ((address & 0x0F00) | value) & ((MyMedia[media_id].filesize > (4096*1024)) ? 0x1FF : 0x0FF);
+    u32 msx_offset = block * MyMedia[media_id].blockSize;
+    u8 *src = (u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB / 2) * 1024) : 0);
+
+    // OpenMSX accepts writes when A13 is set within either 16 KB region.
+    if ((address & 0x3FFF) >= 0x2000)
+    {
+        // A12 selects the bank register.
+        if (((address >> 12) & 1) == 0)
+        {
+            // First 16 KB window: 4000-7FFF, mirrored at C000-FFFF.
+            MSXCartPtr[media_id][2] = src;
+            MSXCartPtr[media_id][3] = src + 0x2000;
+
+            MSXCartPtr[media_id][6] = src;
+            MSXCartPtr[media_id][7] = src + 0x2000;
+
+            if (bCartInPage[1] == (media_id + 1))
+            {
+                MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
+                MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
+            }
+
+            if (bCartInPage[3] == (media_id + 1))
+            {
+                MemoryMap[6] = MSXCartPtr[media_id][6] - 0xC000;
+                MemoryMap[7] = MSXCartPtr[media_id][7] - 0xE000;
+            }
+        }
+        else
+        {
+            // Second 16 KB window: 8000-BFFF, mirrored at 0000-3FFF.
+            MSXCartPtr[media_id][4] = src;
+            MSXCartPtr[media_id][5] = src + 0x2000;
+
+            MSXCartPtr[media_id][0] = src;
+            MSXCartPtr[media_id][1] = src + 0x2000;
+
+            if (bCartInPage[2] == (media_id + 1))
+            {
+                MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
+                MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
+            }
+
+            if (bCartInPage[0] == (media_id + 1))
+            {
+                MemoryMap[0] = MSXCartPtr[media_id][0] - 0x0000;
+                MemoryMap[1] = MSXCartPtr[media_id][1] - 0x2000;
+            }
+        }
+    }
+}
+
 // MSX DOS 2 by ASCII only maps 0x4000-0x7FFF and the hotpsot is at 0x7FFE
 void __attribute__((noinline)) HandleMSXDOS2(u8 media_id, u16 address, u8 value)
 {
@@ -1518,6 +1579,7 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
     [RBSC_FLASH]        = HandleSCCFlash,
     [MATRACOMP]         = HandleMatraCompilation,
     [MSXDOS2]           = HandleMSXDOS2,
+    [ASC16X]            = HandleAscii16X,
     [MEGA_SCC]          = HandleMegaSCC,
     [FMPAC_SRAM]        = HandleFMPAC,
     [SCCPLUS_RAM]       = HandleSCCPlus,

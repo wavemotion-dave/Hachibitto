@@ -1204,7 +1204,7 @@ static inline int lzav_compress( const void* const src, void* const dst,
 static inline int lzav_compress_default( const void* const src,
 	void* const dst, const int srcl, const int dstl ) LZAV_NOEX
 {
-	static uint32_t ht[ 4096 ]; // 16 KiB hash-table, 32-bit aligned.
+	extern uint32_t ht[ 4096 ]; // 16 KiB hash-table, 32-bit aligned. One copy.
 
 	return( lzav_compress( src, dst, srcl, dstl, ht, (int) sizeof( ht )));
 }

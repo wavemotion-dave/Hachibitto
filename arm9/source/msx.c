@@ -61,10 +61,10 @@ u8 mirror_ram_bank[4]   = {3,2,1,0}; // For port readback mostly... though not a
 u8 cold_or_warm_boot    = 0x00;      // After boot, this will be 0x80 so system can warm-boot
 u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
-static u8 Unmapped_Memory[0x2000]; // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
+u8 Unmapped_Memory[0x2000];          // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
 
-static uint8_t rtc_reg  = 0;      // Selected register index (0-15)
-static uint8_t rtc_bank = 0;      // Active bank selected by Reg 13 (0-3)
+static uint8_t rtc_reg  = 0;         // Selected register index (0-15)
+static uint8_t rtc_bank = 0;         // Active bank selected by Reg 13 (0-3)
 
 // Complete 4-bank RAM array initialized with valid MSX2 checksums
 static uint8_t rtc_ram[4][16] = {
@@ -194,8 +194,8 @@ u8 readport_keyboard(void)
       // Keyboard Port (Japanese Layout)
       //  Row   Bit_7 Bit_6 Bit_5 Bit_4 Bit_3 Bit_2 Bit_1 Bit_0
       //   0     "7"   "6"   "5"   "4"   "3"   "2"   "1"   "0"
-      //   1     ":"   ";"   "["   YEN   "="   "-"   "9"   "8"
-      //   2     "B"   "A"  DEAD   /     "."   ","   "]"  QUOTE
+      //   1     ";"   "["   "@"   YEN   "^"   "-"   "9"   "8"
+      //   2     "B"   "A"  DEAD   "/"   "."   ","   "]"   ":"
       //   3     "J"   "I"   "H"   "G"   "F"   "E"   "D"   "C"
       //   4     "R"   "Q"   "P"   "O"   "N"   "M"   "L"   "K"
       //   5     "Z"   "Y"   "X"   "W"   "V"   "U"   "T"   "S"
@@ -273,14 +273,13 @@ u8 readport_keyboard(void)
                   if (kbd_key == '@')           key1 |= 0x20;
                   if (kbd_key == '[')           key1 |= 0x40;
                   if (kbd_key == ';')           key1 |= 0x80;
-                  if (kbd_key == ':')           key1 |= 0x80;
               }
           }
           else if ((Port_PPI_C & 0x0F) == 2)  // Row 2
           {
               if (kbd_key)
               {
-                  if (kbd_key == KBD_KEY_QUOTE) key1 |= 0x01;
+                  if (kbd_key == ':')           key1 |= 0x01;
                   if (kbd_key == ']')           key1 |= 0x02;
                   if (kbd_key == ',')           key1 |= 0x04;
                   if (kbd_key == '.')           key1 |= 0x08;
@@ -354,14 +353,14 @@ u8 readport_keyboard(void)
           {
               if (kbd_key)
               {
-                  if (kbd_key == KBD_KEY_F4)    key1 |= 0x01;
-                  if (kbd_key == KBD_KEY_F5)    key1 |= 0x02;
-                  if (kbd_key == KBD_KEY_ESC)   key1 |= 0x04;
-                  if (kbd_key == KBD_KEY_TAB)   key1 |= 0x08;
-                  if (kbd_key == KBD_KEY_STOP)  key1 |= 0x10;
-                  if (kbd_key == KBD_KEY_BS)    key1 |= 0x20;
-                  if (kbd_key == KBD_KEY_SEL)   key1 |= 0x40;
-                  if (kbd_key == KBD_KEY_RET)   key1 |= 0x80;
+                  if (kbd_key == KBD_KEY_F4)     key1 |= 0x01;
+                  if (kbd_key == KBD_KEY_F5)     key1 |= 0x02;
+                  if (kbd_key == KBD_KEY_ESC)    key1 |= 0x04;
+                  if (kbd_key == KBD_KEY_TAB)    key1 |= 0x08;
+                  if (kbd_key == KBD_KEY_STOP)   key1 |= 0x10;
+                  if (kbd_key == KBD_KEY_BS)     key1 |= 0x20;
+                  if (kbd_key == KBD_KEY_SELECT) key1 |= 0x40;
+                  if (kbd_key == KBD_KEY_RET)    key1 |= 0x80;
               }
           }
           else if ((Port_PPI_C & 0x0F) == 8) // Row 8
@@ -1146,19 +1145,20 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
         if (myConfig.machineType != MACHINE_MSX1)
         {
             u8 page = Port-0xFC;
-            u8 bank = Value & 0xF; // 256K is 16K in 16 banks
+            u8 bank = Value & (isDSiMode() ? 0x1F:0xF); // 512K (DSi) or 256K (DS-Lite) in 16K banks
 
             if (myConfig.expansion == EXP_MEGARAM) // If we have mapped in the MEGARAM 'cart'... expand to 512K
             {
-                bank = Value & (isDSiMode() ? 0x3F : 0x1F); // 512K is 16K in 32 banks, for DSi 1MB is 16K in 64 banks
+                bank = Value & (isDSiMode() ? 0x3F : 0x1F); // 1MB (DSi) or 512K (DS-Lite in 16K Banks
             }
 
             mirror_ram_bank[page] = bank; // For read-back
 
-            if (bank >= 16) // Expanded banks for the MEGARAM 'cart' are stored in upper ROM memory
+            u8 expanded_bank_start = (isDSiMode() ? 32:16);
+            if (bank >= expanded_bank_start) // Expanded banks for the MEGARAM 'cart' are stored in upper ROM memory
             {
-                MSXRamPtr[(page*2)+0] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-16));
-                MSXRamPtr[(page*2)+1] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-16)) + 0x2000;
+                MSXRamPtr[(page*2)+0] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-expanded_bank_start));
+                MSXRamPtr[(page*2)+1] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-expanded_bank_start)) + 0x2000;
             }
             else
             {
@@ -1262,7 +1262,7 @@ u8 MSX_GuessROMType(u32 size)
  ********************************************************************************/
 void msxWipeRAM(void)
 {
-    memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
+    memset(RAM_Memory, 0x00, MAX_RAM_SIZE_KB*1024);
 }
 
 // -------------------------------------------------------------------
@@ -1271,9 +1271,9 @@ void msxWipeRAM(void)
 // -------------------------------------------------------------------
 u8 Is16kBanking(u8 media_id)
 {
-    if (MyMedia[media_id].mapperType == ASC16 || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8 || MyMedia[media_id].mapperType == XBLAM ||
-        MyMedia[media_id].mapperType == SUPERLR || MyMedia[media_id].mapperType == XEVIOUS || MyMedia[media_id].mapperType == GENERIC_16K || MyMedia[media_id].mapperType == RTYPE ||
-        MyMedia[media_id].mapperType == MSXDOS2)
+    if (MyMedia[media_id].mapperType == ASC16   || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8  || MyMedia[media_id].mapperType == XBLAM ||
+        MyMedia[media_id].mapperType == SUPERLR || MyMedia[media_id].mapperType == XEVIOUS    || MyMedia[media_id].mapperType == GENERIC_16K || MyMedia[media_id].mapperType == RTYPE ||
+        MyMedia[media_id].mapperType == MSXDOS2 || MyMedia[media_id].mapperType == ASC16X)
     {
         return 1;
     }
@@ -1583,6 +1583,17 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][6] = (u8*)Unmapped_Memory;          // Segment Unmapped
             MSXCartPtr[media_id][7] = (u8*)Unmapped_Memory;          // Segment Unmapped
         }
+        else if (MyMedia[media_id].mapperType == ASC16X) // Similar to ASC16 but mirrors (and can be bigger)
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x4000;       // Segment 0 default
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x6000;       // Segment 0 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;       // Segment 0 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;       // Segment 0 default
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+        }
         else if (MyMedia[media_id].mapperType == MSXDOS2)
         {
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1758,7 +1769,7 @@ void MSX_CartSetup(u8 media_id)
             else
                 MyMedia[media_id].mapperMask = 0xFF;
         }
-        else // Must be 4096K...  really only the 16K banking works here...
+        else // Must be 4096K or lager...  really only the 16K banking works here...
         {
             MyMedia[media_id].mapperMask = 0xFF;
         }

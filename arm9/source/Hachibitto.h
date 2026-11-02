@@ -101,7 +101,7 @@ extern u32 DX, DY;
 #define META_KBD_COMMA      0xFFFF0032
 #define META_KBD_COLON      0xFFFF0033
 #define META_KBD_SEMI       0xFFFF0034
-#define META_KBD_QUOTE      0xFFFF0035
+#define META_KBD_SELECT     0xFFFF0035
 #define META_KBD_SLASH      0xFFFF0036
 #define META_KBD_CARET      0xFFFF0037
 #define META_KBD_MINUS      0xFFFF0038
@@ -113,7 +113,7 @@ extern u32 DX, DY;
 #define META_KBD_TAB        0xFFFF003E
 #define META_KBD_INS        0xFFFF003F
 #define META_KBD_DEL        0xFFFF0040
-#define META_KBD_STOP_BRK   0xFFFF0041
+#define META_KBD_STOP       0xFFFF0041
 #define META_KBD_F1         0xFFFF0042
 #define META_KBD_F2         0xFFFF0043
 #define META_KBD_F3         0xFFFF0044
@@ -145,20 +145,19 @@ extern u32 DX, DY;
 #define KBD_KEY_SHIFT       11
 #define KBD_KEY_ESC         12
 #define KBD_KEY_STOP        13
-#define KBD_KEY_SEL         14
+#define KBD_KEY_SELECT      14
 #define KBD_KEY_RET         15
 #define KBD_KEY_DEL         16
 #define KBD_KEY_INS         17
 #define KBD_KEY_CLEAR       18
 #define KBD_KEY_HOME        19
-#define KBD_KEY_QUOTE       20
-#define KBD_KEY_CAPS        21
-#define KBD_KEY_TAB         22
-#define KBD_KEY_BS          23
-#define KBD_KEY_KANA        24
-#define KBD_KEY_GRAPH       25
-#define KBD_KEY_DEAD        26
-#define KBD_KEY_YEN         27
+#define KBD_KEY_CAPS        20
+#define KBD_KEY_TAB         21
+#define KBD_KEY_BS          22
+#define KBD_KEY_KANA        23
+#define KBD_KEY_GRAPH       24
+#define KBD_KEY_DEAD        25
+#define KBD_KEY_YEN         26
 
 #define VDP_IRQ_VBLANK      0x01
 #define VDP_IRQ_LINE        0x02
@@ -170,8 +169,8 @@ extern u16 emuActFrames;
 extern u16 timingFrames;
 
 #define MAX_FILES                   1024    // Max files per directory (.ROM and .DSK)
-#define MAX_FILE_NAME_LEN           160     // Max size of any single filename
-#define MAX_PATH_NAME_LEN           200     // Max path size to drill down into
+#define MAX_FILE_NAME_LEN           132     // Max length of any single filename
+#define MAX_PATH_NAME_LEN           200     // Max length of the directory to drill down into
 
 typedef struct
 {

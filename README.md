@@ -13,10 +13,10 @@ These hobby emulators have been a labor of love. An embarassing amount of develo
 Features :
 -----------------------
 * Rock-solid 60Hz sync to the DSi/XL/LL for a tear-free experience (DS-Lite/Phat supported with light frameskip).
-* Loads .ROM cartridge files up to 1MB (DS-Lite/Phat) or 4MB (DSi). 
+* Loads .ROM cartridge files up to 1MB (DS-Lite/Phat) or 8MB (DSi). 
 * Two cart slots supported (if a 2nd cart is utilized, it cuts the max .ROM filesizes above in half).
 * Loads .DSK disk files that are single side (360K) or double sided (720K) with in-game disk swap.
-* Emulated machine is 256K of User RAM and 128K of VRAM.
+* Emulated machine is 512K of User RAM (256K for older DS-Lite) and 128K of VRAM.
 * MEGARAM SCC option available to boost system memory to 512K (DS-Lite) or 1024K (DSi) with SCC support.
 * Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard.
 * Save and Restore states so you can pick up where you left off on a per-game basis.
@@ -29,6 +29,7 @@ Features :
 * Favorites list so you can mark games as 'like' or 'love' - a yellow or red heart icon will mark your favorite games.
 * Solid Z80 core that passes the ZEXDOC test suite (covering everything except undocumented flags which are partially supported for the few games that need them).
 * Game artwork (box cover, etc) is supported - use PNG files of 256 pixels wide by up to 512 pixels tall and place in /roms/art or /roms/msx/art (or same directory as game).
+* Up to 1024 game/ROM/DSK files in any directory (you can have as many directories as you wish) and no more than 128 characters per filename (please keep them on the shorter side).
 * Minimal design aesthetic - pick game, play game. Runs unpatched from your SD card via TWL++ or similar.
 
 Copyright :
@@ -136,6 +137,14 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 1.8a - 02-Nov-2026 by wavemotion-dave
+* Improved Save State handling so future changes don't break the format.
+* DSi expanded to 512K User RAM by default and up to 8MB of ROM.
+* ASCII16-X Preliminary support for 4+MB games. No flash save yet.
+* RAM refactor to lower RAM utilization and provide a bit more room for DS-Lite expansion.
+* Fix for ':' key map in Controller Settings. Added SELECT as a mappable key.
+* User Snapshots (screenshots) no longer possible corrupt VERY large ROMs in memory.
+
 Version 1.8 - 01-Nov-2026 by wavemotion-dave
 * Reworked emulation to use MSX2+ with V9958 video chip as the backbone. DS-Lite drops back to V9938 handling.
 * V9958 emulation added including Screen 10/11/12 and new VDP horizontal scrolling registers.

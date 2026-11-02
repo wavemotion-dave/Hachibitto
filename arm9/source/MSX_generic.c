@@ -30,10 +30,12 @@ int countMSX = 0;
 int ucGameAct = 0;
 int ucGameChoice = -1;
 
-FI_MSX gpFic[MAX_FILES];
+FI_MSX files[MAX_FILES];
 char szName[256];
 char szFile[256];
 char strBuf[40];
+
+uint32_t ht[ 4096 ]; // 16 KiB hash-table, 32-bit aligned. One copy.
 
 struct Config_t         AllConfigs[MAX_CONFIGS];
 struct Config_t         myConfig __attribute((aligned(4))) __attribute__((section(".dtcm")));
@@ -123,7 +125,7 @@ const char szKeyName[MAX_KEY_OPTIONS][18] = {
     "KEYBOARD COMMA",
     "KEYBOARD COLON",
     "KEYBOARD SEMI",
-    "KEYBOARD QUOTE",
+    "KEYBOARD SELECT",
     "KEYBOARD SLASH",  // 65
     "KEYBOARD CARET",
     "KEYBOARD MINUS",
@@ -429,13 +431,13 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
         ucGame = ucBcl + NoDebGame;
         if (ucGame < countMSX)
         {
-            maxLen = strlen(gpFic[ucGame].szName);
-            strcpy(szName, gpFic[ucGame].szName);
+            maxLen = strlen(files[ucGame].szName);
+            strcpy(szName, files[ucGame].szName);
             if (maxLen > 28)
             {
                 szName[30] = '\0';
             }
-            if (gpFic[ucGame].uType == DIRECTORY)
+            if (files[ucGame].uType == DIRECTORY)
             {
                 szName[26] = 0; // Needs to be 2 chars shorter with brackets
                 sprintf(szName2, "[%s]", szName);
@@ -448,9 +450,9 @@ void dsDisplayFiles(u16 NoDebGame, u8 ucSel)
                 sprintf(szName, "%-30s", strupr(szName));
                 DSPrint(1, 6 + ucBcl, (ucSel == ucBcl ? 2 : 0), szName);
 
-                if (IsFavorite(gpFic[ucGame].szName))
+                if (IsFavorite(files[ucGame].szName))
                 {
-                    DSPrint(0, 6 + ucBcl, (IsFavorite(gpFic[ucGame].szName) == 1) ? 0 : 2, (char *)"@");
+                    DSPrint(0, 6 + ucBcl, (IsFavorite(files[ucGame].szName) == 1) ? 0 : 2, (char *)"@");
                 }
                 else
                 {
@@ -517,35 +519,35 @@ void HachibittoFindFiles(u8 media_id)
                 // Do not include the [sav] or [art] directories
                 if ((strcasecmp(szFile, "sav") != 0) && (strcasecmp(szFile, "art") != 0))
                 {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = DIRECTORY;
+                    strcpy(files[uNbFile].szName, szFile);
+                    files[uNbFile].uType = DIRECTORY;
                     uNbFile++;
                     countMSX++;
                 }
             }
         }
-        else
+        else // This is a regular file... Check if we have a valid file extension and the name isn't too short or too long...
         {
-            if ((strlen(szFile) > 4) && (strlen(szFile) < (MAX_FILE_NAME_LEN - 4)) && (szFile[0] != '.') && (szFile[0] != '_')) // For MAC don't allow underscore files
+            if ((strlen(szFile) > 4) && (strlen(szFile) < MAX_FILE_NAME_LEN) && (szFile[0] != '.') && (szFile[0] != '_')) // For MAC don't allow underscore files
             {
                 if ((strcasecmp(strrchr(szFile, '.'), ".rom") == 0) && (media_id != MEDIA_DISK))
                 {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
+                    strcpy(files[uNbFile].szName, szFile);
+                    files[uNbFile].uType = MSXROM;
                     uNbFile++;
                     countMSX++;
                 }
                 if ((strcasecmp(strrchr(szFile, '.'), ".bin") == 0) && (media_id != MEDIA_DISK))
                 {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
+                    strcpy(files[uNbFile].szName, szFile);
+                    files[uNbFile].uType = MSXROM;
                     uNbFile++;
                     countMSX++;
                 }
                 if ((strcasecmp(strrchr(szFile, '.'), ".dsk") == 0) && (media_id == MEDIA_DISK))
                 {
-                    strcpy(gpFic[uNbFile].szName, szFile);
-                    gpFic[uNbFile].uType = MSXROM;
+                    strcpy(files[uNbFile].szName, szFile);
+                    files[uNbFile].uType = MSXROM;
                     uNbFile++;
                     countMSX++;
                 }
@@ -559,7 +561,7 @@ void HachibittoFindFiles(u8 media_id)
     // ----------------------------------------------
     if (countMSX)
     {
-        qsort(gpFic, countMSX, sizeof(FI_MSX), msxFilescmp);
+        qsort(files, countMSX, sizeof(FI_MSX), msxFilescmp);
     }
 }
 
@@ -805,9 +807,9 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
         // The SELECT key will toggle favorites
         if (keysCurrent() & KEY_SELECT)
         {
-            if (gpFic[ucGameAct].uType != DIRECTORY)
+            if (files[ucGameAct].uType != DIRECTORY)
             {
-                ToggleFavorite(gpFic[ucGameAct].szName);
+                ToggleFavorite(files[ucGameAct].szName);
                 dsDisplayFiles(firstRomDisplay, romSelected);
                 SaveFavorites();
                 while (keysCurrent() & KEY_SELECT)
@@ -832,7 +834,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
         // -------------------------------------------------------------------
         if (keysCurrent() & KEY_A)
         {
-            if (gpFic[ucGameAct].uType != DIRECTORY)
+            if (files[ucGameAct].uType != DIRECTORY)
             {
                 bDone = true;
                 ucGameChoice = ucGameAct;
@@ -842,7 +844,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
             {
                 if (allow_dir_change)
                 {
-                    chdir(gpFic[ucGameAct].szName);
+                    chdir(files[ucGameAct].szName);
                     HachibittoFindFiles(media_id);
                     ucGameAct = 0;
                     nbRomPerPage = (countMSX >= 16 ? 16 : countMSX);
@@ -881,14 +883,14 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
         // --------------------------------------------
         // If the filename is too long... scroll it.
         // --------------------------------------------
-        if (strlen(gpFic[ucGameAct].szName) > 31)
+        if (strlen(files[ucGameAct].szName) > 31)
         {
             ucFlip++;
             if (ucFlip >= 10)
             {
                 ucFlip = 0;
                 uLenFic++;
-                if ((uLenFic + 30) > strlen(gpFic[ucGameAct].szName))
+                if ((uLenFic + 30) > strlen(files[ucGameAct].szName))
                 {
                     ucFlop++;
                     if (ucFlop >= 15)
@@ -902,7 +904,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
                         uLenFic--;
                     }
                 }
-                strncpy(szName, gpFic[ucGameAct].szName + uLenFic, 30);
+                strncpy(szName, files[ucGameAct].szName + uLenFic, 30);
                 szName[30] = '\0';
                 DSPrint(1, 6 + romSelected, 2, szName);
             }
@@ -918,7 +920,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
             {
                 if (last_game_highlighted != ucGameAct && ((keysCurrent() & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) == 0))
                 {
-                    if (!BoxArt_ShowPNG(gpFic[ucGameAct].szName, (gpFic[ucGameAct].uType == DIRECTORY) ? 1 : 0, 0))
+                    if (!BoxArt_ShowPNG(files[ucGameAct].szName, (files[ucGameAct].uType == DIRECTORY) ? 1 : 0, 0))
                     {
                         if (bShowPreviewSnaps == 0)
                         {
@@ -1479,7 +1481,7 @@ const struct options_t Option_Table[2][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "MIRRORED", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "GENERIC 8K", "GENERIC 16K", "ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
-                             "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K"},                                             &myConfig.msxMapper,         18},
+                             "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K", "ASCII16-X"},                                &myConfig.msxMapper,         19},
         {"MACHINE TYPE",    {"MSX2+ - NORMAL", "MSX1 - LEGACY"},                                                                                                        &myConfig.machineType,       2},
         {"KEYBOARD",        {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                        &myConfig.keyboard,          2},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
@@ -2153,7 +2155,7 @@ void HachibittoMainMenu(void)
                     HachibittoChooseFile(MEDIA_CART1, 1);
                     if (ucGameChoice != -1)
                     {
-                        LoadGameIntoMedia(MEDIA_CART1, gpFic[ucGameChoice].szName);
+                        LoadGameIntoMedia(MEDIA_CART1, files[ucGameChoice].szName);
                         CheckIfGameHasMusicMapper();
                     }
                 }
@@ -2175,7 +2177,7 @@ void HachibittoMainMenu(void)
                         HachibittoChooseFile(MEDIA_CART2, 1);
                         if (ucGameChoice != -1)
                         {
-                            LoadGameIntoMedia(MEDIA_CART2, gpFic[ucGameChoice].szName);
+                            LoadGameIntoMedia(MEDIA_CART2, files[ucGameChoice].szName);
                         }
                     }
                     BottomScreenMainMenu();
@@ -2202,7 +2204,7 @@ void HachibittoMainMenu(void)
                     HachibittoChooseFile(MEDIA_DISK, 1);
                     if (ucGameChoice != -1)
                     {
-                        LoadGameIntoMedia(MEDIA_DISK, gpFic[ucGameChoice].szName);
+                        LoadGameIntoMedia(MEDIA_DISK, files[ucGameChoice].szName);
                         CheckIfGameHasMusicMapper();
                     }
                 }

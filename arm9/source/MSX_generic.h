@@ -140,7 +140,7 @@ extern u16 timingFrames;
 extern s8 temp_offset;
 extern u8 render_blended;
 
-extern FI_MSX gpFic[MAX_FILES];
+extern FI_MSX files[MAX_FILES];
 extern int ucGameAct;
 extern int ucGameChoice;
 
@@ -171,7 +171,7 @@ extern u8 vdp_type;
 #define LIN64           15
 #define PAGE2           16
 #define ROM_NORMAL      17
-#define RESERVED_1      18
+#define ASC16X          18
 #define RESERVED_2      19
 #define RESERVED_3      20
 #define XBLAM           21  // Not one of the general mappers a user can pick
@@ -195,15 +195,17 @@ extern u8 vdp_type;
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
+extern u32 MAX_RAM_SIZE_KB;
 extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
 #define    MAX_DISK_SIZE_KB 720     // This one is fixed in size
 
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
-extern u8 RAM_Memory[0x40000];
+extern u8 *RAM_Memory;
 extern u8 SRAM_Memory[0x8000];
 extern u8 *SCC_Memory;
 extern u8 *KanjiFontBuffer;
+extern u8 Unmapped_Memory[0x2000];
 
 extern const unsigned char MSXBios_MSX2P[0x8000];
 extern const unsigned char MSXBios_EXT2P[0x4000];
@@ -316,5 +318,6 @@ extern void EnsureSaveDirectory(void);
 extern void intro_logo(void);
 extern void UpperScreenMainMenu(void);
 extern void update_arkanoid_paddle_position(u8 clockwise, u8 speed);
+extern void ayPortBOutHandler(u8 value);
 
 #endif

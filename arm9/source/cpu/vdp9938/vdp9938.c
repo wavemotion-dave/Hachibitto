@@ -1798,13 +1798,6 @@ const u8 *HandlePageScrollScreen5(const u8 *src)
 }
 
 // ---------------------------------------------------------------------
-// MODEL: palette-baked LUT. Same layout as nibbleLUT16 (leftmost pixel in
-// the low byte) but the entries are already XPal-translated, so lines with
-// no sprites can be expanded straight into XBuf with no CommitLine pass.
-// Costs 512 bytes of DTCM.
-// ---------------------------------------------------------------------
-//zzzzTODO
-// ---------------------------------------------------------------------
 // Returns 1 if any sprite is on line Y (caller must then run ColorSprites).
 // If there is none, this does exactly what ColorSprites would have done to
 // VDPStatus[0] on an empty line, so skipping ColorSprites changes nothing.

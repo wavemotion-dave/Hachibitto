@@ -72,13 +72,14 @@ u8 bClickRemoveNeeded   __attribute__((section(".dtcm"))) = 1;
 // pointers that can break down the Z80 memory into 8k chunks.
 // -------------------------------------------------------------------------------------------
 
-u32 MAX_CART_SIZE_KB = 1024; // 1MB of ROM Cart... for DSi we will bump this up to 4MB
+u32 MAX_CART_SIZE_KB = 1024; // 1MB of ROM Cart... for DSi we will bump this up to 8MB
+u32 MAX_RAM_SIZE_KB = 256;   // 256K of RAM... for DSi we will bump this to 512K
 
-u8 *ROM_Memory;                         // ROM Carts up to 1MB/4MB (that's pretty huge in the Z80 world!)
+u8 *ROM_Memory;                         // ROM Carts up to 1MB/8MB (that's pretty huge in the Z80 world!)
 u8 *DISK_Memory;                        // Disk Memory will be 720K to support DSDD disks
-u8 RAM_Memory[0x40000] ALIGN(32) = {0}; // RAM is 256K for the MSX2 (this should run most game/utility software)
+u8 *RAM_Memory;                         // RAM is 256K for the DS-Lite and 512K for the DSi/XL/LL
 u8 SRAM_Memory[0x8000] ALIGN(32) = {0}; // To hold up to 32K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
-u8 *SCC_Memory = RAM_Memory + 0x30000;  // To hold the 64K of SCC-backed RAM we simply use the last 64K of RAM (anything using SCC+ cart won't need that)
+u8 *SCC_Memory;                         // Will be set to the last 64K of RAM (anything using SCC+ cart won't need that)
 u8 *BoxArtBuffer = NULL;                // Used to store the Box Art for display (only the DSi allocates memory for this)
 u8 *KanjiFontBuffer = NULL;             // Used to store the 256K Kanji Font data (only the DSi allocates memory for this)
 
@@ -200,7 +201,7 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_COMMA,
     META_KBD_COLON,
     META_KBD_SEMI,
-    META_KBD_QUOTE,
+    META_KBD_SELECT,
     META_KBD_SLASH,
     META_KBD_CARET,
     META_KBD_MINUS,
@@ -212,7 +213,7 @@ u32 keyCoresp[MAX_KEY_OPTIONS] __attribute__((section(".dtcm"))) = {
     META_KBD_TAB,
     META_KBD_INS,
     META_KBD_DEL,
-    META_KBD_STOP_BRK,
+    META_KBD_STOP,
     META_KBD_F1,
     META_KBD_F2,
     META_KBD_F3,
@@ -1076,7 +1077,7 @@ int cursor_hit(int x, int y)   /* x,y relative to image top-left */
 
 u8 handle_msx_keyboard_press(u16 iTx, u16 iTy) // MSX Keyboard
 {
-    if ((iTx >= 214) && (iTy >= 103) && (iTy < 162)) // Triangular Arrow Keys... do our best
+    if ((iTx >= 214) && (iTy >= 103) && (iTy < 162)) // Triangular Arrow Keys... a bit more complicated geometry as buttons are triangular
     {
         kbd_key = cursor_hit(iTx-214, iTy-103);
     }
@@ -1183,10 +1184,10 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy) // MSX Keyboard
         }
         else if ((iTx >= 210) && (iTx < 255))
         {
-            kbd_key = KBD_KEY_SEL;
+            kbd_key = KBD_KEY_SELECT;
         }
     }
-    else if ((iTy >= 72) && (iTy < 102)) // Row 3 (QWERTY row)
+    else if ((iTy >= 72) && (iTy < 102)) // Row 3
     {
         if ((iTx >= 0) && (iTx < 23))
         {
@@ -1249,7 +1250,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy) // MSX Keyboard
             kbd_key = KBD_KEY_STOP;
         }
     }
-    else if ((iTy >= 102) && (iTy < 132)) // Row 4 (ASDF row)
+    else if ((iTy >= 102) && (iTy < 132)) // Row 4
     {
         if ((iTx >= 0) && (iTx < 27))
         {
@@ -1299,7 +1300,7 @@ u8 handle_msx_keyboard_press(u16 iTx, u16 iTy) // MSX Keyboard
         }
         else if ((iTx >= 178) && (iTx < 192))
         {
-            kbd_key = KBD_KEY_QUOTE;
+            kbd_key = ':';
         }
         else if ((iTx >= 192) && (iTx < 214))
         {
@@ -1949,7 +1950,7 @@ void HachibittoRunEmu(void)
                                 // overwrite the master. Same for filecrc. Instead we save it into filename2
                                 // which always represents the current file for the disk swapped in.
                                 // -------------------------------------------------------------------------
-                                strcpy(MyMedia[MEDIA_DISK].currdisk, gpFic[ucGameChoice].szName);
+                                strcpy(MyMedia[MEDIA_DISK].currdisk, files[ucGameChoice].szName);
                                 MyMedia[MEDIA_DISK].filesize = ReadFileCarefully(MyMedia[MEDIA_DISK].currdisk, DISK_Memory, (MAX_DISK_SIZE_KB * 1024), 0, NULL);
                                 fdc_init(1, (MyMedia[MEDIA_DISK].filesize / 1024 == 360) ? 1 : 2, 80, 9, 512, 1, DISK_Memory, NULL);
                                 fdc_reset(false);
@@ -2205,9 +2206,9 @@ void HachibittoRunEmu(void)
                             {
                                 kbd_key = ';';
                             }
-                            else if (keyCoresp[myConfig.keymap[i]] == META_KBD_QUOTE)
+                            else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SELECT)
                             {
-                                kbd_key = KBD_KEY_QUOTE;
+                                kbd_key = KBD_KEY_SELECT;
                             }
                             else if (keyCoresp[myConfig.keymap[i]] == META_KBD_SLASH)
                             {
@@ -2253,7 +2254,7 @@ void HachibittoRunEmu(void)
                             {
                                 kbd_key = KBD_KEY_DEL;
                             }
-                            else if (keyCoresp[myConfig.keymap[i]] == META_KBD_STOP_BRK)
+                            else if (keyCoresp[myConfig.keymap[i]] == META_KBD_STOP)
                             {
                                 kbd_key = KBD_KEY_STOP;
                             }
@@ -2648,7 +2649,7 @@ void HachibittoInitCPU(void)
     //  -----------------------------------------
     //  Init Main Memory and VDP Video Memory
     //  -----------------------------------------
-    memset(RAM_Memory, 0x00, sizeof(RAM_Memory));
+    memset(RAM_Memory, 0x00, MAX_RAM_SIZE_KB*1024);
     memset(VDP_Memory, 0x00, sizeof(VDP_Memory));
 
     // -----------------------------------------------
@@ -2757,8 +2758,10 @@ int main(int argc, char **argv)
     // -----------------------------------------------------------------
     if (isDSiMode())
     {
-        MAX_CART_SIZE_KB = 4096; // 4MB is the max MSX cart size without tom-foolery
+        MAX_CART_SIZE_KB = 8192; // 8MB is the max MSX cart size we support on the DSi
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
+        MAX_RAM_SIZE_KB = 512;
+        RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
         BoxArtBuffer = malloc(512 * 1024);
         KanjiFontBuffer = malloc(256 * 1024);
         
@@ -2784,11 +2787,15 @@ int main(int argc, char **argv)
             memset(KanjiFontBuffer, 0x00, 256*1024);
         }
     }
-    else // For older DS units... 1MB max
+    else // For older DS units... 1MB max cart, 256K RAM
     {
         MAX_CART_SIZE_KB = 1024;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
+        MAX_RAM_SIZE_KB = 256;
+        RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
     }
+    
+     SCC_Memory = (RAM_Memory + (MAX_RAM_SIZE_KB*1024)) - 0x10000; // 64K off the back end...
 
     // Clear out the ROM memory with all 0xFF values...
     memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
@@ -3285,7 +3292,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE 128
-#define MAX_DEBUG_BUF_SIZE (16 * 1024)
+#define MAX_DEBUG_BUF_SIZE (2 * 1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32 debug_len = 0;

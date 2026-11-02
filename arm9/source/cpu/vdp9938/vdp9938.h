@@ -94,6 +94,7 @@ extern byte RdCtrl9938(void);
 extern void Reset9938(void);
 extern void RebuildLutTablehh(void);
 extern void CheckNewMode(void);
+extern void RebuildPalLUT(void);
 
 // When CPU writes to Port 0x9A:
 extern u8 palette_latch;

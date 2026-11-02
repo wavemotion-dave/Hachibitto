@@ -25,7 +25,11 @@
 #include "lzav.h"
 #include "printf.h"
 
-#define MSX_SAVE_VER   0x0011  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#pragma GCC push_options
+#pragma GCC optimize ("Os")
+// All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
+
+#define MSX_SAVE_VER   0x0013  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -49,7 +53,8 @@ struct RomOffset Offsets[8];
 #define TYPE_FMPAC      6
 #define TYPE_SRAM       7
 #define TYPE_KANJI      8
-#define TYPE_OTHER      9
+#define TYPE_UNMAPPED   9
+#define TYPE_OTHER      99
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
 
@@ -116,7 +121,7 @@ void msxSaveState(void)
         {
             u8 *shifted_offset = MemoryMap[i] + (0x2000 * i);   // Shift the MemoryMap[] back up to non-offset range for the save/restore
 
-            if ((shifted_offset >= ROM_Memory) && (shifted_offset < ROM_Memory+MAX_CART_SIZE_KB))
+            if ((shifted_offset >= ROM_Memory) && (shifted_offset < ROM_Memory+(MAX_CART_SIZE_KB*1024)))
             {
                 Offsets[i].type = TYPE_ROM;
                 Offsets[i].offset = shifted_offset - ROM_Memory;
@@ -126,7 +131,7 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_FDC;
                 Offsets[i].offset = shifted_offset - MSXBios_DISK;
             }
-            else if ((shifted_offset >= RAM_Memory) && (shifted_offset < RAM_Memory+(sizeof(RAM_Memory))))
+            else if ((shifted_offset >= RAM_Memory) && (shifted_offset < RAM_Memory+(MAX_RAM_SIZE_KB*1024)))
             {
                 Offsets[i].type = TYPE_RAM;
                 Offsets[i].offset = shifted_offset - RAM_Memory;
@@ -161,6 +166,11 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_FMPAC;
                 Offsets[i].offset = shifted_offset - MSXBios_FMPAC;
             }
+            else if ((shifted_offset >= Unmapped_Memory) && (shifted_offset < Unmapped_Memory+(sizeof(Unmapped_Memory))))
+            {
+                Offsets[i].type = TYPE_UNMAPPED;
+                Offsets[i].offset = shifted_offset - Unmapped_Memory;
+            }
             else
             {
                 Offsets[i].type = TYPE_OTHER;
@@ -169,56 +179,57 @@ void msxSaveState(void)
         }
         if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
 
-        // We need to save off the MSX Cart offsets so we can restore them properly...
-        for (u8 i=0; i<8; i++)
+        // Save both cart slots... these can only point to a limited number of things...
+        for (int media_id = MEDIA_CART1; media_id <= MEDIA_CART2; media_id++)
         {
-            if ((MSXCartPtr[MEDIA_CART1][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < ROM_Memory+(MAX_CART_SIZE_KB * 1024)))
+            for (u8 i=0; i<8; i++)
             {
-                Offsets[i].type = TYPE_ROM;
-                Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - ROM_Memory;
+                if ((MSXCartPtr[media_id][i] >= ROM_Memory) && (MSXCartPtr[media_id][i] < ROM_Memory+(MAX_CART_SIZE_KB * 1024)))
+                {
+                    Offsets[i].type = TYPE_ROM;
+                    Offsets[i].offset = MSXCartPtr[media_id][i] - ROM_Memory;
+                }
+                else if ((MSXCartPtr[media_id][i] >= RAM_Memory) && (MSXCartPtr[media_id][i] < RAM_Memory+(MAX_RAM_SIZE_KB * 1024)))
+                {
+                    Offsets[i].type = TYPE_RAM;
+                    Offsets[i].offset = MSXCartPtr[media_id][i] - RAM_Memory;
+                }
+                else if ((MSXCartPtr[media_id][i] >= SRAM_Memory) && (MSXCartPtr[media_id][i] < SRAM_Memory+(sizeof(SRAM_Memory))))
+                {
+                    Offsets[i].type = TYPE_SRAM;
+                    Offsets[i].offset = MSXCartPtr[media_id][i] - SRAM_Memory;
+                }
+                else if ((MSXCartPtr[media_id][i] >= MSXBios_FMPAC) && (MSXCartPtr[media_id][i] < MSXBios_FMPAC+(sizeof(MSXBios_FMPAC))))
+                {
+                    Offsets[i].type = TYPE_FMPAC;
+                    Offsets[i].offset = MSXCartPtr[media_id][i] - MSXBios_FMPAC;
+                }
+                else if ((MSXCartPtr[media_id][i] >= Unmapped_Memory) && (MSXCartPtr[media_id][i] < Unmapped_Memory+(sizeof(Unmapped_Memory))))
+                {
+                    Offsets[i].type = TYPE_UNMAPPED;
+                    Offsets[i].offset = MSXCartPtr[media_id][i] - Unmapped_Memory;
+                }
+                else
+                {
+                    Offsets[i].type = TYPE_OTHER;
+                    Offsets[i].offset = (u32)MSXCartPtr[media_id][i];
+                }
             }
-            else if ((MSXCartPtr[MEDIA_CART1][i] >= SRAM_Memory) && (MSXCartPtr[MEDIA_CART1][i] < SRAM_Memory+(sizeof(SRAM_Memory))))
-            {
-                Offsets[i].type = TYPE_SRAM;
-                Offsets[i].offset = MSXCartPtr[MEDIA_CART1][i] - SRAM_Memory;
-            }
-            else
-            {
-                Offsets[i].type = TYPE_OTHER;
-                Offsets[i].offset = (u32)MSXCartPtr[MEDIA_CART1][i];
-            }
+            if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
         }
-        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
-
-
-        // We need to save off the MSX Cart2 offsets so we can restore them properly...
-        for (u8 i=0; i<8; i++)
-        {
-            if ((MSXCartPtr[MEDIA_CART2][i] >= ROM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < ROM_Memory+(MAX_CART_SIZE_KB * 1024)))
-            {
-                Offsets[i].type = TYPE_ROM;
-                Offsets[i].offset = MSXCartPtr[MEDIA_CART2][i] - ROM_Memory;
-            }
-            else if ((MSXCartPtr[MEDIA_CART2][i] >= SRAM_Memory) && (MSXCartPtr[MEDIA_CART2][i] < SRAM_Memory+(sizeof(SRAM_Memory))))
-            {
-                Offsets[i].type = TYPE_SRAM;
-                Offsets[i].offset = MSXCartPtr[MEDIA_CART2][i] - SRAM_Memory;
-            }
-            else
-            {
-                Offsets[i].type = TYPE_OTHER;
-                Offsets[i].offset = (u32)MSXCartPtr[MEDIA_CART2][i];
-            }
-        }
-        if (retVal) retVal = fwrite(Offsets, sizeof(Offsets),1, handle);
 
         // We need to save off the MSX RAM offsets so we can restore them properly...
         for (u8 i=0; i<8; i++)
         {
-            if ((MSXRamPtr[i] >= RAM_Memory) && (MSXRamPtr[i] < RAM_Memory+(sizeof(RAM_Memory))))
+            if ((MSXRamPtr[i] >= RAM_Memory) && (MSXRamPtr[i] < RAM_Memory+(MAX_RAM_SIZE_KB*1024)))
             {
                 Offsets[i].type = TYPE_RAM;
                 Offsets[i].offset = MSXRamPtr[i] - RAM_Memory;
+            }
+            else if ((MSXRamPtr[i] >= ROM_Memory) && (MSXRamPtr[i] < ROM_Memory+(MAX_CART_SIZE_KB*1024)))
+            {
+                Offsets[i].type = TYPE_ROM; // MEGARAM can be stored in ROM
+                Offsets[i].offset = MSXRamPtr[i] - ROM_Memory;
             }
             else
             {
@@ -263,8 +274,8 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&pSvg, sizeof(pSvg),1, handle);
 
         // Write sound chip data
-        if (retVal) retVal = fwrite(&myAY,                  sizeof(myAY),                   1, handle);
-        if (retVal) retVal = fwrite(&myAY2,                 sizeof(myAY2),                  1, handle);
+        if (retVal) retVal = fwrite(&myAY,                  sizeof(myAY) - 16,              1, handle);
+        if (retVal) retVal = fwrite(&myAY2,                 sizeof(myAY2)- 16,              1, handle);
         if (retVal) retVal = fwrite(&mySCC,                 sizeof(mySCC),                  1, handle);
         if (retVal) retVal = fwrite(&myYM,                  sizeof(myYM),                   1, handle);
 
@@ -298,7 +309,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(OccBuf,                 sizeof(OccBuf),                 1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_a,  sizeof(sram_write_enabled_a),   1, handle);
         if (retVal) retVal = fwrite(&sram_write_enabled_b,  sizeof(sram_write_enabled_b),   1, handle);
-        if (retVal) retVal = fwrite(&FMPAC_SRAM_in_view,    sizeof(FMPAC_SRAM_in_view),     1, handle);        
+        if (retVal) retVal = fwrite(&FMPAC_SRAM_in_view,    sizeof(FMPAC_SRAM_in_view),     1, handle);
         if (retVal) retVal = fwrite(&msx_music_capable_game,sizeof(msx_music_capable_game), 1, handle);
         if (retVal) retVal = fwrite(mirror_ram_bank,        sizeof(mirror_ram_bank),        1, handle);
         if (retVal) retVal = fwrite(&msx_caps_lock,         sizeof(msx_caps_lock),          1, handle);
@@ -308,36 +319,33 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
         if (retVal) retVal = fwrite(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
         if (retVal) retVal = fwrite(&vdp_type,              sizeof(vdp_type),               1, handle);
-        
+
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
 
 
-
-        // --------------------------------------------------------------------------------------------
-        // Compress the 256K RAM data using 'high' compression ratio... We do this in two 128K chunks.
-        // --------------------------------------------------------------------------------------------
+        // ---------------------------------------------------------------------------------------------------------------
+        // Compress 512K (DSi) or 256K (DS-Lite) of RAM data using 'high' compression ratio... We do this in 128K chunks.
+        // ---------------------------------------------------------------------------------------------------------------
         int max_len = lzav_compress_bound( 0x20000 );
-        int comp_len = lzav_compress_default( RAM_Memory, COMPRESS_BUFFER, 0x20000, max_len );
-        if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
-        if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,          1, handle);
-
-        // --------------------------------------------------------------------------------------------
-        // Compress the 256K RAM data using 'high' compression ratio... We do this in two 128K chunks.
-        // --------------------------------------------------------------------------------------------
-        comp_len = lzav_compress_default( RAM_Memory+0x20000, COMPRESS_BUFFER, 0x20000, max_len );
-        if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
-        if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,          1, handle);
-
-        // ------------------------------------------------------------------------------------
-        // If we are MEGARAM, we have a pile of RAM sitting in ROM_Memory[] that needs backing.
-        // ------------------------------------------------------------------------------------
+        int comp_len;
+        
+        for (int i=0; i < (isDSiMode() ? 4:2); i++)
+        {
+            comp_len = lzav_compress_default( RAM_Memory+(i*0x20000), COMPRESS_BUFFER, 0x20000, max_len );
+            if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
+            if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,          1, handle);
+        }
+        
+        // -------------------------------------------------------------------------------------
+        // If we are MEGARAM, we have double the RAM but it's sitting out in ROM_Memory[].
+        // -------------------------------------------------------------------------------------
         if (myConfig.expansion == EXP_MEGARAM)
         {
-            // Do this in 128K chunks... DSi has 1MB, DS-Lite has 512K
-            for (int i=0; i < (isDSiMode() ? 8:4); i++)
+            // Do this in 128K chunks... DSi has 512K more and the DS-Lite has 256K more
+            for (int i=0; i < (isDSiMode() ? 4:2); i++)
             {
                 comp_len = lzav_compress_default( ROM_Memory+((MAX_CART_SIZE_KB/2)*1024)+(i*0x20000), COMPRESS_BUFFER, 0x20000, max_len );
                 if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
@@ -443,10 +451,14 @@ void msxLoadState(void)
                 else if (Offsets[i].type == TYPE_KANJI)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_KANJI + Offsets[i].offset) - (0x2000 * i);
-                }                
+                }
                 else if (Offsets[i].type == TYPE_FMPAC)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_FMPAC + Offsets[i].offset) - (0x2000 * i);
+                }
+                else if (Offsets[i].type == TYPE_UNMAPPED)
+                {
+                    MemoryMap[i] = (u8 *) (Unmapped_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {
@@ -454,46 +466,50 @@ void msxLoadState(void)
                 }
             }
 
-            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
-            for (u8 i=0; i<8; i++)
+            // Restore both cart slots... these can only point to a limited number of things...
+            for (int media_id = MEDIA_CART1; media_id <= MEDIA_CART2; media_id++)
             {
-                if (Offsets[i].type == TYPE_ROM)
+                if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
+                for (u8 i=0; i<8; i++)
                 {
-                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (ROM_Memory + Offsets[i].offset);
-                }
-                else if (Offsets[i].type == TYPE_SRAM)
-                {
-                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
-                }
-                else // TYPE_OTHER - this is just a pointer to memory
-                {
-                    MSXCartPtr[MEDIA_CART1][i] = (u8 *) (Offsets[i].offset);
+                    if (Offsets[i].type == TYPE_ROM)
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (ROM_Memory + Offsets[i].offset);
+                    }
+                    else if (Offsets[i].type == TYPE_RAM)
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (RAM_Memory + Offsets[i].offset);
+                    }
+                    else if (Offsets[i].type == TYPE_SRAM)
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
+                    }
+                    else if (Offsets[i].type == TYPE_FMPAC)
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (MSXBios_FMPAC + Offsets[i].offset);
+                    }
+                    else if (Offsets[i].type == TYPE_UNMAPPED)
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (Unmapped_Memory + Offsets[i].offset);
+                    }
+                    else // TYPE_OTHER - this is just a pointer to memory
+                    {
+                        MSXCartPtr[media_id][i] = (u8 *) (Offsets[i].offset);
+                    }
                 }
             }
 
-            if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
-            for (u8 i=0; i<8; i++)
-            {
-                if (Offsets[i].type == TYPE_ROM)
-                {
-                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (ROM_Memory + Offsets[i].offset);
-                }
-                else if (Offsets[i].type == TYPE_SRAM)
-                {
-                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (SRAM_Memory + Offsets[i].offset);
-                }
-                else // TYPE_OTHER - this is just a pointer to memory
-                {
-                    MSXCartPtr[MEDIA_CART2][i] = (u8 *) (Offsets[i].offset);
-                }
-            }
-
+            // Restore RAM pointers... These can only point to a small number of things...
             if (retVal) retVal = fread(Offsets, sizeof(Offsets),1, handle);
             for (u8 i=0; i<8; i++)
             {
                 if (Offsets[i].type == TYPE_RAM)
                 {
                     MSXRamPtr[i] = (u8 *) (RAM_Memory + Offsets[i].offset);
+                }
+                else if (Offsets[i].type == TYPE_ROM) // MEGARAM can be stored in ROM
+                {
+                    MSXRamPtr[i] = (u8 *) (ROM_Memory + Offsets[i].offset);
                 }
                 else // TYPE_OTHER - this is just a pointer to memory
                 {
@@ -536,8 +552,8 @@ void msxLoadState(void)
             SprTab = VDP_Memory + pSvg;
 
             // Write sound chip data
-            if (retVal) retVal = fread(&myAY,                  sizeof(myAY),                   1, handle);
-            if (retVal) retVal = fread(&myAY2,                 sizeof(myAY2),                  1, handle);
+            if (retVal) retVal = fread(&myAY,                  sizeof(myAY) - 16,              1, handle);
+            if (retVal) retVal = fread(&myAY2,                 sizeof(myAY2) - 16,             1, handle);
             if (retVal) retVal = fread(&mySCC,                 sizeof(mySCC),                  1, handle);
             if (retVal) retVal = fread(&myYM,                  sizeof(myYM),                   1, handle);
 
@@ -587,28 +603,28 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
 
-            // -----------------------------------------------------------------------------------
-            // Restore Main RAM memory which was saved in a compressed format. Two chunks of 128K.
-            // -----------------------------------------------------------------------------------
+            // ---------------------------------------------------------------------------------------------------------------
+            // Restore 512K (DSi) or 256K (DS-Lite) of RAM data using 'high' compression ratio... We do this in 128K chunks.
+            // ---------------------------------------------------------------------------------------------------------------
             int comp_len = 0;
-            if (retVal) retVal = fread(&comp_len,               sizeof(comp_len), 1, handle);
-            if (retVal) retVal = fread(COMPRESS_BUFFER,         comp_len,         1, handle);
-            (void)lzav_decompress( COMPRESS_BUFFER, RAM_Memory, comp_len, 0x20000);
 
-            if (retVal) retVal = fread(&comp_len,               sizeof(comp_len), 1, handle);
-            if (retVal) retVal = fread(COMPRESS_BUFFER,         comp_len,         1, handle);
-            (void)lzav_decompress( COMPRESS_BUFFER, RAM_Memory+0x20000, comp_len, 0x20000);
-
-            // --------------------------------------------------------------------------------------
-            // If we are MEGARAM, we have a pile of RAM sitting in ROM_Memory[] that needs restoring.
-            // --------------------------------------------------------------------------------------
+            for (int i=0; i < (isDSiMode() ? 4:2); i++)
+            {
+                if (retVal) retVal = fread(&comp_len,           sizeof(comp_len),  1, handle);
+                if (retVal) retVal = fread(COMPRESS_BUFFER,     comp_len,          1, handle);
+                (void)lzav_decompress( COMPRESS_BUFFER, RAM_Memory + (0x20000 * i), comp_len, 0x20000);
+            }
+            
+            // -------------------------------------------------------------------------------------
+            // If we are MEGARAM, we have double the RAM but it's sitting out in ROM_Memory[].
+            // -------------------------------------------------------------------------------------
             if (myConfig.expansion == EXP_MEGARAM)
             {
-                // Do this in 128K chunks... DSi has 1MB, DS-Lite has 512K
-                for (int i=0; i < (isDSiMode() ? 8:4); i++)
+                // Do this in 128K chunks... DSi has 512K more and the DS-Lite has 256K more
+                for (int i=0; i < (isDSiMode() ? 4:2); i++)
                 {
-                    if (retVal) retVal = fread(&comp_len,               sizeof(comp_len), 1, handle);
-                    if (retVal) retVal = fread(COMPRESS_BUFFER,         comp_len,         1, handle);
+                    if (retVal) retVal = fread(&comp_len,           sizeof(comp_len),  1, handle);
+                    if (retVal) retVal = fread(COMPRESS_BUFFER,     comp_len,          1, handle);
                     (void)lzav_decompress( COMPRESS_BUFFER, ROM_Memory+((MAX_CART_SIZE_KB*2)*1024)+(i*0x20000), comp_len, 0x20000);
                 }
             }
@@ -626,7 +642,8 @@ void msxLoadState(void)
 
     // Recalculate a few things on the VDP side...
     VPAGE=VDP_Memory+((int)VDP[14]<<14);
-    CheckNewMode(); // This will rebuild any lookup tables as needed
+    CheckNewMode();     // This will rebuild any lookup tables as needed
+    RebuildPalLUT();    // And the screen 5 table needs a rebuild
     
     // If there was a disk inserted, re-insert the same one
     if (MyMedia[MEDIA_DISK].filecrc)
@@ -644,5 +661,7 @@ void msxLoadState(void)
     WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;WAITVBL;
     DisplayStatusLine();
 }
+
+#pragma GCC pop_options
 
 // End of file
