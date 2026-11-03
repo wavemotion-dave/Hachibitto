@@ -36,6 +36,7 @@
 #include "minimenu.h"
 #include "msx_kbd.h"
 #include "msx_kbd_ja.h"
+#include "msx_kbd_eu.h"
 #include "msx_music.h"
 #include "options.h"
 #include "topscreen.h"
@@ -2592,9 +2593,18 @@ void BottomScreenKeypad(void)
         }
         else
         {
-            tiles = msx_kbdTiles;
-            map = msx_kbdMap;
-            pal = msx_kbdPal;
+            if (myConfig.machineType == MACHINE_MSX2) // International
+            {
+                tiles = msx_kbd_euTiles;
+                map = msx_kbd_euMap;
+                pal = msx_kbd_euPal;
+            }
+            else
+            {
+                tiles = msx_kbdTiles;
+                map = msx_kbdMap;
+                pal = msx_kbdPal;
+            }
         }
 
         // --------------------------------------------------------------

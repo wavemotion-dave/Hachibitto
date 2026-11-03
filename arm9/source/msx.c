@@ -274,9 +274,8 @@ __attribute__((noinline)) u8 readport_keyboard(void)
               {
                   case ']':  kbd_key = '[';  break;
                   case '[':  kbd_key = '@';  break;
-                  case '@':  kbd_key = ':';  break;
+                  case '@':  kbd_key = ']';  break;
                   case '\\': kbd_key = '|';  break;
-                  case '`':  kbd_key = ']';  break;
               }
           }
 
@@ -302,7 +301,7 @@ __attribute__((noinline)) u8 readport_keyboard(void)
                   if (kbd_key == '9')           key1 |= 0x02;
                   if (kbd_key == '-')           key1 |= 0x04;
                   if (kbd_key == '=')           key1 |= 0x08;
-                  if (kbd_key == '|')           key1 |= 0x10; // YEN
+                  if (kbd_key == '|')           key1 |= 0x10; // YEN on Japan layouts
                   if (kbd_key == '@')           key1 |= 0x20;
                   if (kbd_key == '[')           key1 |= 0x40;
                   if (kbd_key == ';')           key1 |= 0x80;

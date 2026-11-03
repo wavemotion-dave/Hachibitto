@@ -1494,7 +1494,7 @@ const struct options_t Option_Table[2][20] =
     {
         {"MSX MAPPER",      {"GUESS", "MIRRORED", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "GENERIC 8K", "GENERIC 16K", "ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
                              "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K", "ASCII16-X", "NEO-8", "NEO-16"},             &myConfig.msxMapper,         21},
-        {"MACHINE TYPE",    {"MSX2+ - JAPAN", "MSX2 - GLOBAL", "MSX1 - LEGACY"},                                                                                        &myConfig.machineType,       3},
+        {"MACHINE TYPE",    {"MSX2+ - JAPAN", "MSX2 - INT'L", "MSX1 - LEGACY"},                                                                                        &myConfig.machineType,       3},
         {"KEYBOARD",        {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                        &myConfig.keyboard,          2},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},

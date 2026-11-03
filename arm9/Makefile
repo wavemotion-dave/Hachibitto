@@ -70,7 +70,7 @@ SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 PNGFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
 
-OSPECIALS :=  options.o debug_ovl.o alpha_kbd.o msx_kbd.o msx_kbd_ja.o mainmenu.o minimenu.o topscreen.o pdev_bg0.o pdev_tbg0.o instructions.o loading.o
+OSPECIALS :=  options.o debug_ovl.o alpha_kbd.o msx_kbd.o msx_kbd_ja.o msx_kbd_eu.o mainmenu.o minimenu.o topscreen.o pdev_bg0.o pdev_tbg0.o instructions.o loading.o
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -145,6 +145,9 @@ msx_kbd.s msx_kbd.h : msx_kbd.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
 msx_kbd_ja.s msx_kbd_ja.h : msx_kbd_ja.png
+	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
+
+msx_kbd_eu.s msx_kbd_eu.h : msx_kbd_eu.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
 debug_ovl.s debug_ovl.h : debug_ovl.png
