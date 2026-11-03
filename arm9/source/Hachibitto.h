@@ -180,7 +180,8 @@ typedef struct
     u32     filesize;                       // How big this file was (0 if no file in this slot)
     u32     filecrc;                        // The CRC32 of the file (0 if no file in this slot)
     u8      mapperType;                     // Mapper type for the CARTs (Disk will always be 0x00)
-    u8      mapperMask;                     // Mapper mask for the CARTs (Disk will always be 0x00)
+    u8      pad;                            // Not used...
+    u16     mapperMask;                     // Mapper mask for the CARTs (Disk will always be 0x0000)
     u16     blockSize;                      // Mapper block size... 0x2000 (8K) or 0x4000 (16K)
 } Media_t;
 
@@ -192,7 +193,7 @@ typedef struct
 #define FLASH_DIRTY_BLOCK_COUNT ((8 * 1024 * 1024) / FLASH_DIRTY_BLOCK_SIZE)
 
 extern Media_t MyMedia[3]; // Cart1, Cart2 and Disk possibilities
-extern u8 flashDirtyBlocks[2][FLASH_DIRTY_BLOCK_COUNT];
+extern u8 flashDirtyBlocks[FLASH_DIRTY_BLOCK_COUNT];
 
 extern u16 nds_key;
 extern u8  kbd_key;

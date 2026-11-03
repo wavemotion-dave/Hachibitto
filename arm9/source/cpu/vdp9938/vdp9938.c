@@ -3527,8 +3527,15 @@ void Reset9938(void)
     memset(OccBuf,      0x00, sizeof(OccBuf));       // Reset the sprite occurrence buffer
     CurrentEpochSaved = 0;                           // Will be immediately incremented to 1 and so not match our cleared OccBuf[]
 
-    // Set VDP type based on DS machine - we can't handle the faster 
-    vdp_type = (isDSiMode() ? VDP_9958 : VDP_9938);
+    // Set VDP type based on DS machine - we can't handle the faster
+    if (myConfig.machineType == MACHINE_MSX2P)
+    {
+        vdp_type = VDP_9958;    // MSX2+ uses V9958
+    }
+    else
+    {
+        vdp_type = VDP_9938;    // MSX2 and MSX1 always 9938
+    }
 
     if (myConfig.machineType == MACHINE_MSX1)
     {

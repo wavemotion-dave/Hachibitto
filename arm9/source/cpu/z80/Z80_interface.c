@@ -25,10 +25,17 @@
 #include "../../printf.h"
 #include "../scc/SCC.h"
 
-u8 sram_write_enabled_a = 0; // Is SRAM writable in segment A (many SRAM games allow writes in 2 segments)
-u8 sram_write_enabled_b = 0; // Is SRAM writable in segment B (many SRAM games allow writes in 2 segments)
-u8 FMPAC_SRAM_in_view   = 0; // Is the FMPAC SRAM in view?
-u8 FMPAC_Key1           = 0; // FM-PAC SRAM requires a special key write sequence to open up SRAM access
+u8 sram_write_enabled_a = 0;        // Is SRAM writable in segment A (many SRAM games allow writes in 2 segments)
+u8 sram_write_enabled_b = 0;        // Is SRAM writable in segment B (many SRAM games allow writes in 2 segments)
+u8 FMPAC_SRAM_in_view   = 0;        // Is the FMPAC SRAM in view?
+u8 FMPAC_Key1           = 0;        // FM-PAC SRAM requires a special key write sequence to open up SRAM access
+
+// Some mapper storage for the really BIG mapper carts like ASCII16-X and NEO8/16 which can store more data
+u8 ascii16xFlashCmdState[3] = {0};
+u8 ascii16xFlashReadMode[3] = {0};
+u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
+u16 NEO8_bank[6] = {0};
+u16 NEO16_bank[3] = {0};
 
 // -----------------------------------------------------------------------------------------------
 // All memory fetches run through this except OP codes which are read directly from memory
@@ -195,13 +202,6 @@ void __attribute__((noinline)) HandleAscii16(u8 media_id, u16 address, u8 value)
 // -------------------------------------------------------------------------
 // The ASCII 16K Mapper on steroids... has mirrors and can allow 4MB+ ROMs.
 // -------------------------------------------------------------------------
-#define ASCII16X_CFI_SIZE 0x90
-#define ASCII16X_CFI_BYTE(offset) ((offset) * 2)
-#define ASCII16X_COMMAND_ADDRESS(address) ((address) & 0x0FFE)
-
-static u8 ascii16xFlashCommandState[3] = {0};
-static u8 ascii16xFlashReadMode[3] = {0};
-static u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
 static const u16 ascii16xAutoSelectData[16] =
 {
     0x0001, 0x227E, 0x0000, 0xFF0A,
@@ -219,15 +219,10 @@ static const u16 ascii16xCfiIdData[16] =
 
 void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value)
 {
-    if (media_id > MEDIA_CART2)
-        return;
-
-    debug_printf("%04X=%02X\n", address, value);
-
     // ASCII-16X: bank number uses address bits A11-A8 plus the data byte.
     // The mapper mask limits this to the ROM size supported by this cartridge.
     // We support 4MB and 8MB here only...
-    u32 block = ((address & 0x0F00) | value) & ((MyMedia[media_id].filesize > (4096*1024)) ? 0x1FF : 0x0FF);
+    u32 block = ((address & 0x0F00) | value) & MyMedia[media_id].mapperMask;
     u32 msx_offset = block * MyMedia[media_id].blockSize;
     u8 *src = (u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB / 2) * 1024) : 0);
 
@@ -247,15 +242,15 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
         {
             memcpy(flash_base, ascii16xCfiBackup[media_id], ASCII16X_CFI_SIZE);
             ascii16xFlashReadMode[media_id] = 0;
-            ascii16xFlashCommandState[media_id] = 0;
+            ascii16xFlashCmdState[media_id] = 0;
         }
     }
-    else if ((value == 0xF0) && (ascii16xFlashCommandState[media_id] != 3))
+    else if ((value == 0xF0) && (ascii16xFlashCmdState[media_id] != 3))
     {
-        ascii16xFlashCommandState[media_id] = 0;
+        ascii16xFlashCmdState[media_id] = 0;
     }
     else if ((value == 0x98) && ((address & 0x0FFF) == 0x00AA) &&
-             (flash_size >= ASCII16X_CFI_SIZE) && (ascii16xFlashCommandState[media_id] != 3))
+             (flash_size >= ASCII16X_CFI_SIZE) && (ascii16xFlashCmdState[media_id] != 3))
     {
         u8 cfi[ASCII16X_CFI_SIZE] = {0};
         u32 sector_count = (flash_size > 0x10000) ? ((flash_size - 0x10000) / 0x10000) : 0;
@@ -309,7 +304,7 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
         memcpy(ascii16xCfiBackup[media_id], flash_base, ASCII16X_CFI_SIZE);
         memcpy(flash_base, cfi, ASCII16X_CFI_SIZE);
         ascii16xFlashReadMode[media_id] = 1;
-        ascii16xFlashCommandState[media_id] = 0;
+        ascii16xFlashCmdState[media_id] = 0;
     }
     else
     {
@@ -318,18 +313,18 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
         uintptr_t cart_start = (uintptr_t)flash_base;
         uintptr_t dest = (uintptr_t)mapped + (address & 0x1FFF);
 
-        switch (ascii16xFlashCommandState[media_id])
+        switch (ascii16xFlashCmdState[media_id])
         {
             case 0:
                 if ((command_address == 0x0AAA) && (value == 0xAA))
-                    ascii16xFlashCommandState[media_id] = 1;
+                    ascii16xFlashCmdState[media_id] = 1;
                 break;
 
             case 1:
                 if ((command_address == 0x0554) && (value == 0x55))
-                    ascii16xFlashCommandState[media_id] = 2;
+                    ascii16xFlashCmdState[media_id] = 2;
                 else
-                    ascii16xFlashCommandState[media_id] = ((command_address == 0x0AAA) && (value == 0xAA)) ? 1 : 0;
+                    ascii16xFlashCmdState[media_id] = ((command_address == 0x0AAA) && (value == 0xAA)) ? 1 : 0;
                 break;
 
             case 2:
@@ -342,14 +337,14 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
                         flash_base[i] = (i & 1) ? (word >> 8) : word;
                     }
                     ascii16xFlashReadMode[media_id] = 2;
-                    ascii16xFlashCommandState[media_id] = 0;
+                    ascii16xFlashCmdState[media_id] = 0;
                 }
                 else if ((command_address == 0x0AAA) && (value == 0xA0))
-                    ascii16xFlashCommandState[media_id] = 3;
+                    ascii16xFlashCmdState[media_id] = 3;
                 else if ((command_address == 0x0AAA) && (value == 0x80))
-                    ascii16xFlashCommandState[media_id] = 4;
+                    ascii16xFlashCmdState[media_id] = 4;
                 else
-                    ascii16xFlashCommandState[media_id] = 0;
+                    ascii16xFlashCmdState[media_id] = 0;
                 break;
 
             case 3: // Program one byte.
@@ -357,24 +352,24 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
                 {
                     u8 *flash_byte = (u8*)dest;
                     *flash_byte &= value;
-                    flashDirtyBlocks[media_id][(dest - cart_start) / FLASH_DIRTY_BLOCK_SIZE] = 1;
+                    flashDirtyBlocks[(dest - cart_start) / FLASH_DIRTY_BLOCK_SIZE] = 1;
                     flash_show_status = 4;
                 }
-                ascii16xFlashCommandState[media_id] = 0;
+                ascii16xFlashCmdState[media_id] = 0;
                 break;
 
             case 4: // Erase setup: second unlock sequence.
                 if ((command_address == 0x0AAA) && (value == 0xAA))
-                    ascii16xFlashCommandState[media_id] = 5;
+                    ascii16xFlashCmdState[media_id] = 5;
                 else
-                    ascii16xFlashCommandState[media_id] = 0;
+                    ascii16xFlashCmdState[media_id] = 0;
                 break;
 
             case 5:
                 if ((command_address == 0x0554) && (value == 0x55))
-                    ascii16xFlashCommandState[media_id] = 6;
+                    ascii16xFlashCmdState[media_id] = 6;
                 else
-                    ascii16xFlashCommandState[media_id] = 0;
+                    ascii16xFlashCmdState[media_id] = 0;
                 break;
 
             case 6: // Sector erase.
@@ -394,15 +389,15 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
                     u32 last_dirty_block = (sector_start + sector_size - 1) / FLASH_DIRTY_BLOCK_SIZE;
                     for (u32 dirty_block = first_dirty_block; dirty_block <= last_dirty_block; dirty_block++)
                     {
-                        flashDirtyBlocks[media_id][dirty_block] = 1;
+                        flashDirtyBlocks[dirty_block] = 1;
                     }
                     flash_show_status = 4;
                 }
-                ascii16xFlashCommandState[media_id] = 0;
+                ascii16xFlashCmdState[media_id] = 0;
                 break;
 
             default:
-                ascii16xFlashCommandState[media_id] = 0;
+                ascii16xFlashCmdState[media_id] = 0;
                 break;
         }
     }
@@ -459,6 +454,65 @@ void __attribute__((noinline)) HandleAscii16X(u8 media_id, u16 address, u8 value
     }
 }
 
+
+// --------------------------------------------------------------------------------
+// NEO8 is an 8K mapper but has a 16-bit block size. We can only support 8MB max...
+// --------------------------------------------------------------------------------
+void __attribute__((noinline)) HandleNeo8(u8 media_id, u16 address, u8 value)
+{
+    u8 bank = ((address >> 11) & 0x07) - 2;   // 0..5 valid, anything else wraps to >5
+    if (bank > 5)
+        return;
+
+    if (address & 1)   // odd = high byte (only 6 bits used as upper bits reserved)
+        NEO8_bank[bank] = (NEO8_bank[bank] & 0x00FF) | ((u16)(value & 0x3F) << 8);
+    else               // even = low byte
+        NEO8_bank[bank] = (NEO8_bank[bank] & 0xFF00) | value;
+
+    u32 seg       = NEO8_bank[bank] & MyMedia[media_id].mapperMask;
+    u32 msx_offset = seg * MyMedia[media_id].blockSize;
+
+    u8 *src = (u8*)ROM_Memory + msx_offset;
+    MSXCartPtr[media_id][bank] = src;
+
+    if (bCartInPage[bank >> 1] == (media_id + 1))
+        MemoryMap[bank] = src - (bank * 0x2000);
+}
+
+
+// -----------------------------------------------------------------------------------
+// NEO16 is an 16K mapper but has a 16-bit block size. We can only support 8MB max...
+// -----------------------------------------------------------------------------------
+void __attribute__((noinline)) HandleNeo16(u8 media_id, u16 address, u8 value)
+{
+    // Register select = bits 13..11 (BBB): 010 -> bank 0, 100 -> bank 1, 110 -> bank 2
+    u8 bbb = (address >> 11) & 0x07;
+    if (bbb < 2 || (bbb & 1))
+        return;
+    u8 bank = (bbb - 2) >> 1;                  // 0..2
+
+    if (address & 1)   // odd = high byte (only 6 bits used as upper bits reserved)
+        NEO16_bank[bank] = (NEO16_bank[bank] & 0x00FF) | ((u16)(value & 0x3F) << 8);
+    else               // even = low byte
+        NEO16_bank[bank] = (NEO16_bank[bank] & 0xFF00) | value;
+
+    // Segments are 16K here, regardless of what blockSize holds for this media
+    u32 seg     = NEO16_bank[bank] & MyMedia[media_id].mapperMask;
+    u8 *src     = (u8*)ROM_Memory + (seg << 14);
+
+    // Keep the per-8K cart pointers in the same layout HandleNeo8 uses
+    MSXCartPtr[media_id][bank * 2]     = src;
+    MSXCartPtr[media_id][bank * 2 + 1] = src + 0x2000;
+
+    if (bCartInPage[bank] == (media_id + 1))   // 16K bank n == MSX page n
+    {
+        u8 *base = src - (bank * 0x4000);      // same bias works for both 8K halves
+        MemoryMap[bank * 2]     = base;
+        MemoryMap[bank * 2 + 1] = base;
+    }
+}
+
+    
 // MSX DOS 2 by ASCII only maps 0x4000-0x7FFF and the hotpsot is at 0x7FFE
 void __attribute__((noinline)) HandleMSXDOS2(u8 media_id, u16 address, u8 value)
 {
@@ -672,17 +726,11 @@ void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 v
             SRAM_Memory[(address & 0x7FF) + 0x0800] = value;
             SRAM_Memory[(address & 0x7FF) + 0x1000] = value;
             SRAM_Memory[(address & 0x7FF) + 0x1800] = value;
-
-            SRAM_Memory[(address & 0x7FF) + 0x2000] = value;
-            SRAM_Memory[(address & 0x7FF) + 0x2800] = value;
-            SRAM_Memory[(address & 0x7FF) + 0x3000] = value;
-            SRAM_Memory[(address & 0x7FF) + 0x3800] = value;
         }
         else
         {
-            // We are writing to SRAM! Write all the 8K mirrors...
+            // We are writing to SRAM!
             SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-            SRAM_Memory[(address & 0x1FFF) + 0x2000] = value;
         }
         sram_show_status = 4;
     }
@@ -705,6 +753,12 @@ void __attribute__((noinline)) HandleAscii16_SRAM8(u8 media_id, u16 address, u8 
 }
 
 
+// ----------------------------------------------------------------------------------
+// Normally SRAM is 8K or less... for the KOEI games, we allow for a larger SRAM 
+// size of 32K and rather than use up valuable resources in the SRAM_Memory[] array
+// we simply use the last 32K of the RAM_Memory[] as the SRAM since none of the 
+// KOEI games will utilize that area...
+// ----------------------------------------------------------------------------------
 void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 value)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
@@ -717,7 +771,7 @@ void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 v
         {
             // No write support here...
             int sram_bank = value & 3;
-            MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
+            MSXCartPtr[media_id][2] = (u8*)KOEI_SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
         }
         else // SRAM disabled, normal ROM banking
         {
@@ -737,7 +791,7 @@ void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 v
         {
             // No write support here...
             int sram_bank = value & 3;
-            MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
+            MSXCartPtr[media_id][3] = (u8*)KOEI_SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
         }
         else
         {
@@ -757,7 +811,7 @@ void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 v
         {
             sram_write_enabled_a = 1;
             int sram_bank = value & 3;
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
+            MSXCartPtr[media_id][4] = (u8*)KOEI_SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
         }
         else // SRAM disabled, normal ROM banking
         {
@@ -781,7 +835,7 @@ void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 v
         {
             // No write support here...
             int sram_bank = value & 3;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
+            MSXCartPtr[media_id][5] = (u8*)KOEI_SRAM_Memory+(sram_bank * 0x2000); // Map 8K bank into 0x8000 view
         }
         else // SRAM disabled, normal ROM banking
         {
@@ -1014,7 +1068,7 @@ void __attribute__((noinline)) HandleSCCFlash(u8 media_id, u16 address, u8 value
                     {
                         u8 *flash_byte = (u8*)dest;
                         *flash_byte &= value;
-                        flashDirtyBlocks[media_id][(dest - cart_base) / FLASH_DIRTY_BLOCK_SIZE] = 1;
+                        flashDirtyBlocks[(dest - cart_base) / FLASH_DIRTY_BLOCK_SIZE] = 1;
                         flash_show_status = 4;
                     }
                 }
@@ -1061,7 +1115,7 @@ void __attribute__((noinline)) HandleSCCFlash(u8 media_id, u16 address, u8 value
                                 u32 last_dirty_block = (sector_offset + sector_size - 1) / FLASH_DIRTY_BLOCK_SIZE;
                                 for (u32 dirty_block = first_dirty_block; dirty_block <= last_dirty_block; dirty_block++)
                                 {
-                                    flashDirtyBlocks[media_id][dirty_block] = 1;
+                                    flashDirtyBlocks[dirty_block] = 1;
                                 }
                                 flash_show_status = 4;
                             }
@@ -1788,6 +1842,8 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
     [MATRACOMP]         = HandleMatraCompilation,
     [MSXDOS2]           = HandleMSXDOS2,
     [ASC16X]            = HandleAscii16X,
+    [NEO8]              = HandleNeo8,
+    [NEO16]             = HandleNeo16,
     [MEGA_SCC]          = HandleMegaSCC,
     [FMPAC_SRAM]        = HandleFMPAC,
     [SCCPLUS_RAM]       = HandleSCCPlus,
@@ -1853,6 +1909,8 @@ void Z80_Interface_Reset(void)
     sram_write_enabled_b  = 0;
     FMPAC_SRAM_in_view    = 0;
     FMPAC_Key1            = 0;
+    memset(NEO8_bank,  0x00, sizeof(NEO8_bank));
+    memset(NEO16_bank, 0x00, sizeof(NEO16_bank));
 }
 
 // -----------------------------------------------------------------

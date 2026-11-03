@@ -29,7 +29,7 @@
 #pragma GCC optimize ("Os")
 // All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
 
-#define MSX_SAVE_VER   0x0013  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0015  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -44,23 +44,22 @@ struct RomOffset
 
 struct RomOffset Offsets[8];
 
-#define TYPE_ROM        0
-#define TYPE_RAM        1
-#define TYPE_FDC        2
-#define TYPE_BIOS       3   // MSX2 BIOS
-#define TYPE_BIOS1      4   // MSX1 BIOS
-#define TYPE_EBIOS      5
-#define TYPE_FMPAC      6
-#define TYPE_SRAM       7
-#define TYPE_KANJI      8
-#define TYPE_UNMAPPED   9
-#define TYPE_OTHER      99
+#define TYPE_ROM        0   // Cart ROM
+#define TYPE_RAM        1   // Main RAM
+#define TYPE_FDC        2   // Disk ROM
+#define TYPE_BIOS1      3   // MSX1 BIOS
+#define TYPE_BIOS2      4   // MSX2 BIOS
+#define TYPE_BIOS2P     5   // MSX2+ BIOS
+#define TYPE_EXT2       6   // MSX2 Extended
+#define TYPE_EXT2P      7   // MSX2+ Extended
+#define TYPE_FMPAC      8   // FMPAC ROM
+#define TYPE_SRAM       9   // SRAM
+#define TYPE_KANJI      10  // Kanji ROM
+#define TYPE_UNMAPPED   11  // Unmapped Region
+#define TYPE_OTHER      99  // If not found, we save raw offset (should never really happen if we've coded correctly!)
+
 
 static char szLoadFile[256];        // We build the filename out of the base filename and tack on .sav, .ee, etc.
-
-/*********************************************************************************
- * Save the current state - save everything we need to a single .sav file.
- ********************************************************************************/
 
 // --------------------------------------------------------------------------------------
 // We use a 256K buffer on the back-end of the ROM_Memory to use for lzav compression.
@@ -143,8 +142,13 @@ void msxSaveState(void)
             }
             else if ((shifted_offset >= MSXBios_MSX2P) && (shifted_offset < MSXBios_MSX2P+(sizeof(MSXBios_MSX2P))))
             {
-                Offsets[i].type = TYPE_BIOS;
+                Offsets[i].type = TYPE_BIOS2P;
                 Offsets[i].offset = shifted_offset - MSXBios_MSX2P;
+            }
+            else if ((shifted_offset >= MSXBios_MSX2) && (shifted_offset < MSXBios_MSX2+(sizeof(MSXBios_MSX2))))
+            {
+                Offsets[i].type = TYPE_BIOS2;
+                Offsets[i].offset = shifted_offset - MSXBios_MSX2;
             }
             else if ((shifted_offset >= MSXBios_MSX1) && (shifted_offset < MSXBios_MSX1+(sizeof(MSXBios_MSX1))))
             {
@@ -153,8 +157,13 @@ void msxSaveState(void)
             }
             else if ((shifted_offset >= MSXBios_EXT2P) && (shifted_offset < MSXBios_EXT2P+(sizeof(MSXBios_EXT2P))))
             {
-                Offsets[i].type = TYPE_EBIOS;
+                Offsets[i].type = TYPE_EXT2P;
                 Offsets[i].offset = shifted_offset - MSXBios_EXT2P;
+            }
+            else if ((shifted_offset >= MSXBios_EXT2) && (shifted_offset < MSXBios_EXT2+(sizeof(MSXBios_EXT2))))
+            {
+                Offsets[i].type = TYPE_EXT2;
+                Offsets[i].offset = shifted_offset - MSXBios_EXT2;
             }
             else if ((shifted_offset >= MSXBios_KANJI) && (shifted_offset < MSXBios_KANJI+(sizeof(MSXBios_KANJI))))
             {
@@ -319,7 +328,13 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
         if (retVal) retVal = fwrite(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
         if (retVal) retVal = fwrite(&vdp_type,              sizeof(vdp_type),               1, handle);
-
+        if (retVal) retVal = fwrite(NEO8_bank,              sizeof(NEO8_bank),              1, handle);
+        if (retVal) retVal = fwrite(NEO16_bank,             sizeof(NEO16_bank),             1, handle);
+        if (retVal) retVal = fwrite(ascii16xFlashCmdState,  sizeof(ascii16xFlashCmdState),  1, handle);
+        if (retVal) retVal = fwrite(ascii16xFlashReadMode,  sizeof(ascii16xFlashReadMode),  1, handle);
+        if (retVal) retVal = fwrite(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
+        if (retVal) retVal = fwrite(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);            
+        
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
@@ -327,7 +342,7 @@ void msxSaveState(void)
 
 
         // ---------------------------------------------------------------------------------------------------------------
-        // Compress 512K (DSi) or 256K (DS-Lite) of RAM data using 'high' compression ratio... We do this in 128K chunks.
+        // Compress 512K (DSi) or 256K (DS-Lite) of RAM... We do this in 128K chunks.
         // ---------------------------------------------------------------------------------------------------------------
         int max_len = lzav_compress_bound( 0x20000 );
         int comp_len;
@@ -354,7 +369,7 @@ void msxSaveState(void)
         }
 
         // -----------------------------------------------------------------------
-        // Compress the 128K VRAM data using 'high' compression ratio...
+        // Compress the 128K VRAM data to save space...
         // -----------------------------------------------------------------------
         max_len = lzav_compress_bound( sizeof(VDP_Memory) );
         comp_len = lzav_compress_default( VDP_Memory, COMPRESS_BUFFER, sizeof(VDP_Memory), max_len );
@@ -436,17 +451,25 @@ void msxLoadState(void)
                 {
                     MemoryMap[i] = (u8 *) (SRAM_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
-                else if (Offsets[i].type == TYPE_BIOS)
+                else if (Offsets[i].type == TYPE_BIOS2P)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_MSX2P + Offsets[i].offset) - (0x2000 * i);
+                }
+                else if (Offsets[i].type == TYPE_BIOS2)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_MSX2 + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_BIOS1)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_MSX1 + Offsets[i].offset) - (0x2000 * i);
                 }
-                else if (Offsets[i].type == TYPE_EBIOS)
+                else if (Offsets[i].type == TYPE_EXT2P)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_EXT2P + Offsets[i].offset) - (0x2000 * i);
+                }
+                else if (Offsets[i].type == TYPE_EXT2)
+                {
+                    MemoryMap[i] = (u8 *) (MSXBios_EXT2 + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_KANJI)
                 {
@@ -597,14 +620,20 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
             if (retVal) retVal = fread(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
             if (retVal) retVal = fread(&vdp_type,              sizeof(vdp_type),               1, handle);
-
+            if (retVal) retVal = fread(NEO8_bank,              sizeof(NEO8_bank),              1, handle);
+            if (retVal) retVal = fread(NEO16_bank,             sizeof(NEO16_bank),             1, handle);
+            if (retVal) retVal = fread(ascii16xFlashCmdState,  sizeof(ascii16xFlashCmdState),  1, handle);
+            if (retVal) retVal = fread(ascii16xFlashReadMode,  sizeof(ascii16xFlashReadMode),  1, handle);
+            if (retVal) retVal = fread(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
+            if (retVal) retVal = fread(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);            
+            
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
 
             // ---------------------------------------------------------------------------------------------------------------
-            // Restore 512K (DSi) or 256K (DS-Lite) of RAM data using 'high' compression ratio... We do this in 128K chunks.
+            // Restore 512K (DSi) or 256K (DS-Lite) of RAM ... We do this in 128K chunks.
             // ---------------------------------------------------------------------------------------------------------------
             int comp_len = 0;
 

@@ -22,7 +22,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define MAX_CONFIGS                 2048
-#define CONFIG_VER                  0x0015
+#define CONFIG_VER                  0x0016
 
 #define MSXROM                      0x01
 #define DIRECTORY                   0x02
@@ -99,7 +99,8 @@ struct __attribute__((__packed__)) Config_t
 #define NORAM                       0xFF    // When reading IO that is unmapped... we just return 0xFF
 
 #define MACHINE_MSX2P               0x00    // Standard MSX2+ slot layout (slot 3 expanded with RAM in slot 3-3)
-#define MACHINE_MSX1                0x01    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
+#define MACHINE_MSX2                0x01    // Standard MSX2 slot layout (slot 3 expanded with RAM in slot 3-3)
+#define MACHINE_MSX1                0x02    // Standard MSX1 slot layout (nothing expanded, RAM in Slot 2)
 
 #define EXP_NONE                    0       // No special expansion
 #define EXP_FM_PAC                  1       // FM PAC / MSX-MUSIC
@@ -172,8 +173,8 @@ extern u8 vdp_type;
 #define PAGE2           16
 #define ROM_NORMAL      17
 #define ASC16X          18
-#define RESERVED_2      19
-#define RESERVED_3      20
+#define NEO8            19
+#define NEO16           20
 #define XBLAM           21  // Not one of the general mappers a user can pick
 #define SUPERLR         22  // Not one of the general mappers a user can pick
 #define XEVIOUS         23  // Not one of the general mappers a user can pick
@@ -202,10 +203,12 @@ extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
 extern u8 *RAM_Memory;
-extern u8 SRAM_Memory[0x8000];
+extern u8 SRAM_Memory[0x2000];
 extern u8 *SCC_Memory;
 extern u8 *KanjiFontBuffer;
 extern u8 Unmapped_Memory[0x2000];
+
+#define KOEI_SRAM_Memory (RAM_Memory + (MAX_RAM_SIZE_KB*1024) - (32*1024))
 
 extern const unsigned char MSXBios_MSX2P[0x8000];
 extern const unsigned char MSXBios_EXT2P[0x4000];
@@ -213,6 +216,8 @@ extern const unsigned char MSXBios_MSX1[0x8000];
 extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_FMPAC[0x4000];
 extern const unsigned char MSXBios_KANJI[0x8000];
+extern const unsigned char MSXBios_MSX2[0x8000];
+extern const unsigned char MSXBios_EXT2[0x4000];
 
 extern u8  cold_or_warm_boot;
 extern u32 KanjiAdr[2];
@@ -229,6 +234,10 @@ typedef struct
 } ArkanoidPaddle;
 
 extern ArkanoidPaddle myPaddle;
+
+#define ASCII16X_CFI_SIZE                 0x90
+#define ASCII16X_CFI_BYTE(offset)         ((offset) * 2)
+#define ASCII16X_COMMAND_ADDRESS(address) ((address) & 0x0FFE)
 
 extern u8 bCartInPage[4];
 extern u8 bRAMInPage[4];
@@ -270,6 +279,11 @@ extern u16 beeperFreq;
 extern u8 zoom_screen;
 extern u8 keyMapType;
 extern u8 bMainMenuActive;
+extern u16 NEO8_bank[6];
+extern u16 NEO16_bank[3];
+extern u8 ascii16xFlashCmdState[3];
+extern u8 ascii16xFlashReadMode[3];
+extern u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need
@@ -319,5 +333,7 @@ extern void intro_logo(void);
 extern void UpperScreenMainMenu(void);
 extern void update_arkanoid_paddle_position(u8 clockwise, u8 speed);
 extern void ayPortBOutHandler(u8 value);
+extern void MsxSaveFlash(void);
+extern void MsxRestoreFlash(void);
 
 #endif

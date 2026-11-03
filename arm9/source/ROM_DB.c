@@ -41,8 +41,6 @@ typedef struct {
 #define Zemina26in1         0xFF        // Zemina compilation cart - all of which are available in other formats.
 #define Zemina126in1        0xFF        // Zemina compilation cart - all of which are available in other formats.
 #define NettouYakyuu        0xFF        // Uses a sample player chip. No more music mappers for this weary dev!
-#define NEO8                0xFF        // 4MB+ carts. Very few games use this currently (more likely coming) but those that do often use other unemulated features (e.g. OPL4 FM).
-#define NEO16               0xFF        // 4MB+ carts. Very few games use this currently (more likely coming) but those that do often use other unemulated features (e.g. OPL4 FM).
 #define YAMANOOTO           0xFF        // Modern flashcart with some specialized features. Might emulate someday.
 #define ReproCartridgeV1    0xFF        // For Konami Metal Gear series of which there are roughly 1 billion alternate mappers to pick from.
 #define ReproCartridgeV2    0xFF        // For Konami Metal Gear series of which there are roughly 1 billion alternate mappers to pick from.

@@ -1289,6 +1289,12 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.overscan = 1;
     }
+
+    if (strstr(filename, "MAIDEN") && strstr(filename, "FIST"))
+    {
+        myConfig.cpuBoost = 1;      // For some reason Maiden's Fist homebrew needs a bit more speed to detect right
+        myConfig.splitRefresh = 1;  // And adjust the split refresh to be safe
+    }
 }
 
 void MapPlayer1(void)
@@ -1356,8 +1362,14 @@ void SetDefaultGameConfig(void)
 
     MapPlayer1(); // Default to Player 1 mapping
 
+    // ----------------------------------------------------------------
+    // The DS-Lite really doesn't have enough CPU power to handle the 
+    // advanced V9958 video chip so we default to MSX2 with V9938.
+    // ----------------------------------------------------------------
+    u8 defaultMachineType = (isDSiMode() ? MACHINE_MSX2P : MACHINE_MSX2);
+    
     myConfig.msxMapper = GUESS;                 // MSX mapper takes its best guess
-    myConfig.machineType = MACHINE_MSX2P;       // Default machine is MSX2+ with Slot 3 Expanded
+    myConfig.machineType = defaultMachineType;  // Default machine is MSX2+ for DSi and MSX2 for DS-Lite
     myConfig.autoFire = 0;                      // Default to no auto-fire on either button
     myConfig.keyboard = OVL_FULLKBD;            // Default to normal full MSX keyboard
     myConfig.maxSprites = 1;                    // 0 means limit to the original 4/8 sprites of the VDP, 1 means 32 sprites for emulation
@@ -1481,8 +1493,8 @@ const struct options_t Option_Table[2][20] =
     // Page 1 - Game Options
     {
         {"MSX MAPPER",      {"GUESS", "MIRRORED", "KONAMI 8K", "ASCII 8K", "KONAMI SCC", "ASCII 16K", "GENERIC 8K", "GENERIC 16K", "ASC8 SRAM 2K", "ASC8 SRAM 8K", "ASC16 SRAM 2K",
-                             "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K", "ASCII16-X"},                                &myConfig.msxMapper,         19},
-        {"MACHINE TYPE",    {"MSX2+ - NORMAL", "MSX1 - LEGACY"},                                                                                                        &myConfig.machineType,       2},
+                             "ASC16 SRAM 8K", "AT 0000H",  "AT 4000H", "AT 8000H", "64K LINEAR", "PAGE2", "NORMAL 8K/16K", "ASCII16-X", "NEO-8", "NEO-16"},             &myConfig.msxMapper,         21},
+        {"MACHINE TYPE",    {"MSX2+ - JAPAN", "MSX2 - GLOBAL", "MSX1 - LEGACY"},                                                                                        &myConfig.machineType,       3},
         {"KEYBOARD",        {"FULL KEYBOARD", "ALPHA KEYBOARD"},                                                                                                        &myConfig.keyboard,          2},
         {"MAX SPRITES",     {"4/8 PER LINE", "32 PER LINE"},                                                                                                            &myConfig.maxSprites,        2},
         {"AUTO FIRE",       {"OFF", "B1 ONLY", "B2 ONLY", "BOTH"},                                                                                                      &myConfig.autoFire,          4},

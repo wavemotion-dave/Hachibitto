@@ -64,58 +64,42 @@ u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte of
 u8 Unmapped_Memory[0x2000];          // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
 
 static uint8_t rtc_reg  = 0;         // Selected register index (0-15)
-static uint8_t rtc_bank = 0;         // Active bank selected by Reg 13 (0-3)
 
 // Complete 4-bank RAM array initialized with valid MSX2 checksums
 static uint8_t rtc_ram[4][16] = {
-    // Bank 0: Time & Date Tracking
-    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0x01, 0, 0 },
-
-    // Bank 1: Alarm Settings (Do not place System/Screen settings here)
+    // Bank 0: Time & Date (overwritten by populate_msx_rtc())
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0, 0, 0, 0 },
+
+    // Bank 1: Alarm settings; reg 10 = 1 selects 24-hour mode, reg 11 = leap year counter
+    { 0,0,0,0, 0,0,0,0, 0,0, 1, 0, 0, 0, 0, 0 },
 
     // Bank 2: MSX system initialization settings
     {
-        0x0A,  // Reg 0: RTC settings valid — REQUIRED
-        0x00,  // Reg 1: X adjust
-        0x00,  // Reg 2: Y adjust
-        0x00,  // Reg 3: SCREEN 0, normal display
-        0x08,  // Reg 4: WIDTH low nibble
-        0x02,  // Reg 5: WIDTH high bits (40 columns)
-        0x0F,  // Reg 6: Initial text color
-        0x04,  // Reg 7: Initial background color
-        0x04,  // Reg 8: Initial border color
-        0x00,  // Reg 9: Default transfer/keyboard options
-        0x00,  // Reg 10: BEEP settings
-        0x00,  // Reg 11: Startup logo colors
-        0x01,  // Reg 12: Area code (US)
+        0x0A,  // Reg 0: RTC settings valid (ID)
+        0x00,  // Reg 1
+        0x00,  // Reg 2
+        0x00,  // Reg 3
+        0x08,  // Reg 4
+        0x02,  // Reg 5
+        0x0F,  // Reg 6
+        0x04,  // Reg 7
+        0x04,  // Reg 8
+        0x00,  // Reg 9
+        0x00,  // Reg 10
+        0x00,  // Reg 11
+        0x01,  // Reg 12
         0x00, 0x00, 0x00
     },
 
-    // Bank 3: Color Palette Settings + General Validation Checksums
+    // Bank 3: Color palette settings
     { 0x04, 0x04, 0x07, 0x05, 0x02, 0x02, 0x07, 0x07,
       0x01, 0x01, 0x03, 0x03, 0x08, 0x05, 0x00, 0x00 }
 };
 
-// WRITE PORT 0xB4: Selects Register Index ONLY
-__attribute__((noinline)) void write_port_RTC_index(uint8_t data)
-{
-    rtc_reg = data & 0x0F; // Only lower 4 bits pick the register!
-}
+static uint8_t rtc_mode  = 0x08;   // reg 13: bit3 timer enable, bits0-1 = bank
+static uint8_t rtc_test  = 0;      // reg 14
+static uint8_t rtc_reset = 0;      // reg 15
 
-// WRITE PORT 0xB5: Writes Data into the current Bank & Register
-__attribute__((noinline))  void write_port_RTC_data(uint8_t data)
-{
-    uint8_t val = data & 0x0F;
-
-    // Store data in current active bank
-    rtc_ram[rtc_bank][rtc_reg] = val;
-
-    // IF writing to Register 13 (Mode Register), update the ACTIVE BANK!
-    if (rtc_reg == 13 || rtc_reg == 0x0D) {
-        rtc_bank = val & 0x03; // Bits 0-1 select Banks 0-3
-    }
-}
 
 // RTC Register Layout Constants for the date/time handling
 #define R_1_SEC    0
@@ -145,7 +129,7 @@ void store_nibbles(uint8_t rtc_sub_ram[], int index_1, int index_10, int val)
 // ---------------------------------------------------------------------------------------
 // Grab system time/date and populate RTC registers... unlikely any program really cares.
 // ---------------------------------------------------------------------------------------
-void populate_msx_rtc()
+__attribute__((noinline)) void populate_msx_rtc(void)
 {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -168,27 +152,43 @@ void populate_msx_rtc()
     store_nibbles(rtc_ram[0], R_1_YEAR, R_10_YEAR, year_2_digits);
 }
 
-// READ PORT 0xB5: Reads Data from current Bank & Register
+
+// port 0xB4 unchanged
+__attribute__((noinline)) void write_port_RTC_index(uint8_t data)
+{
+    rtc_reg = data & 0x0F;
+}
+
+__attribute__((noinline)) void write_port_RTC_data(uint8_t data)
+{
+    uint8_t val = data & 0x0F;
+
+    switch (rtc_reg) {
+        case 13: rtc_mode  = val; break;   // bank select lives here
+        case 14: rtc_test  = val; break;
+        case 15: rtc_reset = val; break;
+        default: rtc_ram[rtc_mode & 3][rtc_reg] = val; break;
+    }
+}
+
 __attribute__((noinline)) uint8_t read_port_RTC_data(void)
 {
-    populate_msx_rtc(); // Get current system time/date and populate RTC
-
-    uint8_t val = rtc_ram[rtc_bank][rtc_reg] & 0x0F;
-
-    // Reg 13 (Mode Register): Force BUSY flag (Bit 1) to 0
-    if (rtc_reg == 13)
-    {
-        val &= ~0x02; // Bit 1 = 0 (NOT BUSY)
+    switch (rtc_reg) {
+        case 13: return rtc_mode & 0x0D;   // bit 1 (busy) reads as 0
+        case 14:
+        case 15: return 0x0F;
     }
 
-    return val;
+    uint8_t bank = rtc_mode & 3;
+    if (bank == 0) populate_msx_rtc();     // only refresh the clock for bank 0
+    return rtc_ram[bank][rtc_reg] & 0x0F;
 }
 
 // ------------------------------------------------------------------------------------------
 // Keyboard / Joystick reading is generally done every frame so at most 60 times per second.
 // It's fine to keep this out of ITCM fast memory as it's not a hot spot for emulation.
 // ------------------------------------------------------------------------------------------
-u8 readport_keyboard(void)
+__attribute__((noinline)) u8 readport_keyboard(void)
 {
       // ----------------------------------------------------------
       // Keyboard Port (Japanese Layout)
@@ -203,6 +203,24 @@ u8 readport_keyboard(void)
       //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
       //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
       // ----------------------------------------------------------
+      
+      // ----------------------------------------------------------
+      // Keyboard Port (International Layout)
+      //  Row   Bit_7 Bit_6 Bit_5 Bit_4 Bit_3 Bit_2 Bit_1 Bit_0
+      //   0     "7"   "6"   "5"   "4"   "3"   "2"   "1"   "0"
+      //   1     ";"   "]"   "["   "\"   "="   "-"   "9"   "8"
+      //   2     "B"   "A"  DEAD   "/"   "."   ","   "`"   "'"
+      //   3     "J"   "I"   "H"   "G"   "F"   "E"   "D"   "C"
+      //   4     "R"   "Q"   "P"   "O"   "N"   "M"   "L"   "K"
+      //   5     "Z"   "Y"   "X"   "W"   "V"   "U"   "T"   "S"
+      //   6     F3    F2    F1   CODE   CAPS GRAPH  CTRL  SHIFT
+      //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
+      //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
+      // ----------------------------------------------------------      
+      
+//Row 1: YEN becomes \, ^ becomes [, and the bracket positions change.
+//Row 2: The Japanese ] and : positions become backtick and apostrophe.
+//Row 6: KANA becomes CODE.
 
       // For the full keyboard overlay... this is a bit of a hack for SHIFT and CTRL
       if (last_special_key != 0)
@@ -246,6 +264,21 @@ u8 readport_keyboard(void)
       for (u8 i=0; i< (kbd_keys_pressed ? kbd_keys_pressed:1); i++) // Always one pass at least for joysticks...
       {
           kbd_key = kbd_keys[i];
+          
+          // -------------------------------------------------------------------
+          // Check if we need to change the key to handle international matrix.
+          // -------------------------------------------------------------------
+          if (myConfig.machineType == MACHINE_MSX2)
+          {
+              switch (kbd_key)
+              {
+                  case ']':  kbd_key = '[';  break;
+                  case '[':  kbd_key = '@';  break;
+                  case '@':  kbd_key = ':';  break;
+                  case '\\': kbd_key = '|';  break;
+                  case '`':  kbd_key = ']';  break;
+              }
+          }
 
           if ((Port_PPI_C & 0x0F) == 0)      // Row 0
           {
@@ -411,7 +444,7 @@ ArkanoidPaddle myPaddle;
 // Experimentally determined that 0-290 is about the usable range in both
 // Arkanoid games which are the only games known to use the paddles. Good enough..
 // -------------------------------------------------------------------------------
-void update_arkanoid_paddle_position(u8 clockwise, u8 speed)
+__attribute__((noinline)) void update_arkanoid_paddle_position(u8 clockwise, u8 speed)
 {
     if (clockwise)
     {
@@ -528,7 +561,7 @@ static bool read_paddle_pin1(ArkanoidPaddle *paddle)
 // --------------------------------------------------------------------
 // PSG Port B output
 // --------------------------------------------------------------------
-void ayPortBOutHandler(u8 value)
+__attribute__((noinline)) void ayPortBOutHandler(u8 value)
 {
     /*
      * Bit 6 selects joystick port 1.
@@ -541,10 +574,7 @@ void ayPortBOutHandler(u8 value)
         update_arkanoid_paddle(&myPaddle, pin6, pin8);
 
         /*
-         * Your existing dpad/analog mapping goes here.
-         *
-         * Leave this as whatever code you are currently using
-         * to produce 0..255.
+         * This is the dpad/analog mapping
          */
         myPaddle.current_position = myPaddle.current_position;
 
@@ -555,7 +585,7 @@ void ayPortBOutHandler(u8 value)
     }
 }
 
-u8 ReadJoystick(void)
+__attribute__((noinline)) u8 ReadJoystick(void)
 {
     u8 joy1 = 0;
 
@@ -626,7 +656,7 @@ u8 ReadJoystick(void)
 // Pulled out to help with ITCM_CODE space pressure. 
 // This is likely only called once per frame or even less frequently...
 // ---------------------------------------------------------------------
-u8 read_joypad_data(void)
+__attribute__((noinline)) u8 read_joypad_data(void)
 {
       // -------------------------------------------
       // Only port 1 is used for the first Joystick
@@ -655,8 +685,13 @@ u8 read_joypad_data(void)
       return ay38910DataR(&myAY);
 }
 
-uint8_t ReadPort_KanjiDriver(uint8_t port)
+__attribute__((noinline)) uint8_t ReadPort_KanjiDriver(uint8_t port)
 {
+    if (myConfig.machineType != MACHINE_MSX2P)
+    {
+        return 0xFF;
+    }
+    
     switch (port) 
     {
         case 0xD9:
@@ -673,8 +708,12 @@ uint8_t ReadPort_KanjiDriver(uint8_t port)
     return 0xFF;
 }
 
-void WritePort_KanjiDriver(uint8_t port, uint8_t value)
+__attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value)
 {
+    if (myConfig.machineType != MACHINE_MSX2P)
+    {
+        return;
+    }
     switch (port) 
     {
         case 0xD8: KanjiAdr[0] = (KanjiAdr[0] & 0x1F800) | ((value & 0x3F) << 5);  break;
@@ -688,7 +727,7 @@ void WritePort_KanjiDriver(uint8_t port, uint8_t value)
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
 // --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
+ unsigned char cpu_readport_msx(register u8 Port)
 {
   //98h~9Bh   Access to the VDP I/O ports.
   if      (Port == 0x98) return RdData9938();               // VDP Data
@@ -733,7 +772,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   }
   else if (Port == 0xF5)
   {
-      return 0xDE; // Kanji installed
+      return (myConfig.machineType == MACHINE_MSX2) ? 0xDE : 0xFF; // Kanji installed on MSX2+
   }
   else // Unknown port read
   {
@@ -899,8 +938,16 @@ void msx_slot_map_msx2(unsigned char Value)
         case 0x00:  // Slot 0:  Maps to Main BIOS ROM
             bCartInPage[0] = 0;
             bRAMInPage[0] = 0;
-            MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
-            MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
+            if (myConfig.machineType == MACHINE_MSX2P)
+            {
+                MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
+                MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
+            }
+            else
+            {
+                MemoryMap[0] = (u8*)MSXBios_MSX2 + 0x0000 - 0x0000;
+                MemoryMap[1] = (u8*)MSXBios_MSX2 + 0x2000 - 0x2000;
+            }
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[0] = 1;
@@ -919,8 +966,16 @@ void msx_slot_map_msx2(unsigned char Value)
             bRAMInPage[0] = 0;
             if (((msx_subslot & 0x03) >> 0) == 0) // Subslot 0 has Extended BIOS
             {
-                MemoryMap[0] = (u8 *)MSXBios_EXT2P+0x0000 - 0x0000;
-                MemoryMap[1] = (u8 *)MSXBios_EXT2P+0x2000 - 0x2000;
+                if (myConfig.machineType == MACHINE_MSX2P)
+                {
+                    MemoryMap[0] = (u8 *)MSXBios_EXT2P+0x0000 - 0x0000;
+                    MemoryMap[1] = (u8 *)MSXBios_EXT2P+0x2000 - 0x2000;
+                }
+                else
+                {
+                    MemoryMap[0] = (u8 *)MSXBios_EXT2+0x0000 - 0x0000;
+                    MemoryMap[1] = (u8 *)MSXBios_EXT2+0x2000 - 0x2000;
+                }
             }
             else if (((msx_subslot & 0x03) >> 0) == 3) // Subslot 3 has RAM Mapper
             {
@@ -939,11 +994,19 @@ void msx_slot_map_msx2(unsigned char Value)
 
     switch ((Value>>2) & 0x03)  // Page 1 [0x4000~0x7FFF]
     {
-        case 0x00:  // Slot 0:  Maps to Main BIOS ROM
+        case 0x00:  // Slot 0:  Maps to Main BIOS ROM / SUB ROM
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
-            MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
+            if (myConfig.machineType == MACHINE_MSX2P)
+            {
+                MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
+                MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
+            }
+            else
+            {
+                MemoryMap[2] = (u8*)MSXBios_MSX2 + 0x4000 - 0x4000;
+                MemoryMap[3] = (u8*)MSXBios_MSX2 + 0x6000 - 0x6000;
+            }
             break;
         case 0x01:  // Slot 1:  Maps to Game Cart
             bCartInPage[1] = 1;
@@ -957,10 +1020,10 @@ void msx_slot_map_msx2(unsigned char Value)
             MemoryMap[2] = (u8 *)(MSXCartPtr[MEDIA_CART2][2]) - 0x4000;
             MemoryMap[3] = (u8 *)(MSXCartPtr[MEDIA_CART2][3]) - 0x6000;
             break;
-        case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1
+        case 0x03:  // Slot 3:  Expanded slot has the Disk Controller in subslot 1, RAM in subslot 3
             bCartInPage[1] = 0;
             bRAMInPage[1] = 0;
-            if (((msx_subslot & 0x0C) >> 2) == 0) // Subslot 0 has Kanji Driver
+            if ((((msx_subslot & 0x0C) >> 2) == 0) && (myConfig.machineType == MACHINE_MSX2P)) // Subslot 0 has Kanji Driver for MSX2+
             {
                 MemoryMap[2] = (u8 *)MSXBios_KANJI + 0x0000 - 0x4000;
                 MemoryMap[3] = (u8 *)MSXBios_KANJI + 0x2000 - 0x6000;
@@ -1006,7 +1069,7 @@ void msx_slot_map_msx2(unsigned char Value)
             MemoryMap[4] = (u8 *)(MSXCartPtr[MEDIA_CART2][4]) - 0x8000;
             MemoryMap[5] = (u8 *)(MSXCartPtr[MEDIA_CART2][5]) - 0xA000;
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
+        case 0x03:  // Slot 3:  Maps to RAM mapper and possibly Kanji driver
             if (((msx_subslot & 0x30) >> 4) == 3) // Subslot 3 has RAM Mapper
             {
                 bCartInPage[2] = 0;
@@ -1014,7 +1077,7 @@ void msx_slot_map_msx2(unsigned char Value)
                 MemoryMap[4] = (u8 *)(MSXRamPtr[4]) - 0x8000;
                 MemoryMap[5] = (u8 *)(MSXRamPtr[5]) - 0xA000;
             }
-            else if (((msx_subslot & 0x30) >> 4) == 0) // Subslot 0 has 2nd half of Kanji Driver
+            else if ((((msx_subslot & 0x30) >> 4) == 0) && (myConfig.machineType == MACHINE_MSX2P)) // Subslot 0 has 2nd half of Kanji Driver (MSX2+ only)
             {
                 bCartInPage[2] = 0;
                 bRAMInPage[2] = 0;
@@ -1051,7 +1114,7 @@ void msx_slot_map_msx2(unsigned char Value)
             MemoryMap[6] = (u8 *)(MSXCartPtr[MEDIA_CART2][6]) - 0xC000;
             MemoryMap[7] = (u8 *)(MSXCartPtr[MEDIA_CART2][7]) - 0xE000;
             break;
-        case 0x03:  // Slot 3:  Maps to nothing... 0xFF. Expanded slot but nothing lives here.
+        case 0x03:  // Slot 3:  The RAM mapper lives here
             special_memory_access |= SPEC_MEM_SUBSLOT_ACTIVE; // Opens up 0xFFFF
             if (((msx_subslot & 0xC0) >> 6) == 3) // Subslot 3 has RAM Mapper
             {
@@ -1104,11 +1167,9 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
     else if (Port == 0xA8) // Slot system for MSX
     {
-        if (myConfig.machineType)
-            msx_slot_map_msx1(Value);
-        else
-            msx_slot_map_msx2(Value);
-
+        if (myConfig.machineType == MACHINE_MSX1) msx_slot_map_msx1(Value);
+        else msx_slot_map_msx2(Value);
+        
         Port_PPI_A = Value;
     }
     else if (Port == 0xA9)  // PPI - Register B
@@ -1203,6 +1264,26 @@ u8 MSX_GuessROMType(u32 size)
 {
     u8 type = KON8;  // Default to Konami 8K mapper
     u32 guess[MAX_GUESS_MAPPER];
+    
+    // Check filesize... if really large, it can only be ASCII16, ASCII16-X, NEO8 or NEO16
+    if (size >= (4096 * 1024))
+    {
+        if (memcmp(ROM_Memory+16, "ASCII16X", 8) == 0)
+        {
+            return ASC16X;
+        }
+        if (memcmp(ROM_Memory+16, "ROM_NEO8", 8) == 0)
+        {
+            return NEO8;
+        }
+        if (memcmp(ROM_Memory+16, "ROM_NE16", 8) == 0)
+        {
+            return NEO16;
+        }
+        
+        // Otherwise, this is about all we can support...
+        return ASC16;
+    }
 
     memset(guess, 0x00, sizeof(guess));
     for (int i=0; i<size - 3; i++)
@@ -1273,7 +1354,7 @@ u8 Is16kBanking(u8 media_id)
 {
     if (MyMedia[media_id].mapperType == ASC16   || MyMedia[media_id].mapperType == ASC16SRAM2 || MyMedia[media_id].mapperType == ASC16SRAM8  || MyMedia[media_id].mapperType == XBLAM ||
         MyMedia[media_id].mapperType == SUPERLR || MyMedia[media_id].mapperType == XEVIOUS    || MyMedia[media_id].mapperType == GENERIC_16K || MyMedia[media_id].mapperType == RTYPE ||
-        MyMedia[media_id].mapperType == MSXDOS2 || MyMedia[media_id].mapperType == ASC16X)
+        MyMedia[media_id].mapperType == MSXDOS2 || MyMedia[media_id].mapperType == ASC16X     || MyMedia[media_id].mapperType == NEO16)
     {
         return 1;
     }
@@ -1594,6 +1675,28 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;       // Segment 0 default
             MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;       // Segment 0 default
         }
+        else if (MyMedia[media_id].mapperType == NEO8)
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0xC000;        // Segment 6 default
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0xE000;        // Segment 7 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;        // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;        // Segment 1 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;        // Segment 2 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;        // Segment 3 default
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x8000;        // Segment 4 default
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0xA000;        // Segment 5 default
+        }
+        else if (MyMedia[media_id].mapperType == NEO16)
+        {
+            MSXCartPtr[media_id][0] = (u8*)CART_Memory+0xC000;       // Segment 3 default
+            MSXCartPtr[media_id][1] = (u8*)CART_Memory+0xE000;       // Segment 3 default
+            MSXCartPtr[media_id][2] = (u8*)CART_Memory+0x0000;       // Segment 0 default
+            MSXCartPtr[media_id][3] = (u8*)CART_Memory+0x2000;       // Segment 0 default
+            MSXCartPtr[media_id][4] = (u8*)CART_Memory+0x4000;       // Segment 1 default
+            MSXCartPtr[media_id][5] = (u8*)CART_Memory+0x6000;       // Segment 1 default
+            MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x8000;       // Segment 2 default
+            MSXCartPtr[media_id][7] = (u8*)CART_Memory+0xA000;       // Segment 2 default
+        }
         else if (MyMedia[media_id].mapperType == MSXDOS2)
         {
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;          // Segment Unmapped
@@ -1769,9 +1872,20 @@ void MSX_CartSetup(u8 media_id)
             else
                 MyMedia[media_id].mapperMask = 0xFF;
         }
-        else // Must be 4096K or lager...  really only the 16K banking works here...
+        else // Must be 4096K or lager... Generally the mask is 0xFF but for ASCII16-X and NEO8/16 we can go higher
         {
-            MyMedia[media_id].mapperMask = 0xFF;
+            if (MyMedia[media_id].mapperType == NEO8)
+            {
+                MyMedia[media_id].mapperMask = (MyMedia[media_id].filesize == (4096 * 1024)) ? 0x1FF : 0x3FF;
+            }
+            else if ((MyMedia[media_id].mapperType == NEO16) || (MyMedia[media_id].mapperType == ASC16X))
+            {
+                MyMedia[media_id].mapperMask = (MyMedia[media_id].filesize == (4096 * 1024)) ? 0xFF : 0x1FF;
+            }
+            else // One of the legacy mappers... this only really works for 16K mappers...
+            {
+                MyMedia[media_id].mapperMask = 0xFF;
+            }
         }
     }
     else
@@ -1956,6 +2070,15 @@ void MSX_InitialMemoryLayout(void)
     {
         msxLoadSRAM();
     }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // If we are dealing with one of the rare FLASH writable games, read the modified flash blocks back into ROM.
+    // ------------------------------------------------------------------------------------------------------------
+    if ((MyMedia[MEDIA_CART1].mapperType == ASC16X) || (MyMedia[MEDIA_CART1].mapperType == MANBOW2) || (MyMedia[MEDIA_CART1].mapperType == HAMARAJANIGHT) ||
+        (MyMedia[MEDIA_CART1].mapperType == RBSC_FLASH))
+    {
+        MsxRestoreFlash();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1999,12 +2122,22 @@ void msx_restore_bios(void)
         MemoryMap[2] = (u8*)MSXBios_MSX1 + 0x4000 - 0x4000;
         MemoryMap[3] = (u8*)MSXBios_MSX1 + 0x6000 - 0x6000;
     }
-    else // Must be MSX2+
+    else // Must be MSX2 or MSX2+
     {
-        MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
-        MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
-        MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
-        MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
+        if (myConfig.machineType == MACHINE_MSX2P)
+        {
+            MemoryMap[0] = (u8*)MSXBios_MSX2P + 0x0000 - 0x0000;
+            MemoryMap[1] = (u8*)MSXBios_MSX2P + 0x2000 - 0x2000;
+            MemoryMap[2] = (u8*)MSXBios_MSX2P + 0x4000 - 0x4000;
+            MemoryMap[3] = (u8*)MSXBios_MSX2P + 0x6000 - 0x6000;
+        }
+        else
+        {
+            MemoryMap[0] = (u8*)MSXBios_MSX2 + 0x0000 - 0x0000;
+            MemoryMap[1] = (u8*)MSXBios_MSX2 + 0x2000 - 0x2000;
+            MemoryMap[2] = (u8*)MSXBios_MSX2 + 0x4000 - 0x4000;
+            MemoryMap[3] = (u8*)MSXBios_MSX2 + 0x6000 - 0x6000;
+        }
     }
 
     MemoryMap[4] = Unmapped_Memory - 0x8000;
@@ -2096,10 +2229,109 @@ void msxLoadSRAM(void)
     szName[len-1] = 'm';
     szName[len-0] = 0;
 
-    // Check if the file exists... if so read it...
-    if (ReadFileCarefully(szName, SRAM_Memory, 0x8000, 0, NULL) == 0)   // SRAM can be anywhere from 2K to 32K
+    // -----------------------------------------------------------------------
+    // Check if the file exists... if so read it... The KOEISRAM32 mapper has
+    // more SRAM than normal and is stored in the back end of RAM_Memory[]
+    // -----------------------------------------------------------------------
+    if (myConfig.msxMapper == KOEISRAM32)
     {
-        memset(SRAM_Memory, 0xFF, 0x8000); // Not found, so init the SRAM area
+        if (ReadFileCarefully(szName, KOEI_SRAM_Memory, 0x8000, 0, NULL) == 0)
+        {
+            memset(KOEI_SRAM_Memory, 0xFF, 0x8000); // Not found, so init the SRAM area
+        }        
+    }
+    else // Normal SRAM handling 8K or less
+    {
+        if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0, NULL) == 0)   // SRAM can be anywhere from 2K to 8K
+        {
+            memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory)); // Not found, so init the SRAM area
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------------
+// Some of the newer Flash mappers are malleable - meaning that the flash sectors
+// can be erased and reprogrammed while the game is running. The .rom file is
+// somewhat more akin to a disk file in that it can be updated on-the-fly. If we
+// have detected any sector erase and byte programming, we will start a 3 second
+// countdown timer that will call into this routine to save the .rom file back out.
+// ---------------------------------------------------------------------------------
+static char szSaveFlashFile[MAX_FILE_NAME_LEN];
+
+// -----------------------------------------------------------------------
+// The flash save file is the same as the original ROM filename but we
+// use .SST in place of .ROM and we also ensure the sav directory exists.
+// -----------------------------------------------------------------------
+static void MsxMakeFlashFilename(void)
+{
+    DIR* dir = opendir("sav");
+    if (dir) closedir(dir);    // Directory exists... close it out and move on.
+    else mkdir("sav", 0777);   // Otherwise create the directory...
+    sprintf(szSaveFlashFile,"sav/%s", GetMasterFilename());
+
+    int len = strlen(szSaveFlashFile);
+    szSaveFlashFile[len-3] = 's';
+    szSaveFlashFile[len-2] = 's';
+    szSaveFlashFile[len-1] = 't';
+}
+
+// ---------------------------------------------------------------------------
+// We save off only the modified 8K flash blocks and keep it separate from 
+// the original .rom file since we don't want to modify or change change the
+// original CRC which has implications for config settings, etc. Plus it just
+// feels cleaner to leave the original ROM as-is with no risk of damaging it.
+// ---------------------------------------------------------------------------
+void MsxSaveFlash(void)
+{
+    MsxMakeFlashFilename();    
+    FILE *handle = fopen(szSaveFlashFile, "wb");
+    if (handle != NULL)
+    {
+        // -----------------------------------------------------------------------------
+        // Write the 1024 byte writemap... this tells us what flash blocks were written.
+        // -----------------------------------------------------------------------------
+        fwrite(flashDirtyBlocks, sizeof(flashDirtyBlocks), 1, handle);
+        
+        // --------------------------------------------------------------------
+        // And now write out all of the 8K blocks that were erased/written. 
+        // Generally not more than 1 or 2 blocks but we allow for any and all.
+        // --------------------------------------------------------------------
+        for (int i=0; i<1024; i++)
+        {
+            if (flashDirtyBlocks[i]) // Has block been modified?
+            {
+                fwrite(ROM_Memory + (0x2000 * i), 0x2000, 1, handle); // Write it...
+            }
+        }
+        fclose(handle);
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// Restore the 8K blocks from the .sst file and place them back into the ROM_memory[].
+// Think of the .sst file as the variable portion of the ROM that is written to save
+// things like high scores or configuration for the game and is overlaid on the real ROM.
+// ---------------------------------------------------------------------------------------
+void MsxRestoreFlash(void)
+{
+    memset(flashDirtyBlocks, 0x00, sizeof(flashDirtyBlocks));
+
+    MsxMakeFlashFilename();
+    
+    ReadFileCarefully(szSaveFlashFile, flashDirtyBlocks, sizeof(flashDirtyBlocks), 0, 0);
+    
+    // --------------------------------------------------------------------
+    // Read back any modified blocks and put them into the proper place.
+    // --------------------------------------------------------------------
+    int offset = sizeof(flashDirtyBlocks);
+    for (int i=0; i<1024; i++)
+    {
+        if (flashDirtyBlocks[i]) // Has 8K block been modified?
+        {
+            ReadFileCarefully(szSaveFlashFile, ROM_Memory + (0x2000 * i), 0x2000, offset, 0);
+            offset += 0x2000;
+        }
     }
 }
 

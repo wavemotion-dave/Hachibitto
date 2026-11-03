@@ -140,7 +140,7 @@ Version History :
 Version 1.8b - 02-Nov-2026 by wavemotion-dave
 * Improved Save State handling so future changes don't break the format.
 * DSi expanded to 512K User RAM by default and up to 8MB of ROM.
-* ASCII16-X Preliminary support for 4+MB games. No flash save yet.
+* ASCII16-X Preliminary support for 4+MB games. Flash writes to memory only - not yet persisted.
 * RAM refactor to lower RAM utilization and provide a bit more room for DS-Lite expansion.
 * Fix for ':' key map in Controller Settings. Added SELECT as a mappable key.
 * User Snapshots (screenshots) no longer possible corrupt VERY large ROMs in memory.

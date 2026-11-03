@@ -61,7 +61,7 @@ bool screenshotbmp(const char* filename) {
     // Use the back-end of the large cart buffer. We save off 128K into LCD ram temporarily and use it.
     // -------------------------------------------------------------------------------------------------
     u8 *temp = (u8*)ROM_Memory+(MAX_CART_SIZE_KB*1024) - (128*1024);
-    memcpy((u8*)0x06860000, temp, 128*1024);
+    memcpy((u8*)0x06880000, temp, 128*1024);    // Avoid use of VRAM_D
 
     HEADER *header= (HEADER*)temp;
     INFOHEADER *infoheader = (INFOHEADER*)(temp + sizeof(HEADER));
@@ -101,7 +101,7 @@ bool screenshotbmp(const char* filename) {
     fclose(file);
     
     // Restore the memory used...
-    memcpy(temp, (u8*)0x06860000, 128*1024);
+    memcpy(temp, (u8*)0x06880000, 128*1024); // Avoid use of VRAM_D
     
     return true;
 }

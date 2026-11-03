@@ -78,7 +78,7 @@ u32 MAX_RAM_SIZE_KB = 256;   // 256K of RAM... for DSi we will bump this to 512K
 u8 *ROM_Memory;                         // ROM Carts up to 1MB/8MB (that's pretty huge in the Z80 world!)
 u8 *DISK_Memory;                        // Disk Memory will be 720K to support DSDD disks
 u8 *RAM_Memory;                         // RAM is 256K for the DS-Lite and 512K for the DSi/XL/LL
-u8 SRAM_Memory[0x8000] ALIGN(32) = {0}; // To hold up to 32K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
+u8 SRAM_Memory[0x2000] ALIGN(32) = {0}; // To hold up to 8K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
 u8 *SCC_Memory;                         // Will be set to the last 64K of RAM (anything using SCC+ cart won't need that)
 u8 *BoxArtBuffer = NULL;                // Used to store the Box Art for display (only the DSi allocates memory for this)
 u8 *KanjiFontBuffer = NULL;             // Used to store the 256K Kanji Font data (only the DSi allocates memory for this)
@@ -91,7 +91,7 @@ u8 dix_patch = 0;          // Only for DIX to allow game to boot
 u8 bMainMenuActive = 0;    // Set to 1 when main menu is active
 
 Media_t MyMedia[3];        // Covering CART1, CART2 and DISK
-u8 flashDirtyBlocks[2][FLASH_DIRTY_BLOCK_COUNT] = {{0}};
+u8 flashDirtyBlocks[FLASH_DIRTY_BLOCK_COUNT] = {0};
 
 // --------------------------------------------------------------------------
 // For machines that have a full keybaord, we use the Left and Right
@@ -857,7 +857,7 @@ void DisplayStatusLine(void)
         DSPrint(22, 1, 0, " ");
         if (--flash_show_status == 0)
         {
-            // TODO: Write flash to SD?
+            MsxSaveFlash();
         }
     }
     else if (io_show_status)
@@ -2584,7 +2584,7 @@ void BottomScreenKeypad(void)
         const void *map;
         const u16 *pal;
 
-        if (msx_kana_lock)
+        if (msx_kana_lock && (myConfig.machineType == MACHINE_MSX2P))
         {
             tiles = msx_kbd_jaTiles;
             map = msx_kbd_jaMap;
@@ -3164,10 +3164,7 @@ void LoadGameIntoMedia(u8 media_id, char *filename)
 {
     ShowLoading(); // Put up a loading screen so user is aware...
 
-    if (media_id <= MEDIA_CART2)
-    {
-        memset(flashDirtyBlocks[media_id], 0, sizeof(flashDirtyBlocks[media_id]));
-    }
+    memset(flashDirtyBlocks, 0x00, sizeof(flashDirtyBlocks));   // Ensure flash blocks are clear (for games that have writable flash)
 
     // Save the directory in which this file was found...
     getcwd(MyMedia[media_id].filepath, MAX_PATH_NAME_LEN);
@@ -3298,7 +3295,7 @@ u32 LoopZ80(void)
 // -----------------------------------------------------------------------
 
 #define MAX_DPRINTF_STR_SIZE 128
-#define MAX_DEBUG_BUF_SIZE (128 * 1024)
+#define MAX_DEBUG_BUF_SIZE (2 * 1024)
 
 char DEBUG_BUFFER[MAX_DEBUG_BUF_SIZE];
 u32 debug_len = 0;
