@@ -17,7 +17,7 @@ Features :
 * Two cart slots supported (if a 2nd cart is utilized, it cuts the max .ROM filesizes above in half).
 * Loads .DSK disk files that are single side (360K) or double sided (720K) with in-game disk swap.
 * Emulated machine is 512K of User RAM (256K for older DS-Lite) and 128K of VRAM.
-* MEGARAM SCC option available to boost system memory to 512K (DS-Lite) or 1024K (DSi) with SCC support.
+* MEGARAM SCC option available to boost system memory to 512K (DS-Lite) or 1024K (DSi) with SCC and MSX-MUSIC support.
 * Fully configurable keys for the 12 NDS keys to any combination of joystick/keyboard.
 * Save and Restore states so you can pick up where you left off on a per-game basis.
 * Standard PSG, 2x PSG, SCC, SCC+ and FM-PAC (MSX-MUSIC + SRAM) available.
@@ -93,11 +93,12 @@ When zoomed, use the Left/Right shoulder buttons to pan the screen left and righ
 ![Screen Zoom](images/zoom.jpg)
 
 
-V9938 vs V9958 :
+MSX2+ vs MSX2 :
 -----------------------
 The base emulation is for MSX2+ which works quite well on the DSi/XL/LL or above running at 2x CPU. The DS-Lite/Phat (or when running in 'compatibility mode' 
 via an R4 or similar cart) is just not fast enough with this emulator for the advanced V9958 processing (Screen 10+, smooth Horizontal scroll). To that end, the
-older hardware will report out as a V9938 and default to MSX2-like video handling.
+older hardware defaults to MSX2 mode which still lets you run many thousands of games. You can change this to MSX2+ on a per-game basis but you'll probably have
+to enable some aggressive frameskip to get games running semi-properly.
 
 
 Box Artwork :
@@ -121,9 +122,9 @@ Place this file into /roms/bios or into /roms/msx or into /roms so that the emul
 
 Known Issues :
 -----------------------
-* MSX-MUSIC is complicated and consumes quite a bit of the DS CPU horsepower. As such, the Yamaha YM2413 / OPLL implementation is vastly simplified. It only runs full-speed on the DSi or above with the 2X CPU. Do not judge MSX-MUSIC harshly based on this emulator's ability.
+* MSX-MUSIC is complicated and consumes quite a bit of the DS CPU horsepower. As such, the Yamaha YM2413 / OPLL implementation is, by necessity, simplified. It only runs full-speed on the DSi or above with the 2X CPU. Do not judge MSX-MUSIC harshly based on this emulator's ability.
 * The DS-Lite/Phat do not have enough CPU horsepower to handle this implementation of MSX-MUSIC so by default the standard PSG (or SCC if the game supports it) will be used instead.
-* Manbow 2 has some minor glitching when using save/continue functionality. Does not affect gameplay.
+* Manbow 2 has some minor glitching when using save/continue functionality. Cause unknown. Does not affect gameplay.
 
 The Hachibitto HB-8 Fantasy Console :
 -----------------------

@@ -1114,11 +1114,11 @@ static const GameTweak gameTweaks[] =
                                                                                                      
     // MSX-MUSIC                                                                                     
     {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
-    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_HIGH},
+    {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
     {"BLASTER",         "BURN",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"BUSHOUHUUNROKU",  NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
+    {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"DEAD",            "BRAIN",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"EMERALD",         "DRAGON",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1136,7 +1136,9 @@ static const GameTweak gameTweaks[] =
     {"GOLVELLIUS 2",    NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"GOLVELLIUS II",   NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"HEROES",          "LANCE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ILLUSION",        "CITY",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"KPI",             "BALL",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"LAYDOCK",         "LAST",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"LILLY",           "SAGA",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"LUBECK",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1157,7 +1159,7 @@ static const GameTweak gameTweaks[] =
     {"SENKOKUGUNYUDEN", NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SINGULAR",        "STONE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SLAYER",          "VI",                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"SONYC",           NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"SONYC",           NULL,                EXP_FM_PAC,  FS_LIGHT,       TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SUIKODEN",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"SUPER",           "COOKS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"TANNH",           "GATE",              EXP_FM_PAC,  FS_LIGHT,       TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1293,6 +1295,12 @@ void ApplyDatabaseTweaks(void)
     if (strstr(filename, "MAIDEN") && strstr(filename, "FIST"))
     {
         myConfig.cpuBoost = 1;      // For some reason Maiden's Fist homebrew needs a bit more speed to detect right
+        myConfig.splitRefresh = 1;  // And adjust the split refresh to be safe
+    }
+
+    if (strstr(filename, "SONYC"))
+    {
+        myConfig.cpuBoost = 1;      // For a bit more speed!
         myConfig.splitRefresh = 1;  // And adjust the split refresh to be safe
     }
 }

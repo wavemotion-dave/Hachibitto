@@ -560,7 +560,7 @@ enum
 };
 
 static u8 YM_FM_SustainAtten[16] __attribute__((section(".dtcm"))) = {
-    0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 127
+    0, 74, 128, 165, 191, 210, 223, 232, 239, 243, 247, 249, 251, 252, 253, 255
 };
 
 /* Feedback in phase units (256 per cycle) at full-scale modulator output.
@@ -636,9 +636,11 @@ static inline void YM_PrecomputeFMRates(YM *chip, int ch)
        sustain level while the key is down. To experiment, use:
            p->susMod = inst->egTypeMod ? 0 : p->rrMod;
            p->susCar = inst->egTypeCar ? 0 : p->rrCar;                       */
-    p->susMod = 0;
-    p->susCar = 0;
-
+#define YM_EGTYP0_SHIFT 2  // 1 = half the RR speed; raise to fade slower
+        p->susMod = 0;
+        p->susCar = (chip->channels[ch].instrument && !inst->egTypeCar)
+                    ? (p->rrCar >> YM_EGTYP0_SHIFT) : 0;
+                    
     /* YM2413 TL is 0.75 dB per step: precompute the linear amplitude factor.
        Modulation depth is applied at full precision in the renderer. */
     p->modAtten = YM_TLAtten[inst->tl & 0x3F];
@@ -837,7 +839,12 @@ ITCM_CODE static inline s32 YM_RenderChannel2FM(YM_Oscillator *osc, u8 keyOn, in
     osc->phase += pi;
 
     // Apply the configured YM output level after channel-volume attenuation.
-    return carrier >> (13 - myConfig.ymScale);   // same level as (>>14) then << (ymScale+1)
+    // Peak per channel is about +/-8.26M (127 * 255 * 255) before this shift.
+    // (>>12) is +6 dB over the old (>>13), restoring loudness lost when the
+    // sustain-level table and percussive decay were made more accurate.
+    // Equivalent to (>>14) then << (ymScale+2). If dense chords crackle at high
+    // ymScale, check the final mix for overflow or go back to (>>13).
+    return carrier >> (12 - myConfig.ymScale);
 }
 
 // -------------------------------------------------------------------------
