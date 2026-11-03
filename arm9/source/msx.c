@@ -2027,8 +2027,8 @@ void MSX_InitialMemoryLayout(void)
     {
         if (myConfig.msxMapper == GUESS)
         {
-            // Look for the matching SHA1 in the ROM Database
-            MyMedia[MEDIA_CART1].mapperType = RomDB_Lookup(MEDIA_CART1);
+            // Look for the matching SHA1 in the ROM Database. If file size is more than 4MB, just guess
+            MyMedia[MEDIA_CART1].mapperType = (MyMedia[MEDIA_CART1].filesize <= (4096*1024)) ? RomDB_Lookup(MEDIA_CART1) : 0xFF;
             if (MyMedia[MEDIA_CART1].mapperType == 0xFF && (MyMedia[MEDIA_CART1].filesize >= (64*1024))) // Not found... let's do our best to guess it...
             {
                 MyMedia[MEDIA_CART1].mapperType = MSX_GuessROMType(MyMedia[MEDIA_CART1].filesize); // We only bother if the game is 64K or larger

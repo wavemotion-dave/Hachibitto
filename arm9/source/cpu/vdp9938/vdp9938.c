@@ -1498,12 +1498,11 @@ ITCM_CODE void CommitLine(u8 Y)
 }
 // ============================================================================
 // V9958 horizontal scroll (R#26/R#27) + left mask (R#25 MSK) for Screens 4 and 5.
-// Paste this block AFTER CommitLine() and replace your RefreshLine4/RefreshLine5.
 //
 // Design: only the BACKGROUND source is scrolled. P (the line pointer returned
 // by RefreshBorder) is never moved, so ColorSprites(Y, P-32) and CommitLine()
 // are unchanged and sprites stay put exactly as on real hardware.
-// Scrolling is quantised to 2 pixels, matching your HAdjust handling.
+// Scrolling is quantised to 2 pixels, matching the HAdjust handling.
 // SP2 (two-page wrap) is not handled; wrap is 256 pixels.
 // ============================================================================
 

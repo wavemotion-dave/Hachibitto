@@ -258,7 +258,7 @@ void sha1_reset(SHA1 *sha1)
  * Process one byte.
  *
  * Kept for compatibility with the original interface.
- * Your normal ROM path should go through sha1_process_bytes().
+ * Normal ROM path should go through sha1_process_bytes().
  */
 void sha1_process_byte(SHA1 *sha1, uint8_t octet)
 {
@@ -296,7 +296,7 @@ void sha1_process_block(SHA1 *sha1, const void *start, const void *end)
  * Full 64-byte blocks are processed directly from the source buffer.
  * This avoids copying every block into sha1->block.
  *
- * Your ROM path starts with block_byte_index == 0 and uses lengths
+ * ROM path starts with block_byte_index == 0 and uses lengths
  * that are multiples of 64 bytes, so the fast path handles the
  * entire ROM.
  */

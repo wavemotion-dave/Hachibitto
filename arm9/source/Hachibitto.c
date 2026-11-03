@@ -2769,12 +2769,12 @@ int main(int argc, char **argv)
     // -----------------------------------------------------------------
     if (isDSiMode())
     {
-        MAX_CART_SIZE_KB = 8192; // 8MB is the max MSX cart size we support on the DSi
+        MAX_CART_SIZE_KB = 8192;                // 8MB is the max MSX cart size we support on the DSi
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
-        MAX_RAM_SIZE_KB = 512;
+        MAX_RAM_SIZE_KB = 512;                  // And RAM gets a boost to 512K
         RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
-        BoxArtBuffer = malloc(512 * 1024);
-        KanjiFontBuffer = malloc(256 * 1024);
+        BoxArtBuffer = malloc(512 * 1024);      // Box ART gets a dedicated buffer
+        KanjiFontBuffer = malloc(256 * 1024);   // And we support the Kanji Font for DSi
         
         // -------------------------------------------------------------
         // Try to load up the 256K Kanji Font data. Almost nothing uses
@@ -2798,7 +2798,7 @@ int main(int argc, char **argv)
             memset(KanjiFontBuffer, 0x00, 256*1024);
         }
     }
-    else // For older DS units... 1MB max cart, 256K RAM
+    else // For older DS units... 1MB max cart, 256K RAM, No Kanji Font
     {
         MAX_CART_SIZE_KB = 1024;
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
@@ -2806,10 +2806,11 @@ int main(int argc, char **argv)
         RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
     }
     
-     SCC_Memory = (RAM_Memory + (MAX_RAM_SIZE_KB*1024)) - 0x10000; // 64K off the back end...
-
-    // Clear out the ROM memory with all 0xFF values...
-    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
+    // ------------------------------------------------------------------------
+    // The SCC Memory is only needed for 2 games (Snatcher and SD Snatcher) so
+    // rather than allocating 64K, we just peel 64K off the back end of RAM.
+    // ------------------------------------------------------------------------
+    SCC_Memory = (RAM_Memory + (MAX_RAM_SIZE_KB*1024)) - (64*1024);
 
     // ------------------------------------------------------
     // Both DS-Lite and DSi get a single Disk buffer of 720K
@@ -2822,6 +2823,9 @@ int main(int argc, char **argv)
 
     // Make sure the SRAM is reset... This small buffer is pre-allocated.
     memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory));
+
+    // Clear out the ROM memory with all 0xFF values...
+    memset(ROM_Memory, 0xFF, (MAX_CART_SIZE_KB * 1024));
 
     // ------------------------------------------
     // Load the High Score table into memory...
