@@ -79,7 +79,7 @@ u32 MAX_RAM_SIZE_KB = 256;   // 256K of RAM... for DSi we will bump this to 512K
 u8 *ROM_Memory;                         // ROM Carts up to 1MB/8MB (that's pretty huge in the Z80 world!)
 u8 *DISK_Memory;                        // Disk Memory will be 720K to support DSDD disks
 u8 *RAM_Memory;                         // RAM is 256K for the DS-Lite and 512K for the DSi/XL/LL
-u8 SRAM_Memory[0x2000] ALIGN(32) = {0}; // To hold up to 8K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
+u8 SRAM_Memory[0x8000] ALIGN(32) = {0}; // To hold up to 32K of SRAM (FM-PAC, Game Master 2, or special SRAM capable carts)
 u8 *SCC_Memory;                         // Will be set to the last 64K of RAM (anything using SCC+ cart won't need that)
 u8 *BoxArtBuffer = NULL;                // Used to store the Box Art for display (only the DSi allocates memory for this)
 u8 *KanjiFontBuffer = NULL;             // Used to store the 256K Kanji Font data (only the DSi allocates memory for this)

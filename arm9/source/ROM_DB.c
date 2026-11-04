@@ -5827,7 +5827,7 @@ const ROM_DB_t ROM_DB[] =
   {"9af8d1d04aa751328f9e", MIRRORED},
   {"9afcc136d8ab5ef96161", ASC8},
   {"9afd7caf5aecd861ca5c", MIRRORED},
-  {"9afdee40e7b243f99cc5", ASC8SRAM8},
+  {"9afdee40e7b243f99cc5", MSXWRITE2},
   {"9b04d06fa77c4f0757be", ASC16},
   {"9b093878f92ce8b918be", MIRRORED},
   {"9b0da21d8e6e9a762c57", PAGE23},

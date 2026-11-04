@@ -29,7 +29,7 @@
 #pragma GCC optimize ("Os")
 // All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
 
-#define MSX_SAVE_VER   0x0015  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0016  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -46,7 +46,7 @@ struct RomOffset Offsets[8];
 
 #define TYPE_ROM        0   // Cart ROM
 #define TYPE_RAM        1   // Main RAM
-#define TYPE_FDC        2   // Disk ROM
+#define TYPE_DISK       2   // Disk ROM
 #define TYPE_BIOS1      3   // MSX1 BIOS
 #define TYPE_BIOS2      4   // MSX2 BIOS
 #define TYPE_BIOS2P     5   // MSX2+ BIOS
@@ -127,7 +127,7 @@ void msxSaveState(void)
             }
             else if ((shifted_offset >= MSXBios_DISK) && (shifted_offset < MSXBios_DISK+(sizeof(MSXBios_DISK))))
             {
-                Offsets[i].type = TYPE_FDC;
+                Offsets[i].type = TYPE_DISK;
                 Offsets[i].offset = shifted_offset - MSXBios_DISK;
             }
             else if ((shifted_offset >= RAM_Memory) && (shifted_offset < RAM_Memory+(MAX_RAM_SIZE_KB*1024)))
@@ -237,7 +237,7 @@ void msxSaveState(void)
             }
             else if ((MSXRamPtr[i] >= ROM_Memory) && (MSXRamPtr[i] < ROM_Memory+(MAX_CART_SIZE_KB*1024)))
             {
-                Offsets[i].type = TYPE_ROM; // MEGARAM can be stored in ROM
+                Offsets[i].type = TYPE_ROM; // MEGARAM can be stored in ROM Cart 2 area
                 Offsets[i].offset = MSXRamPtr[i] - ROM_Memory;
             }
             else
@@ -333,8 +333,9 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(ascii16xFlashCmdState,  sizeof(ascii16xFlashCmdState),  1, handle);
         if (retVal) retVal = fwrite(ascii16xFlashReadMode,  sizeof(ascii16xFlashReadMode),  1, handle);
         if (retVal) retVal = fwrite(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
-        if (retVal) retVal = fwrite(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);            
-        
+        if (retVal) retVal = fwrite(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);
+        if (retVal) retVal = fwrite(sccFlashCommandState,   sizeof(sccFlashCommandState),   1, handle);
+
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
@@ -346,14 +347,14 @@ void msxSaveState(void)
         // ---------------------------------------------------------------------------------------------------------------
         int max_len = lzav_compress_bound( 0x20000 );
         int comp_len;
-        
+
         for (int i=0; i < (isDSiMode() ? 4:2); i++)
         {
             comp_len = lzav_compress_default( RAM_Memory+(i*0x20000), COMPRESS_BUFFER, 0x20000, max_len );
             if (retVal) retVal = fwrite(&comp_len,           sizeof(comp_len),  1, handle);
             if (retVal) retVal = fwrite(COMPRESS_BUFFER,     comp_len,          1, handle);
         }
-        
+
         // -------------------------------------------------------------------------------------
         // If we are MEGARAM, we have double the RAM but it's sitting out in ROM_Memory[].
         // -------------------------------------------------------------------------------------
@@ -439,7 +440,7 @@ void msxLoadState(void)
                 {
                     MemoryMap[i] = (u8 *) (ROM_Memory + Offsets[i].offset) - (0x2000 * i);
                 }
-                else if (Offsets[i].type == TYPE_FDC)
+                else if (Offsets[i].type == TYPE_DISK)
                 {
                     MemoryMap[i] = (u8 *) (MSXBios_DISK + Offsets[i].offset) - (0x2000 * i);
                 }
@@ -625,8 +626,9 @@ void msxLoadState(void)
             if (retVal) retVal = fread(ascii16xFlashCmdState,  sizeof(ascii16xFlashCmdState),  1, handle);
             if (retVal) retVal = fread(ascii16xFlashReadMode,  sizeof(ascii16xFlashReadMode),  1, handle);
             if (retVal) retVal = fread(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
-            if (retVal) retVal = fread(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);            
-            
+            if (retVal) retVal = fread(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);
+            if (retVal) retVal = fread(sccFlashCommandState,   sizeof(sccFlashCommandState),   1, handle);
+
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
@@ -643,7 +645,7 @@ void msxLoadState(void)
                 if (retVal) retVal = fread(COMPRESS_BUFFER,     comp_len,          1, handle);
                 (void)lzav_decompress( COMPRESS_BUFFER, RAM_Memory + (0x20000 * i), comp_len, 0x20000);
             }
-            
+
             // -------------------------------------------------------------------------------------
             // If we are MEGARAM, we have double the RAM but it's sitting out in ROM_Memory[].
             // -------------------------------------------------------------------------------------
@@ -673,7 +675,7 @@ void msxLoadState(void)
     VPAGE=VDP_Memory+((int)VDP[14]<<14);
     CheckNewMode();     // This will rebuild any lookup tables as needed
     RebuildPalLUT();    // And the screen 5 table needs a rebuild
-    
+
     // If there was a disk inserted, re-insert the same one
     if (MyMedia[MEDIA_DISK].filecrc)
     {

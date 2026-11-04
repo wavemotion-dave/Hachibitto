@@ -189,10 +189,11 @@ extern u8 vdp_type;
 #define RBSC_FLASH      32  // Not one of the general mappers a user can pick
 #define MATRACOMP       33  // Not one of the general mappers a user can pick
 #define MSXDOS2         34  // Not one of the general mappers a user can pick
-#define MEGA_SCC        35  // For our special MEGARAM SCC 'Cart'
-#define FMPAC_SRAM      36  // For our special FM-PAC 'Cart'
-#define SCCPLUS_RAM     37  // For our special SCC+ 'Cart'
-#define END_MAPPERS     38
+#define MSXWRITE2       35  // Not one of the general mappers a user can pick
+#define MEGA_SCC        36  // For our special MEGARAM SCC 'Cart'
+#define FMPAC_SRAM      37  // For our special FM-PAC 'Cart'
+#define SCCPLUS_RAM     38  // For our special SCC+ 'Cart'
+#define END_MAPPERS     39
 
 #define MAX_GUESS_MAPPER 8   // The highest guess we can guess when examining ROM data
 
@@ -203,7 +204,7 @@ extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
 extern u8 *RAM_Memory;
-extern u8 SRAM_Memory[0x2000];
+extern u8 SRAM_Memory[0x8000];
 extern u8 *SCC_Memory;
 extern u8 *KanjiFontBuffer;
 extern u8 Unmapped_Memory[0x2000];
@@ -284,6 +285,7 @@ extern u16 NEO16_bank[3];
 extern u8 ascii16xFlashCmdState[3];
 extern u8 ascii16xFlashReadMode[3];
 extern u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
+extern u8 sccFlashCommandState[2];
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need

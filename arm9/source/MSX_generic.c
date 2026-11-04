@@ -580,7 +580,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
     s16 dwell = 60;
     u8 bShowPreviewSnaps = 1;
     u8 dampen_boxart = 15;
-    
+
     // Show the menu...
     while ((keysCurrent() & (KEY_TOUCH | KEY_START | KEY_SELECT | KEY_A | KEY_B)) != 0)
         ;
@@ -615,7 +615,7 @@ u8 HachibittoChooseFile(u8 media_id, u8 allow_dir_change)
         romSelected = 0;
     }
     dsDisplayFiles(firstRomDisplay, romSelected);
-    
+
     // -----------------------------------------------------
     // Until the user selects a file or exits the menu...
     // -----------------------------------------------------
@@ -1102,17 +1102,17 @@ typedef struct
 static const GameTweak gameTweaks[] =
 {
     // match1,          match2,              expansion,   frameSkip,      maxSprites, machineType,   dpad,               ymScale
-                                                                                                     
-                                                                                                     
+
+
     {"QBIQS",           NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"URIDIUM",         NULL,                TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ANTARCTIC",       "ADVENTURE",         TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ADVENTURES",      "PARK",              TWEAK_NONE,  TWEAK_NONE,     0,          TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-                                                                                                     
-    // SCC+                                                                                          
+
+    // SCC+
     {"SNATCHER",        NULL,                EXP_SCC_PLUS, 0x80|FS_HEAVY, TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-                                                                                                     
-    // MSX-MUSIC                                                                                     
+
+    // MSX-MUSIC
     {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
@@ -1167,20 +1167,20 @@ static const GameTweak gameTweaks[] =
     {"UNDEADLINE",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"XAK",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_LOW},
     {"XEVIOUS",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-                                                                                                     
-    // D-Pad                                                                                         
+
+    // D-Pad
     {"ARKANOID",        NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_ARKANOID,      TWEAK_NONE},
     {"CHUCKIE",         NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_SLIDE_N_GLIDE, TWEAK_NONE},
     {"QBERT",           NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
     {"Q-BERT",          NULL,                TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    DPAD_DIAGONALS,     TWEAK_NONE},
-                                                                                                     
-    // Machine type                                                                                  
+
+    // Machine type
     {"KING",            "BALLOON",           TWEAK_NONE,  TWEAK_NONE,     TWEAK_NONE, MACHINE_MSX1,  TWEAK_NONE,         TWEAK_NONE},
-                                                                                                     
-    // Aggressive frame skip on DS-Lite. V9958 on DSi.                                               
+
+    // Aggressive frame skip on DS-Lite. V9958 on DSi.
     {"MANBOW",          NULL,                TWEAK_NONE,  0x80|FS_HEAVY,  TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-                                                                                                     
-    // Beeper                                                                                        
+
+    // Beeper
     {"WAY",             "TIGER",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"JACK",            "NIPPER",            EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"MASTER",          "LAMPS",             EXP_BEEPER,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1371,11 +1371,11 @@ void SetDefaultGameConfig(void)
     MapPlayer1(); // Default to Player 1 mapping
 
     // ----------------------------------------------------------------
-    // The DS-Lite really doesn't have enough CPU power to handle the 
+    // The DS-Lite really doesn't have enough CPU power to handle the
     // advanced V9958 video chip so we default to MSX2 with V9938.
     // ----------------------------------------------------------------
     u8 defaultMachineType = (isDSiMode() ? MACHINE_MSX2P : MACHINE_MSX2);
-    
+
     myConfig.msxMapper = GUESS;                 // MSX mapper takes its best guess
     myConfig.machineType = defaultMachineType;  // Default machine is MSX2+ for DSi and MSX2 for DS-Lite
     myConfig.autoFire = 0;                      // Default to no auto-fire on either button
@@ -1515,7 +1515,7 @@ const struct options_t Option_Table[2][20] =
         {"FRAMESKIP",       {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                            &myConfig.frameSkip,         3},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
         {"VDP OVERSCAN",    {"OFF", "ENABLED"},                                                                                                                         &myConfig.overscan,          2},
-        {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19",     
+        {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19",
                              "+20", "+21", "+22", "+23", "+24", "+25", "+26", "+27", "+28", "+29", "+30", "+31", "+32"},                                                &myConfig.yOffset,           33},
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
     },
@@ -1664,7 +1664,7 @@ void HachibittoGameOptions(bool bIsGlobal)
             myConfig.yOffset = 0;
             (void)display_options_list(true, optionHighlighted);
         }
-        
+
         // -----------------------------------------------------------------------
         // As we boost the CPU power, we need less scanline refresh to compensate.
         // -----------------------------------------------------------------------
@@ -1685,7 +1685,7 @@ void HachibittoGameOptions(bool bIsGlobal)
                 myConfig.splitRefresh = 0;
                 (void)display_options_list(true, optionHighlighted);
             }
-            
+
             last_cpu_boost = myConfig.cpuBoost;
         }
 
@@ -2037,7 +2037,7 @@ u32 ReadFileCarefully(char *filename, u8 *buf, u32 buf_size, u32 buf_offset, u32
 
         // TODO add a trap for infinite loop - exit with error.
     } while (crc1 != crc2); // If the file couldn't be read, file_size will be 0 and the CRCs will both be 0xFFFFFFFF
-    
+
     // -----------------------------------------------------------------------
     // If we are a .DSK file, we need to use the filename itself as the CRC32
     // or else disks that get re-written will end up with a different CRC32.
@@ -2128,7 +2128,7 @@ void HachibittoMainMenu(void)
 
     // Upper Screen Background
     UpperScreenMainMenu();
-    
+
     // Lower Screen Background
     BottomScreenMainMenu();
 
@@ -2305,7 +2305,7 @@ void HachibittoMainMenu(void)
         ShowRandomPreviewSnaps();
         swiWaitForVBlank();
     }
-    
+
     bMainMenuActive = 0;
 }
 

@@ -203,7 +203,7 @@ __attribute__((noinline)) u8 readport_keyboard(void)
       //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
       //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
       // ----------------------------------------------------------
-      
+
       // ----------------------------------------------------------
       // Keyboard Port (International Layout)
       //  Row   Bit_7 Bit_6 Bit_5 Bit_4 Bit_3 Bit_2 Bit_1 Bit_0
@@ -216,8 +216,8 @@ __attribute__((noinline)) u8 readport_keyboard(void)
       //   6     F3    F2    F1   CODE   CAPS GRAPH  CTRL  SHIFT
       //   7     RET   SEL   BS   STOP   TAB   ESC   F5    F4
       //   8    RIGHT DOWN   UP   LEFT   DEL   INS  HOME  SPACE
-      // ----------------------------------------------------------      
-      
+      // ----------------------------------------------------------
+
 //Row 1: YEN becomes \, ^ becomes [, and the bracket positions change.
 //Row 2: The Japanese ] and : positions become backtick and apostrophe.
 //Row 6: KANA becomes CODE.
@@ -264,7 +264,7 @@ __attribute__((noinline)) u8 readport_keyboard(void)
       for (u8 i=0; i< (kbd_keys_pressed ? kbd_keys_pressed:1); i++) // Always one pass at least for joysticks...
       {
           kbd_key = kbd_keys[i];
-          
+
           // -------------------------------------------------------------------
           // Check if we need to change the key to handle international matrix.
           // -------------------------------------------------------------------
@@ -652,7 +652,7 @@ __attribute__((noinline)) u8 ReadJoystick(void)
 }
 
 // ---------------------------------------------------------------------
-// Pulled out to help with ITCM_CODE space pressure. 
+// Pulled out to help with ITCM_CODE space pressure.
 // This is likely only called once per frame or even less frequently...
 // ---------------------------------------------------------------------
 __attribute__((noinline)) u8 read_joypad_data(void)
@@ -690,11 +690,11 @@ __attribute__((noinline)) uint8_t ReadPort_KanjiDriver(uint8_t port)
     {
         return 0xFF;
     }
-    
-    switch (port) 
+
+    switch (port)
     {
         case 0xD9:
-        case 0xDB: 
+        case 0xDB:
         {
             int lvl = (port == 0xDB);
             u32 a = KanjiAdr[lvl];
@@ -713,7 +713,7 @@ __attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value
     {
         return;
     }
-    switch (port) 
+    switch (port)
     {
         case 0xD8: KanjiAdr[0] = (KanjiAdr[0] & 0x1F800) | ((value & 0x3F) << 5);  break;
         case 0xD9: KanjiAdr[0] = (KanjiAdr[0] & 0x007E0) | ((value & 0x3F) << 11); break;
@@ -726,7 +726,7 @@ __attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
 // --------------------------------------------------------------------
- unsigned char cpu_readport_msx(register u8 Port)
+ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
 {
   //98h~9Bh   Access to the VDP I/O ports.
   if      (Port == 0x98) return RdData9938();               // VDP Data
@@ -1168,7 +1168,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     {
         if (myConfig.machineType == MACHINE_MSX1) msx_slot_map_msx1(Value);
         else msx_slot_map_msx2(Value);
-        
+
         Port_PPI_A = Value;
     }
     else if (Port == 0xA9)  // PPI - Register B
@@ -1263,7 +1263,7 @@ u8 MSX_GuessROMType(u32 size)
 {
     u8 type = KON8;  // Default to Konami 8K mapper
     u32 guess[MAX_GUESS_MAPPER];
-    
+
     // Check filesize... if really large, it can only be ASCII16, ASCII16-X, NEO8 or NEO16
     if (size >= (4096 * 1024))
     {
@@ -1279,7 +1279,7 @@ u8 MSX_GuessROMType(u32 size)
         {
             return NEO16;
         }
-        
+
         // Otherwise, this is about all we can support...
         return ASC16;
     }
@@ -1641,7 +1641,7 @@ void MSX_CartSetup(u8 media_id)
             MSXCartPtr[media_id][6] = (u8*)CART_Memory+0x0000;        // Segment 0 Mirror
             MSXCartPtr[media_id][7] = (u8*)CART_Memory+0x2000;        // Segment 1 Mirror
         }
-        else if ((MyMedia[media_id].mapperType == ASC8) || (MyMedia[media_id].mapperType == ASC8SRAM2) || (MyMedia[media_id].mapperType == ASC8SRAM8))
+        else if ((MyMedia[media_id].mapperType == ASC8) || (MyMedia[media_id].mapperType == ASC8SRAM2) || (MyMedia[media_id].mapperType == ASC8SRAM8) || (MyMedia[media_id].mapperType == MSXWRITE2))
         {
             MSXCartPtr[media_id][0] = (u8*)CART_Memory+0x0000;        // Segment 0 default
             MSXCartPtr[media_id][1] = (u8*)CART_Memory+0x0000;        // Segment 0 default
@@ -2009,7 +2009,7 @@ void MSX_InitialMemoryLayout(void)
     {
         // Clear out the cart space that will house expanded RAM
         memset(ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024), 0x00, ((MAX_CART_SIZE_KB/2) * 1024));
-        
+
         MyMedia[MEDIA_CART2].mapperMask = 0;
         MyMedia[MEDIA_CART2].blockSize = 0x2000;
         MyMedia[MEDIA_CART2].mapperType = MEGA_SCC;
@@ -2228,23 +2228,12 @@ void msxLoadSRAM(void)
     szName[len-1] = 'm';
     szName[len-0] = 0;
 
-    // -----------------------------------------------------------------------
-    // Check if the file exists... if so read it... The KOEISRAM32 mapper has
-    // more SRAM than normal and is stored in the back end of RAM_Memory[]
-    // -----------------------------------------------------------------------
-    if (myConfig.msxMapper == KOEISRAM32)
+    // -------------------------------------------------------------------------
+    // Check if the file exists... if so read it... SRAM can be up to 32K bytes.
+    // -------------------------------------------------------------------------
+    if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0, NULL) == 0)   // SRAM can be anywhere from 2K to 32K
     {
-        if (ReadFileCarefully(szName, KOEI_SRAM_Memory, 0x8000, 0, NULL) == 0)
-        {
-            memset(KOEI_SRAM_Memory, 0xFF, 0x8000); // Not found, so init the SRAM area
-        }        
-    }
-    else // Normal SRAM handling 8K or less
-    {
-        if (ReadFileCarefully(szName, SRAM_Memory, sizeof(SRAM_Memory), 0, NULL) == 0)   // SRAM can be anywhere from 2K to 8K
-        {
-            memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory)); // Not found, so init the SRAM area
-        }
+        memset(SRAM_Memory, 0xFF, sizeof(SRAM_Memory)); // Not found, so init the SRAM area
     }
 }
 
@@ -2276,14 +2265,14 @@ static void MsxMakeFlashFilename(void)
 }
 
 // ---------------------------------------------------------------------------
-// We save off only the modified 8K flash blocks and keep it separate from 
+// We save off only the modified 8K flash blocks and keep it separate from
 // the original .rom file since we don't want to modify or change change the
 // original CRC which has implications for config settings, etc. Plus it just
 // feels cleaner to leave the original ROM as-is with no risk of damaging it.
 // ---------------------------------------------------------------------------
 void MsxSaveFlash(void)
 {
-    MsxMakeFlashFilename();    
+    MsxMakeFlashFilename();
     FILE *handle = fopen(szSaveFlashFile, "wb");
     if (handle != NULL)
     {
@@ -2291,9 +2280,9 @@ void MsxSaveFlash(void)
         // Write the 1024 byte writemap... this tells us what flash blocks were written.
         // -----------------------------------------------------------------------------
         fwrite(flashDirtyBlocks, sizeof(flashDirtyBlocks), 1, handle);
-        
+
         // --------------------------------------------------------------------
-        // And now write out all of the 8K blocks that were erased/written. 
+        // And now write out all of the 8K blocks that were erased/written.
         // Generally not more than 1 or 2 blocks but we allow for any and all.
         // --------------------------------------------------------------------
         for (int i=0; i<1024; i++)
@@ -2317,9 +2306,9 @@ void MsxRestoreFlash(void)
     memset(flashDirtyBlocks, 0x00, sizeof(flashDirtyBlocks));
 
     MsxMakeFlashFilename();
-    
+
     ReadFileCarefully(szSaveFlashFile, flashDirtyBlocks, sizeof(flashDirtyBlocks), 0, 0);
-    
+
     // --------------------------------------------------------------------
     // Read back any modified blocks and put them into the proper place.
     // --------------------------------------------------------------------

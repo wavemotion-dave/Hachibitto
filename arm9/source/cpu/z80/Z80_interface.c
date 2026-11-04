@@ -548,12 +548,13 @@ void __attribute__((noinline)) HandleRType(u8 media_id, u16 address, u8 value)
     }
 }
 
-// ---------------------------------------------
-// Various ASCII mappers with SRAM (2K or 8K)
-// ---------------------------------------------
-#define SRAM_ENABLE_BIT     (MyMedia[media_id].mapperMask+1)      // SRAM Enable is normally the bit right after the rom selection bits...
+// ---------------------------------------------------------------------------------------------
+// Various ASCII mappers with SRAM (2K or 8K). We pass in the bit to enable SRAM as most
+// SRAM carts will use the bit right after the bank selection bits but a few use the high bit.
+// ---------------------------------------------------------------------------------------------
+#define SRAM_ENABLE_BIT     (MyMedia[media_id].mapperMask+1) // SRAM Enable is normally the bit right after the bank selection bits...
 
-void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask)
+void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask, u8 sram_enable_bit)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
     u32 msx_offset = block * MyMedia[media_id].blockSize;
@@ -561,7 +562,7 @@ void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 va
 
     if ((address & 0xF800) == 0x6000) // Bank 1
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM requested? No write support.
+        if (value & sram_enable_bit) // Is SRAM requested? No write support.
         {
             MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000;
         }
@@ -577,7 +578,7 @@ void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 va
     }
     else if ((address & 0xF800) == 0x6800) // Bank 2
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM requested? No write support.
+        if (value & sram_enable_bit) // Is SRAM requested? No write support.
         {
             MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+0x0000;
         }
@@ -593,7 +594,7 @@ void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 va
     }
     else if ((address & 0xF800) == 0x7000) // Bank 3
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM requested?
+        if (value & sram_enable_bit) // Is SRAM requested?
         {
             sram_write_enabled_a = 1; // Allow writing on Bank 3
             MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
@@ -611,7 +612,7 @@ void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 va
     }
     else if ((address & 0xF800) == 0x7800) // Bank 4
     {
-        if (value & SRAM_ENABLE_BIT) // Is SRAM requested?
+        if (value & sram_enable_bit) // Is SRAM requested?
         {
             sram_write_enabled_b = 1;   // Allow writing on Bank 4
             MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000;
@@ -664,16 +665,31 @@ void __attribute__((noinline)) HandleAscii8_SRAM(u8 media_id, u16 address, u8 va
 
 void __attribute__((noinline)) HandleAscii8_SRAM2(u8 media_id, u16 address, u8 value)
 {
-    HandleAscii8_SRAM(media_id, address, value, 0x7FF); // 2K SRAM Mask
+    HandleAscii8_SRAM(media_id, address, value, 0x7FF, SRAM_ENABLE_BIT); // 2K SRAM Mask
 }
 
 void __attribute__((noinline)) HandleAscii8_SRAM8(u8 media_id, u16 address, u8 value)
 {
-    HandleAscii8_SRAM(media_id, address, value, 0x1FFF); // 8K SRAM Mask
+    HandleAscii8_SRAM(media_id, address, value, 0x1FFF, SRAM_ENABLE_BIT); // 8K SRAM Mask
 }
 
+// -------------------------------------------------------------------------------------
+// MSX-WRITE II and Wizardry are ASCII 8 with 8K SRAM using the high bit for enable.
+// -------------------------------------------------------------------------------------
+void __attribute__((noinline)) HandleMSXWrite2(u8 media_id, u16 address, u8 value)
+{
+    HandleAscii8_SRAM(media_id, address, value, 0x1FFF, 0x80); // 8K SRAM Mask, high bit for SRAM
+}
 
-void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask)
+void __attribute__((noinline)) HandleWizardry(u8 media_id, u16 address, u8 value)
+{
+    HandleAscii8_SRAM(media_id, address, value, 0x1FFF, 0x80); // 8K SRAM Mask, high bit for SRAM
+}
+
+// -----------------------------------------
+// ASCII16K Mapper with 2K or 8K of SRAM...
+// -----------------------------------------
+void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 value, u16 SRAM_Mask, u8 sram_enable_bit)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
     u32 msx_offset = block * MyMedia[media_id].blockSize;
@@ -681,7 +697,7 @@ void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 v
     
     if ((address & 0xF800) == 0x6000)
     {
-        if (value &  0x10) // Is SRAM enabled?
+        if (value & sram_enable_bit) // Is SRAM enabled?
         {
             // Read-only access
             MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000;
@@ -698,7 +714,7 @@ void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 v
     }
     else if ((address & 0xF800) == 0x7000)
     {
-        if (value &  0x10) // Is SRAM enabled?
+        if (value & sram_enable_bit) // Is SRAM enabled?
         {
             sram_write_enabled_a = 1;
             MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000;
@@ -741,7 +757,7 @@ void __attribute__((noinline)) HandleAscii16_SRAM(u8 media_id, u16 address, u8 v
 // ----------------------------------------------
 void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 value)
 {
-    HandleAscii16_SRAM(media_id, address, value, 0x7FF); // 2K SRAM
+    HandleAscii16_SRAM(media_id, address, value, 0x7FF, SRAM_ENABLE_BIT); // 2K SRAM
 }
 
 // ------------------------------------------------------------
@@ -749,16 +765,13 @@ void __attribute__((noinline)) HandleAscii16_SRAM2(u8 media_id, u16 address, u8 
 // ------------------------------------------------------------
 void __attribute__((noinline)) HandleAscii16_SRAM8(u8 media_id, u16 address, u8 value)
 {
-    HandleAscii16_SRAM(media_id, address, value, 0x1FFF); // 8K SRAM
+    HandleAscii16_SRAM(media_id, address, value, 0x1FFF, SRAM_ENABLE_BIT); // 8K SRAM
 }
 
 
-// ----------------------------------------------------------------------------------
-// Normally SRAM is 8K or less... for the KOEI games, we allow for a larger SRAM 
-// size of 32K and rather than use up valuable resources in the SRAM_Memory[] array
-// we simply use the last 32K of the RAM_Memory[] as the SRAM since none of the 
-// KOEI games will utilize that area...
-// ----------------------------------------------------------------------------------
+// --------------------------------
+// KOEI games utilize 32K of SRAM 
+// --------------------------------
 void __attribute__((noinline)) HandleKoei_SRAM32K(u8 media_id, u16 address, u8 value)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
@@ -997,7 +1010,7 @@ void __attribute__((noinline)) HandleMegaSCC(u8 media_id, u16 address, u8 value)
 // 4 = erase setup: waiting for AA
 // 5 = erase setup: waiting for 55
 // 6 = waiting for sector erase command (30)
-static u8 sccFlashCommandState[2] = {0};
+u8 sccFlashCommandState[2] = {0};
 
 void __attribute__((noinline)) HandleSCCFlash(u8 media_id, u16 address, u8 value)
 {
@@ -1528,111 +1541,6 @@ void __attribute__((noinline)) HandleSuperLodeRunner(u8 media_id, u16 address, u
     }
 }
 
-// -------------------------------------------------------------------------------------
-// This is really the same as ASCII-8 with 8K of SRAM but it uses bit 7 for SRAM access
-// -------------------------------------------------------------------------------------
-#define SRAM_ENABLE_BIT_WIZARDRY    0x80
-void __attribute__((noinline)) HandleWizardry(u8 media_id, u16 address, u8 value)
-{
-    u32 block = (value & MyMedia[media_id].mapperMask);
-    u32 msx_offset = block * MyMedia[media_id].blockSize;
-    u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
-
-    if ((address & 0xF800) == 0x6000)
-    {
-        if (value & SRAM_ENABLE_BIT_WIZARDRY) // Is SRAM enabled?
-        {
-            // No write support here...
-            MSXCartPtr[media_id][2] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            MSXCartPtr[media_id][2] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][6] = (u8*)src;  // Mirror
-        }
-
-        MemoryMap[2] = MSXCartPtr[media_id][2] - 0x4000;
-        if (bCartInPage[3] == (media_id+1))
-        {
-            MemoryMap[6] = MSXCartPtr[media_id][6] - 0xC000;
-        }
-    }
-    else if ((address & 0xF800) == 0x6800)
-    {
-        if (value & SRAM_ENABLE_BIT_WIZARDRY) // Is SRAM enabled?
-        {
-            // No write support here...
-            MSXCartPtr[media_id][3] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else
-        {
-            MSXCartPtr[media_id][3] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][7] = (u8*)src;  // Mirror
-        }
-
-        MemoryMap[3] = MSXCartPtr[media_id][3] - 0x6000;
-        if (bCartInPage[3] == (media_id+1))
-        {
-            MemoryMap[7] = MSXCartPtr[media_id][7] - 0xE000;
-        }
-    }
-    else if ((address & 0xF800) == 0x7000)
-    {
-        if (value & SRAM_ENABLE_BIT_WIZARDRY) // Is SRAM enabled?
-        {
-            sram_write_enabled_a = 1;
-            MSXCartPtr[media_id][4] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            sram_write_enabled_a = 0;
-            MSXCartPtr[media_id][4] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][0] = (u8*)src;  // Mirror
-        }
-
-        if (bCartInPage[2] == (media_id+1))
-        {
-            MemoryMap[4] = MSXCartPtr[media_id][4] - 0x8000;
-        }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[0] = MSXCartPtr[media_id][0] - 0x0000;
-        }
-    }
-    else if ((address & 0xF800) == 0x7800)
-    {
-        if (value & SRAM_ENABLE_BIT_WIZARDRY) // Is SRAM enabled?
-        {
-            sram_write_enabled_b = 1;
-            MSXCartPtr[media_id][5] = (u8*)SRAM_Memory+0x0000; // Map 8K into 0x8000 view
-        }
-        else // SRAM disabled, normal ROM banking
-        {
-            sram_write_enabled_b = 0;
-            MSXCartPtr[media_id][5] = (u8*)src;  // Main ROM
-            MSXCartPtr[media_id][1] = (u8*)src;  // Mirror
-        }
-
-        if (bCartInPage[2] == (media_id+1))
-        {
-            MemoryMap[5] = MSXCartPtr[media_id][5] - 0xA000;
-        }
-        if (bCartInPage[0] == (media_id+1))
-        {
-            MemoryMap[1] = MSXCartPtr[media_id][1] - 0x2000;
-        }
-    }
-    else if (((address & 0xE000) == 0x8000) && sram_write_enabled_a)
-    {
-        SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 4;
-    }
-    else if (((address & 0xE000) == 0xA000) && sram_write_enabled_b)
-    {
-        SRAM_Memory[(address & 0x1FFF) + 0x0000] = value;
-        sram_show_status = 4;
-    }
-}
 
 // -------------------------------------------------------------------
 // The FM-PAC presents 8K of SRAM for a game to use to save progress.
@@ -1841,6 +1749,7 @@ static MapperWriteHandler const mapperWriteHandlers[END_MAPPERS] __attribute__((
     [RBSC_FLASH]        = HandleSCCFlash,
     [MATRACOMP]         = HandleMatraCompilation,
     [MSXDOS2]           = HandleMSXDOS2,
+    [MSXWRITE2]         = HandleMSXWrite2,
     [ASC16X]            = HandleAscii16X,
     [NEO8]              = HandleNeo8,
     [NEO16]             = HandleNeo16,
