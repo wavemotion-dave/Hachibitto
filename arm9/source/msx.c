@@ -2053,9 +2053,9 @@ void MSX_InitialMemoryLayout(void)
     if (MyMedia[MEDIA_CART2].filecrc && (myConfig.expansion != EXP_SCC_PLUS) && (myConfig.expansion != EXP_FM_PAC) && (myConfig.expansion != EXP_MEGARAM))
     {
         MyMedia[MEDIA_CART2].mapperType = RomDB_Lookup(MEDIA_CART2);
-        if (MyMedia[MEDIA_CART1].mapperType == 0xFF)
+        if (MyMedia[MEDIA_CART2].mapperType == 0xFF)
         {
-            MyMedia[MEDIA_CART1].mapperType = MIRRORED;
+            MyMedia[MEDIA_CART2].mapperType = MIRRORED;
         }
         MSX_CartSetup(MEDIA_CART2);
     }

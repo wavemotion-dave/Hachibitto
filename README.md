@@ -101,6 +101,13 @@ older hardware defaults to MSX2 mode which still lets you run many thousands of 
 to enable some aggressive frameskip to get games running semi-properly.
 
 
+Optional Kanji Data :
+-----------------------
+The MSX2+ Kanji driver is built into the emulation but if you actually want to use anything that has support for the Kanji data, you will need the Kanji Font.
+This file is 256K and in an emulator like OpenMSX, it would be named hb-f1xdj_kanjifont.rom
+Place this file into /roms/bios or into /roms/msx or into /roms so that the emulator can read it. Not having this font data will have almost no impact on your typical game-play enjoyment.
+
+
 Box Artwork :
 -----------------------
 Artwork must be a standard PNG file of 256 pixels wide... and any height up to 512 pixels tall. It looks for artwork in one of 4 places: /roms/art, /roms/msx/art, /data/art or the same directory as the ROM/Game file.
@@ -113,17 +120,11 @@ Pressing the X button will halt the auto-scroll so you can more closely inspect 
 
 If no artwork is found for a game, it shows the legacy loading screen with the preview snaps cycling.
 
-Optional Kanji Data :
------------------------
-The MSX2+ Kanji driver is built into the emulation but if you actually want to use anything that has support for the Kanji data, you will need the Kanji Font.
-This file is 256K and in an emulator like OpenMSX, it would be named hb-f1xdj_kanjifont.rom
-Place this file into /roms/bios or into /roms/msx or into /roms so that the emulator can read it. Not having this font data will have almost no impact on your typical game-play enjoyment.
 
-
-Known Issues :
+Known Issues and Limitations:
 -----------------------
+* V9958 horizontal 'smooth scrolling' is in 2 pixel increments so that the DS can use fast 16-bit VRAM operations. This isn't accurate but it should still look quite smooth to the naked eye.
 * MSX-MUSIC is complicated and consumes quite a bit of the DS CPU horsepower. As such, the Yamaha YM2413 / OPLL implementation is, by necessity, simplified. It only runs full-speed on the DSi or above with the 2X CPU. Do not judge MSX-MUSIC harshly based on this emulator's ability.
-* The DS-Lite/Phat do not have enough CPU horsepower to handle this implementation of MSX-MUSIC so by default the standard PSG (or SCC if the game supports it) will be used instead.
 * Manbow 2 has some minor glitching when using save/continue functionality. Cause unknown. Does not affect gameplay.
 
 The Hachibitto HB-8 Fantasy Console :

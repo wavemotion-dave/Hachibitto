@@ -1115,18 +1115,22 @@ static const GameTweak gameTweaks[] =
     // MSX-MUSIC
     {"ALESTE",          NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ANGELIC",         "WARRIOR",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_MED},
+    {"BLADE",           "LORDS",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_HIGH},
     {"BLASTER",         "BURN",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BOMBER",          "MAN 2",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"BOMBER",          "MAN2",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"BUSHOUHUUNROKU",  NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"DEAD",            "BRAIN",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"EMERALD",         "DRAGON",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"EUROPE",          "WAR",               EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"EXTERLIEN",       NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FAMICLE",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FAMILY",          "STADIUM",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FARDRAUT",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FEEDBACK",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"FINAL",           "FANTASY",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FLEET",           "COMMANDER 2",       EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"FRAY",            NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"G3LEGEND",        NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1135,9 +1139,12 @@ static const GameTweak gameTweaks[] =
     {"GHOSTLY",         "MANOR",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"GOLVELLIUS 2",    NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"GOLVELLIUS II",   NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GORBY",           "PIPELINE",          EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"GRADIUS",         "LEGEND",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"GREEN",           "CRYSTAL",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"HEROES",          "LANCE",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"ILLUSION",        "CITY",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"ININDO",          "NINJA",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"KPI",             "BALL",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"LAYDOCK",         "LAST",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"LILLY",           "SAGA",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
@@ -1165,6 +1172,7 @@ static const GameTweak gameTweaks[] =
     {"TANNH",           "GATE",              EXP_FM_PAC,  FS_LIGHT,       TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"THEXDER",         "HAWK",              EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"UNDEADLINE",      NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"VALIS",           "FANTASM",           EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"XAK",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_LOW},
     {"XEVIOUS",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
 
@@ -1211,7 +1219,7 @@ void ApplyDatabaseTweaks(void)
         {
             if ((t->expansion == EXP_FM_PAC) && !isDSiMode())
             {
-                // No MSX-MUSIC for the DSi... not enough CPU
+                // No MSX-MUSIC for the DSi... not enough CPU power
             }
             else
             {
