@@ -25,6 +25,47 @@ volatile u8 bufferZone1[32] = {0};      // In case we ever index out of bounds (
 u8 XBuf[2][256*224] ALIGN(32) = {0};    // V9938/V9958 screen is 256x224 (for overscan). We double-buffer the output.
 volatile u8 bufferZone2[32] = {0};      // In case we ever index out of bounds (we removed some safety checks to speed it up)
 
+u16 *XBuf16 = (u16*)XBuf;               // Simply reuse the XBuf[] space only we need both 57K chunks for the 16-bit version...
+
+#define FLUSH_ROW_START     128         // On direct renders, flush below 128 scanline so we don't get artifacts on the ASYNC transfer to the DS LCD
+
+// -----------------------------------------------------------------------------------------------
+// 15-bit (RGB15) output for Screen 8 / 10 / 11 / 12. Completely optional and OFF by default.
+// Set myConfig.yjkTrueColor = 1 for the few games that benefit. While it is 1 and the VDP is in Screen 8
+// (VDP15_Active()), every Screen 8/10/11/12 line is drawn into XBuf16[] instead of XBuf[] and the
+// LCD copy must use XBuf16 (256*224 u16 = 114,688 bytes). Every other mode still uses XBuf[] as before.
+// A DS bitmap pixel needs bit 15 set to be visible, so every pixel written here has it set.
+// -----------------------------------------------------------------------------------------------
+u16 XPal16[16]       __attribute__((aligned(4), section(".dtcm"))) = {0};   // Logical VDP color -> RGB15|0x8000 (YAE pixels and sprites)
+u16 XPalReal0_16     __attribute__((section(".dtcm"))) = 0x8000;            // RGB15 twin of XPalReal0
+u16 Grb332ToRgb15[256];                                                     // Screen 8 native color byte -> RGB15|0x8000
+u16 vdp15_pending = 0;                                                      // Full-precision RGB15 color passed from the port 0x9A write to the palette store (0 = none)
+u32 Pal15Epoch = 0;                                                         // Bumped on every palette write (YAE rows depend on the palette) RGB15 handed over by write_port_palette()
+u16 *Spr15Dst = NULL;                                                       // Non-NULL: ColorSpritesScreen8 composites into this RGB15 row
+int  Spr15Shift = 0;                                                        //   ...shifted by this many pixels (R#18)
+
+static u8 Expand3to5[8] __attribute__((aligned(4), section(".dtcm"))) = {0,4,9,13,18,22,27,31};
+static u8 Expand2to5[4] __attribute__((aligned(4), section(".dtcm"))) = {0,10,21,31};
+
+void BuildGrb332LUT(void)
+{
+    for (int i = 0; i < 256; i++)
+    {
+        Grb332ToRgb15[i] = ARGB16(1, Expand3to5[(i >> 2) & 7], Expand3to5[(i >> 5) & 7], Expand2to5[i & 3]);
+    }
+}
+
+// Fill n RGB15 pixels (not inlined, not ITCM - only used by the optional 15-bit path)
+__attribute__((noinline)) static void Fill16(u16 *d, u16 v, int n)
+{
+    if (n <= 0) return;
+    if ((uintptr_t)d & 2) { *d++ = v; n--; }
+    u32 w = (u32)v | ((u32)v << 16);
+    u32 *d32 = (u32 *)d;
+    for (; n >= 2; n -= 2) *d32++ = w;
+    if (n) *(u16 *)d32 = v;
+}
+
 u8 XPal[256]                __attribute__((aligned(4), section(".dtcm"))) = {0};
 u8 XPalReal0                __attribute__((section(".dtcm"))) = 0;   // the genuinely-programmed color for slot 0, independent of TP substitution
 u8 ALatch                   __attribute__((section(".dtcm"))) = 0;
@@ -39,10 +80,11 @@ u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizont
 u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be set to 1 if game tries to bypass the VSYNC
 u8 vdp_type                 __attribute__((section(".dtcm"))) = VDP_9958;
 
-u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
+u8 frame_draw_mask[4][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
                             {1,0,1,0,1,0,1,0,   1,0,1,0,1,0,1,0},  // Light: 50% (every other frame drawn)
-                            {1,0,1,0,0,0,1,0,   0,0,1,0,0,0,1,0}   // Aggressive: 31.2% frames drawn
+                            {1,0,1,0,0,0,1,0,   0,0,1,0,0,0,1,0},  // Heavy: 31.2% frames drawn
+                            {1,0,0,1,0,0,0,0,   0,0,1,0,0,0,0,0}   // Max: 18% frames drawn
                         };
 
 u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
@@ -71,8 +113,7 @@ u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
 u8  OccBuf[320]             __attribute__((section(".dtcm")));
 u16 nibbleLUT16[256]        __attribute__((section(".dtcm")));
 u32 Screen2NibbleMask[16]   __attribute__((section(".dtcm")));
-
-u16 nibbleLUTPal[256] __attribute__((section(".dtcm")));
+u16 nibbleLUTPal[256]       __attribute__((section(".dtcm")));
 
 // Full build: call once after XPal is initialised.
 void RebuildPalLUT(void)
@@ -124,21 +165,31 @@ inline void handle_transparency(void)
         u8 new_bg_color = (!BGColor || (VDP[8] & 0x20)) ? XPalReal0 : XPal[BGColor];
         XPal[0] = new_bg_color;
     }
-    
+
+    // RGB15 twin (only the 15-bit Screen 8/10/11/12 path reads this)
+    XPal16[0] = (!BGColor || (VDP[8] & 0x20)) ? XPalReal0_16 : XPal16[BGColor];
+
     PalLutUpdate(0);
 }
 
 void vdp_9938_write_palette(u8 index, u8 color_grb)
 {
+    // Full 3-3-3 color if write_port_palette() handed one over, otherwise derive it from the GRB332 byte
+    u16 c15 = vdp15_pending ? vdp15_pending : Grb332ToRgb15[color_grb];
+    vdp15_pending = 0;
+    Pal15Epoch++;
+
     if (index == 0)
     {
         XPalReal0 = color_grb;
+        XPalReal0_16 = c15;
         handle_transparency();
     }
     else
     {
         u8 new_color = color_grb ? color_grb : 4;    // Never land back on transparency.  Index 4 is our black.
         XPal[index] = new_color;
+        XPal16[index & 15] = c15;
         PalLutUpdate(index);
     }
 }
@@ -164,6 +215,9 @@ void write_port_palette(uint8_t data)
         // Second Byte: Green (bits 2-0)
         uint8_t index = VDP[16] & 0x0F;
         uint8_t color_grb = ((ALatch & 0x70) >> 2) | ((ALatch>>1) & 3) | ((data & 7) << 5);
+
+        // The real MSX2 palette is 3-3-3 bits. Expand it to 5-5-5 for the 15-bit path.
+        vdp15_pending = ARGB16(1, Expand3to5[(ALatch >> 4) & 7], Expand3to5[data & 7], Expand3to5[ALatch & 7]);
 
         vdp_9938_write_palette(index, color_grb);
 
@@ -1127,6 +1181,18 @@ void ColorSpritesScreen8(uint8_t Y, u8 *ZBuf)
             OrThem>>=1;
         }
 
+    if (Spr15Dst)
+    {
+        // 15-bit path: the YJK background is already RGB15 in Spr15Dst. Write sprite pixels straight in.
+        for (int x = spriteMinX; x < spriteMaxX; x++)
+        {
+            int dx = x + Spr15Shift;     // sprites move with a horizontally adjusted background
+            if (x >= 0 && x < 256 && dx >= 0 && dx < 256 && OccBuf[32 + x] == CurrentEpoch)
+                Spr15Dst[dx] = XPal16[ZBuf[32 + x] & 0x0F];
+        }
+    }
+    else
+    {
     // Screen 8: fixed sprite colors. Screens 10/11/12: sprite colors come from the palette.
     const u8 *lut = (VDP[25] & 0x18) ? XPal : Screen8SpriteByteLUT;
 
@@ -1134,6 +1200,7 @@ void ColorSpritesScreen8(uint8_t Y, u8 *ZBuf)
     {
         if (x >= 0 && x < 256 && OccBuf[32 + x] == CurrentEpoch)
             ZBuf[32 + x] = lut[ZBuf[32 + x]];
+    }
     }
 #undef SPR_SET
 #undef SPR_OR
@@ -1917,6 +1984,7 @@ ITCM_CODE void RefreshLine5(u8 uY)
         }
         else
         {
+
             // Never a direct line, so this always uses the raw LUT.
             u16 *dst16 = (u16*)P;
 
@@ -2033,7 +2101,7 @@ const u8 *HandlePageScrollScreen6(const u8 *src)
 /** RefreshLine6() ******************************************/
 /** Refresh VDP9938 Screen 6: 512x192, 4 colors bitmap     **/
 /************************************************************/
-ITCM_CODE void RefreshLine6(u8 uY)
+void RefreshLine6(u8 uY)
 {
     DEBUG_REFRESH(6);
 
@@ -2700,12 +2768,18 @@ void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
     if (VDP[25] & 0x02)                            // MSK: blank leftmost 8 pixels
         memset(P, BORDER_COLOR_SCREEN8, 8);
 
-    if ((VDP[25] & 0x08) && uY > 128) DC_FlushRange(P, 256);
+    if ((VDP[25] & 0x08) && uY > FLUSH_ROW_START) DC_FlushRange(P, 256);
 }
 
 ITCM_CODE void RefreshLine8(u8 uY)
 {    
     DEBUG_REFRESH(8);
+
+    if (unlikely(myConfig.yjkTrueColor) && (VDP[25] & 0x08))    // Optional 15-bit path for Screen 10/11/12 (see RefreshLine8_15)
+    {
+        RefreshLine8_15(uY);
+        return;
+    }
 
     if (!ScreenON)
     {
@@ -2770,7 +2844,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
                 else
                     Screen12_Line_InPlace(P);  // Pure YJK
 
-                if (uY > 128) DC_FlushRange(P, 256);
+                if (uY > FLUSH_ROW_START) DC_FlushRange(P, 256);
             }
         }   // <-- end of the HScroll8 / normal split
 
@@ -2786,6 +2860,218 @@ ITCM_CODE void RefreshLine8(u8 uY)
             memcpy(dst, src, 256);
         }
     }
+}
+
+/*************************************************************/
+/**               15-bit (RGB15) Screen 8/10/11/12              **/
+/** Everything below is only reached when VDP15_Enabled is set. **/
+/** None of it lives in ITCM.                                    **/
+/*************************************************************/
+
+/** YJK -> RGB15 ********************************************/
+/** The YJK math already yields 5-bit R/G/B so nothing is     **/
+/** lost. yae=1 (Screen 10/11): pixels with bit 3 set are     **/
+/** palette colors (XPal16); the others use YJK.              **/
+/*************************************************************/
+#define YJK15_GROUP(S0, S1, S2, S3, OUT, YAE) do {                                \
+        int K = (((S0) & 7) | (((S1) & 7) << 3));                                 \
+        int J = (((S2) & 7) | (((S3) & 7) << 3));                                 \
+        K = (K ^ 32) - 32;                                                        \
+        J = (J ^ 32) - 32;                                                        \
+        const u8 *rBase = clamp + J + 32;                                         \
+        const u8 *gBase = clamp + K + 32;                                         \
+        int bc = -2 * J - K + 128;                                                \
+        YJK15_PX(S0, 0, OUT, YAE); YJK15_PX(S1, 1, OUT, YAE);                     \
+        YJK15_PX(S2, 2, OUT, YAE); YJK15_PX(S3, 3, OUT, YAE);                     \
+    } while (0)
+
+#define YJK15_PX(S, O, OUT, YAE) do {                                             \
+        int Y = (S) >> 3;                                                         \
+        u16 px = (u16)(rBase[Y] | (gBase[Y] << 5) |                               \
+                       (clamp[(5 * Y + bc) >> 2] << 10) | 0x8000);                \
+        (OUT)[O] = ((YAE) && ((S) & 8)) ? XPal16[(S) >> 4] : px;                  \
+    } while (0)
+
+// 256 already-interleaved raw bytes -> 256 RGB15 (used by the scrolling path)
+static inline __attribute__((always_inline)) void YjkLineToRgb15(const u8 *restrict p, u16 *restrict out, const int yae)
+{
+    const u8 *clamp = yjkClamp;
+    for (int x = 0; x < 256; x += 4, p += 4, out += 4)
+    {
+        int s0 = p[0], s1 = p[1], s2 = p[2], s3 = p[3];
+        YJK15_GROUP(s0, s1, s2, s3, out, yae);
+    }
+}
+
+void Screen10_Line_ToRGB15(const u8 *p, u16 *out) { YjkLineToRgb15(p, out, 1); }   // YJK + YAE
+void Screen12_Line_ToRGB15(const u8 *p, u16 *out) { YjkLineToRgb15(p, out, 0); }   // Pure YJK
+
+// Fused: read the even/odd VRAM banks directly (128 bytes each) and emit 256 RGB15 pixels.
+// Pixel order is e0 o0 e1 o1 | e2 o2 e3 o3 per pair of words - no intermediate 256 byte line.
+static inline __attribute__((always_inline)) void YjkRowFromVram(const u32 *restrict e32, const u32 *restrict o32, u16 *restrict out, const int yae)
+{
+    const u8 *clamp = yjkClamp;
+    for (int i = 0; i < 32; i++, out += 8)
+    {
+        u32 e = e32[i];
+        u32 o = o32[i];
+        int e0 = e & 0xFF, e1 = (e >> 8) & 0xFF, e2 = (e >> 16) & 0xFF, e3 = e >> 24;
+        int o0 = o & 0xFF, o1 = (o >> 8) & 0xFF, o2 = (o >> 16) & 0xFF, o3 = o >> 24;
+        YJK15_GROUP(e0, o0, e1, o1, out,     yae);
+        YJK15_GROUP(e2, o2, e3, o3, out + 4, yae);
+    }
+}
+
+static u16 YjkShift15[256] ALIGN(4);    // converted YJK line waiting to be shifted by R#18
+static u16 YjkLine15[512]  ALIGN(4);    // one converted (unscrolled) YJK line, up to 512 pixels with SP2
+
+// Row cache. For each XBuf16 buffer and row: a signature of the exact source data and VDP state that produced
+// the row (0 = unknown/dirty, e.g. sprites were drawn over it). Static pictures then cost a signature pass
+// instead of a full conversion, and the double buffering is handled by copying the row from the other buffer.
+static u32 Yjk15Sig[2][256];
+
+static u32 Yjk15Signature(const u32 *restrict e32, const u32 *restrict o32, u32 mix)
+{
+    u32 h = mix;
+    for (int i = 0; i < 32; i++)
+    {
+        h = ((h << 5) | (h >> 27)) ^ e32[i];  h *= 0x9E3779B1u;
+        h = ((h << 5) | (h >> 27)) ^ o32[i];  h *= 0x9E3779B1u;
+    }
+    h ^= h >> 16;
+    return h ? h : 1;
+}
+
+// Screen 10/11/12 with horizontal scroll: convert the unscrolled source first (groups of 4 are tied to
+// VRAM, not the screen), then scroll the finished 16-bit pixels into dst16.
+static void RefreshLine8_HScroll15(u32 sourceAddress, u16 *dst16)
+{
+    u32 buf[128] __attribute__((aligned(4)));      // 512 px worst case (SP2)
+
+    u32 sp2 = VDP[25] & 0x01;
+    u32 hs  = (((VDP[26] & 0x3F) << 3) - (VDP[27] & 7)) & (sp2 ? 0x1FF : 0xFF);
+
+    u32 leftAddr = sp2 ? (sourceAddress & 0xFFFF) : sourceAddress;
+    Interleave8LineTo(buf, leftAddr);
+    if (sp2) Interleave8LineTo(buf + 64, leftAddr + 0x10000);
+
+    if (VDP[25] & 0x10)
+    {
+        Screen10_Line_ToRGB15((const u8 *)buf, YjkLine15);
+        if (sp2) Screen10_Line_ToRGB15((const u8 *)(buf + 64), YjkLine15 + 256);
+    }
+    else
+    {
+        Screen12_Line_ToRGB15((const u8 *)buf, YjkLine15);
+        if (sp2) Screen12_Line_ToRGB15((const u8 *)(buf + 64), YjkLine15 + 256);
+    }
+
+    const u32 pmask = sp2 ? 511 : 255;
+    for (u32 k = 0; k < 256; k++)
+        dst16[k] = YjkLine15[(hs + k) & pmask];
+
+    if (VDP[25] & 0x02)                            // MSK: blank leftmost 8 pixels
+        Fill16(dst16, XPal16[0], 8);
+}
+
+/** RefreshLine8_15() ****************************************/
+/** RefreshLine8() for Screen 10/11/12 with RGB15 output into **/
+/** XBuf16[]. Handles sprites, R#18 horizontal adjust,        **/
+/** R#26/27 scroll, SP2 and MSK. Only reached for YJK lines.  **/
+/*************************************************************/
+void RefreshLine8_15(u8 uY)
+{
+    const u32 buf = drawn_frame_number & 1;
+    u16 *dstRow = XBuf16 + ((u16)uY << 8);
+    u32 *sigp = &Yjk15Sig[buf][uY];
+
+    if (!ScreenON)
+    {
+        Fill16(dstRow, XPal16[BGColor], 256);
+        *sigp = 0;
+        return;
+    }
+
+    if (timingFrames & 1)
+    {
+        if (myConfig.frameSkip == 0)
+        {
+            // Same 50% frameskip for Screen 10/11/12 as the 8-bit path.
+            skip_render = 1;
+            *sigp = Yjk15Sig[buf ^ 1][uY];
+            return;
+        }
+    }
+
+    const u8 HasSprites = DoesScreen8LineHaveSprites(uY);
+    const int yae = (VDP[25] & 0x10);
+
+    // R#18 horizontal adjust: build the line in YjkShift15 when it shifts, then slide it into the frame buffer.
+    const int yjkShift = (HAdjust & ~1);
+    u16 *yjkDst = yjkShift ? YjkShift15 : dstRow;
+
+    u32 sourceAddress = (u32)(ChrTab - VDP_Memory) + (((u32)(uY + VScroll) << 8) & ChrTabM & 0xFFFF);
+    if (FlipEvenOdd && OddPage && sourceAddress >= 0x10000)
+        sourceAddress -= 0x10000;
+    sourceAddress &= 0x1FFFF;
+
+    u32 sig = 0;
+
+    if (HScroll8)
+    {
+        RefreshLine8_HScroll15(sourceAddress, yjkDst);
+    }
+    else
+    {
+        u32 bankOffset = (sourceAddress >> 1) & 0xFFFF;
+        const u32 *restrict e32 = (const u32 *)(VDP_Memory + bankOffset);
+        const u32 *restrict o32 = (const u32 *)(VDP_Memory + 0x10000 + bankOffset);
+
+        if (!HasSprites)
+        {
+            u32 mix = ((u32)VDP[25] << 8) ^ ((u32)(yjkShift & 0xFF) << 16) ^ 0x5A5A0000u;
+            if (yae)      mix ^= Pal15Epoch * 0x9E3779B1u;           // Palette pixels depend on the palette
+            if (yjkShift) mix ^= (u32)XPal16[BGColor] * 0x85EBCA6Bu; // ...and so does the border fill
+
+            sig = Yjk15Signature(e32, o32, mix);
+
+            if (*sigp == sig) return;                                // This buffer's row is already exactly right
+
+            if (Yjk15Sig[buf ^ 1][uY] == sig)                        // The other buffer has it: just copy
+            {
+                memcpy(dstRow, XBuf16 + ((u16)uY << 8), 512);
+                *sigp = sig;
+                if (uY > FLUSH_ROW_START) DC_FlushRange(dstRow, 512);
+                return;
+            }
+        }
+
+        if (yae) YjkRowFromVram(e32, o32, yjkDst, 1);   // YJK + YAE
+        else     YjkRowFromVram(e32, o32, yjkDst, 0);   // Pure YJK
+    }
+
+    if (yjkShift > 0)           // Shift right: border on the left
+    {
+        Fill16(dstRow, XPal16[BGColor], yjkShift);
+        memcpy(dstRow + yjkShift, YjkShift15, (256 - yjkShift) * 2);
+    }
+    else if (yjkShift < 0)      // Shift left: border on the right
+    {
+        int n = -yjkShift;
+        memcpy(dstRow, YjkShift15 + n, (256 - n) * 2);
+        Fill16(dstRow + 256 - n, XPal16[BGColor], n);
+    }
+
+    if (HasSprites)
+    {
+        Spr15Dst = dstRow;
+        Spr15Shift = yjkShift;
+        ColorSpritesScreen8(uY, LineScratch + LS_BASE - 32);
+        Spr15Dst = NULL;
+    }
+
+    *sigp = sig;                // 0 (dirty) for sprite and scrolled lines
+    if (uY > FLUSH_ROW_START) DC_FlushRange(dstRow, 512);
 }
 
 /** RefreshLine80_Zoomed() ************************************/
@@ -3085,6 +3371,21 @@ void CheckNewMode(void)
     case 0x07: newMode=8;break;
     case 0x12: newMode=9;break; // Screen 0 with 80 columns... not REALLY screen 9
     default:   newMode=ScrMode;break;
+  }
+
+  if ((ScrMode != 8) && (newMode == 8))
+  {
+      if (myConfig.yjkTrueColor)
+      {
+          setup_emulation_RGB15();
+      }
+  }
+  if ((ScrMode == 8) && (newMode != 8))
+  {
+      if (myConfig.yjkTrueColor)
+      {
+          setup_emulation_BP8();
+      }
   }
 
   ScrMode=newMode;
@@ -3460,7 +3761,7 @@ ITCM_CODE void Loop9938(void)
       // -------------------------------------
       // !!!Into the Vertical Blank!!!
       // -------------------------------------
-      if (frame_draw_mask[myConfig.frameSkip][timingFrames & 0xF])
+      if (!skip_render)
       {
           drawn_frame_number++; // This one is for A/B pixels for the 512px modes... and must track only frames drawn
       }
@@ -3506,6 +3807,8 @@ void Reset9938(void)
 
     BG_PALETTE[4] = RGB15(1,1,1);   // We need a real black... and index 4 was already very close!
 
+    BuildGrb332LUT();               // Needed by the 15-bit path and by compat palette writes
+
     // Set the XPal[] palette index array for Legacy colors
     for (int idx=0; idx<16; idx++)
     {
@@ -3515,11 +3818,16 @@ void Reset9938(void)
 
         u8 byte = (g3 << 5) | (r3 << 2) | b2;
         XPal[idx] = byte ? byte : 4; // Never land back on transparent. Index 4 is our black.
+
+        // 15-bit palette: the full 8-bit 9918 colors reduced to 5-5-5
+        XPal16[idx] = ARGB16(1, VDP9918A_palette[idx*3+0] >> 3, VDP9918A_palette[idx*3+1] >> 3, VDP9918A_palette[idx*3+2] >> 3);
     }
 
     XPal[0] =  XPalReal0 = 0;   // Always transparency to start
+    XPal16[0] = XPalReal0_16 = ARGB16(1,0,0,0);
 
     memset(XBuf,        0x00, sizeof(XBuf));         // Ensure the A:B buffers are clear
+    memset(Yjk15Sig,    0x00, sizeof(Yjk15Sig));     // (and their row cache)
     memset(VDP_Memory,  0x00, sizeof(VDP_Memory));   // Reset Video memory (128K for VDP9938)
     memset(VDP,         0x00, sizeof(VDP));          // Reset the VDP registers for the VDP9938
     memset(VDPStatus,   0x00, sizeof(VDPStatus));    // Reset the VDP Status registers
@@ -3529,7 +3837,7 @@ void Reset9938(void)
     // Set VDP type based on DS machine - we can't handle the faster
     if (myConfig.machineType == MACHINE_MSX2P)
     {
-        vdp_type = VDP_9958;    // MSX2+ uses V9958
+        vdp_type = VDP_9958;    // MSX2+ uses V9958    
     }
     else
     {

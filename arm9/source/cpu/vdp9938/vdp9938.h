@@ -65,6 +65,19 @@ typedef struct {
 } tScrMode;
 
 extern u8 XBuf[2][256*224];
+
+// ---- Optional 15-bit (RGB15) output for Screen 10 / 11 / 12 (YJK) ------------------------------
+// Set VDP15_Enabled = 1 (per game config). When VDP15_Active() is true the frame is in XBuf16[]
+// (256*224 u16, row stride 256 pixels, bit 15 set = opaque) and the LCD must be in a 16-bit bitmap
+// mode copying XBuf16 (bytes = lines * 256 * 2). Otherwise it is in XBuf[] as always.
+extern u16 *XBuf16;
+extern u16 XPal16[16];
+extern u16 Grb332ToRgb15[256];
+extern void BuildGrb332LUT(void);
+extern void RefreshLine8_15(u8 uY);
+extern void Screen10_Line_ToRGB15(const u8 *p, u16 *out);
+extern void Screen12_Line_ToRGB15(const u8 *p, u16 *out);
+#define VDP15_Active()  (myConfig.yjkTrueColor && (ScrMode == 8) && (VDP[25] & 0x08))   // YJK on = Screen 10/11/12
 extern u8 OH;
 extern u8 IH;
 extern u8 *VPAGE;

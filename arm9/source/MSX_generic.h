@@ -85,7 +85,7 @@ struct __attribute__((__packed__)) Config_t
     u8  frameSkip;
     u8  ymScale;
     u8  overscan;
-    u8  reserved1;
+    u8  yjkTrueColor;
     u8  reserved2;
     u8  reserved3;
     u8  reserved4;

@@ -223,6 +223,8 @@ extern u32  GetMasterCRC(void);
 extern char *GetMasterFilename(void);
 extern char *GetMasterPath(void);
 extern void LoadGameIntoMedia(u8 media_id, char *filename);
+extern void setup_emulation_RGB15(void);
+extern void setup_emulation_BP8(void);
 extern void debug_init();
 extern void debug_save();
 extern void debug_printf(const char * str, ...);

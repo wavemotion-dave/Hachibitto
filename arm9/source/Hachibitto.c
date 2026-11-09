@@ -698,6 +698,8 @@ void ResetMSX(void)
     JoyState = 0x00000000;      // Nothing pressed to start
 
     Reset9938(); // Reset the video chip
+    
+    setup_emulation_BP8(); // Put us back to normal 8-bit mode
 
     sound_chip_reset(); // Reset the SN, AY and SCC chips
 
@@ -1674,7 +1676,7 @@ void HachibittoRunEmu(void)
 
     // Force the sound engine to turn on when we start emulation
     bStartSoundEngine = true;
-
+    
     // -------------------------------------------------------------------
     // Stay in this loop running the MSX game until the user exits...
     // -------------------------------------------------------------------
@@ -1769,7 +1771,7 @@ void HachibittoRunEmu(void)
             {
                 if (!zoom_screen)
                 {
-                    zoom_screen = 1;
+                    zoom_screen = 2; // Go right to Zoom mode (can't read it otherwise)
                 }
             }
             else
@@ -1789,7 +1791,7 @@ void HachibittoRunEmu(void)
             if (old_blended != render_blended)
             {
                 old_blended = render_blended;
-                memset(DS_LCD_VRAM_2, 0x00, 64*1024);
+                memset(DS_LCD_VRAM_2, 0x00, 128*1024);
             }
 
             // ---------------------------------------------------------------------------------
@@ -2404,6 +2406,89 @@ void useVRAM(void)
     vramSetBankG(VRAM_G_LCD); // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x06894000 -   ..
     vramSetBankH(VRAM_H_LCD); // Not using this for video but 32K of faster RAM always useful!   Mapped at 0x06898000 -   ..
     vramSetBankI(VRAM_I_LCD); // Not using this for video but 16K of faster RAM always useful!   Mapped at 0x068A0000 -   16K available for general use...
+}
+
+// Call when a game starts (before the first frame is copied).
+void setup_emulation_RGB15(void)
+{
+    swiWaitForVBlank();
+
+    // Bank A: 128K at 0x06000000 holds exactly one RGB15 bitmap (256x256x2) - BG2
+    // Bank B: 128K at 0x06020000 holds exactly one RGB15 bitmap (256x256x2) - BG3
+    vramSetBankA(VRAM_A_MAIN_BG_0x06000000); // Bank A starts at 0x06000000
+    vramSetBankB(VRAM_B_MAIN_BG_0x06020000); // Bank B starts at 0x06020000
+
+    // Mode 5: BG2 and BG3 are extended-rotation bitmap layers that can be 16-bit.
+    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
+
+    // 16-bit bitmap, 256x256, bitmap base at the start of bank A
+    REG_BG2CNT = BG_BMP16_256x256 | BG_BMP_BASE(0) | BG_PRIORITY(0);
+    REG_BG3CNT = BG_BMP16_256x256 | BG_BMP_BASE(8) | BG_PRIORITY(1);
+
+    // Alpha blending configuration
+    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
+
+    // EVA = 8, EVB = 8 (50/50 blend)
+    REG_BLDALPHA = (8) | (8 << 8);
+
+    REG_BG2PA = (1 << 8);
+    REG_BG2PB = 0;
+    REG_BG2PC = 0;
+    REG_BG2PD = (1 << 8);
+    REG_BG2X = 0;
+    REG_BG2Y = 0;
+
+    REG_BG3PA = (1 << 8);
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = (1 << 8);
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
+
+    // Clear old tile/map data out of bank A and B. 
+    dmaFillWords(0, (void *)BG_BMP_RAM(0), 256 * 256 * 2);
+    dmaFillWords(0, (void *)BG_BMP_RAM(8), 256 * 256 * 2);
+}
+
+void setup_emulation_BP8(void)
+{
+    swiWaitForVBlank();
+
+    // -----------------------------------------------------------------
+    // Change graphic mode to initiate emulation.
+    // Here we can claim back 128K of VRAM which is otherwise unused
+    // but we can use it for fast memory swaps and look-up-tables.
+    // -----------------------------------------------------------------
+    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
+    vramSetBankA(VRAM_A_MAIN_BG_0x06000000); // Bank A starts at 0x06000000
+    vramSetBankB(VRAM_B_MAIN_BG_0x06020000); // Bank B starts at 0x06020000
+
+    REG_BG2CNT = BG_BMP8_256x256 | BG_BMP_BASE(0); // Uses Bank A
+    REG_BG3CNT = BG_BMP8_256x256 | BG_BMP_BASE(8); // Uses Bank B
+
+    // Alpha blending configuration
+    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
+
+    // EVA = 8, EVB = 8 (50/50 blend)
+    REG_BLDALPHA = (8) | (8 << 8);
+
+    REG_BG2PA = (1 << 8);
+    REG_BG2PB = 0;
+    REG_BG2PC = 0;
+    REG_BG2PD = (1 << 8);
+    REG_BG2X = 0;
+    REG_BG2Y = 0;
+
+    REG_BG3PA = (1 << 8);
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = (1 << 8);
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
+    
+    // Clear old tile/map data out of bank A and B. 
+    dmaFillWords(0, (void *)BG_BMP_RAM(0), 256 * 256 * 2);
+    dmaFillWords(0, (void *)BG_BMP_RAM(8), 256 * 256 * 2);
 }
 
 void ShowInstructions(void)
@@ -3033,38 +3118,8 @@ void msxInit(void)
 
     // Put up the proper bottom keyboard overlay/graphic
     BottomScreenKeypad();
-
-    // -----------------------------------------------------------------
-    // Change graphic mode to initiate emulation.
-    // Here we can claim back 128K of VRAM which is otherwise unused
-    // but we can use it for fast memory swaps and look-up-tables.
-    // -----------------------------------------------------------------
-    videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
-    vramSetBankA(VRAM_A_MAIN_BG_0x06000000); // Bank A starts at 0x06000000
-    vramSetBankB(VRAM_B_MAIN_BG_0x06020000); // Bank B starts at 0x06020000
-
-    REG_BG2CNT = BG_BMP8_256x256 | BG_BMP_BASE(0); // Uses Bank A
-    REG_BG3CNT = BG_BMP8_256x256 | BG_BMP_BASE(8); // Uses Bank B
-
-    // Alpha blending configuration
-    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
-
-    // EVA = 8, EVB = 8 (50/50 blend)
-    REG_BLDALPHA = (8) | (8 << 8);
-
-    REG_BG2PA = (1 << 8);
-    REG_BG2PB = 0;
-    REG_BG2PC = 0;
-    REG_BG2PD = (1 << 8);
-    REG_BG2X = 0;
-    REG_BG2Y = 0;
-
-    REG_BG3PA = (1 << 8);
-    REG_BG3PB = 0;
-    REG_BG3PC = 0;
-    REG_BG3PD = (1 << 8);
-    REG_BG3X = 0;
-    REG_BG3Y = 0;
+    
+    setup_emulation_BP8();
 
     memset((u8 *)0x06000000, 0x00, 0x40000); // Ensure screen is clear... (LCD_A and LCD_B)
 
@@ -3100,13 +3155,16 @@ void msxUpdateScreen(void)
         // stale enough to be rendered properly. Yes, this means that the output is 1 frame delayed
         // but nobody notices 1/60th of a second and it's all butter smooth to the player.
         // -----------------------------------------------------------------------------------------
-        if (drawn_frame_number & render_blended)
+        u32 *DS_LCD_VRAM = (u32*) DS_LCD_VRAM_1;
+        if (drawn_frame_number & render_blended) DS_LCD_VRAM = (u32*) DS_LCD_VRAM_2; // Blended will alpha blend VRAM_1 +  VRAM_2
+
+        if (VDP15_Active()) // Draw form the one 16-bit buffer
         {
-            dmaCopyWordsAsynch(2, (u32 *)XBuf[(drawn_frame_number + 1) & 1], (u32 *)DS_LCD_VRAM_2, (myConfig.overscan ? (256 * 224) : (256 * 212)));
+            dmaCopyWordsAsynch(2, (u32 *)XBuf16, DS_LCD_VRAM, (myConfig.overscan ? (256 * 224) : (256 * 212)) * 2);
         }
-        else
+        else // Draw from the normal ping-pong output buffer
         {
-            dmaCopyWordsAsynch(2, (u32 *)XBuf[(drawn_frame_number + 1) & 1], (u32 *)DS_LCD_VRAM_1, (myConfig.overscan ? (256 * 224) : (256 * 212)));
+            dmaCopyWordsAsynch(2, (u32 *)XBuf[(drawn_frame_number + 1) & 1], DS_LCD_VRAM, (myConfig.overscan ? (256 * 224) : (256 * 212)));
         }
     }
 

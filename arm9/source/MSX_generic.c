@@ -1399,7 +1399,7 @@ void SetDefaultGameConfig(void)
     myConfig.frameSkip = (isDSiMode() ? 0 : 1); // Frame Skip is disabled on DSi and above
     myConfig.ymScale = YM_BAL_MAX;              // Normal YM is scaled to be the loudest
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
-    myConfig.reserved1 = 0;
+    myConfig.yjkTrueColor = 0;                  // Turn on to enable 32K color depth
     myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;
     myConfig.reserved4 = 0;
@@ -1523,8 +1523,10 @@ const struct options_t Option_Table[2][20] =
         {"FRAMESKIP",       {"NONE", "LIGHT", "AGGRESSIVE"},                                                                                                            &myConfig.frameSkip,         3},
         {"YM BALANCE",      {"LOW", "MEDIUM", "HIGH", "MAX"},                                                                                                           &myConfig.ymScale,           4},
         {"VDP OVERSCAN",    {"OFF", "ENABLED"},                                                                                                                         &myConfig.overscan,          2},
+        {"YJK COLORS",      {"256 (FAST)", "32K (SLOW)"},                                                                                                               &myConfig.yjkTrueColor,      2},
         {"Y OFFSET",        {"None", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10", "+11", "+12", "+13", "+14", "+15", "+16", "+17", "+18", "+19",
                              "+20", "+21", "+22", "+23", "+24", "+25", "+26", "+27", "+28", "+29", "+30", "+31", "+32"},                                                &myConfig.yOffset,           33},
+                                        
         {NULL,              {"", ""},                                                                                                                                   NULL,                        1},
     },
 
