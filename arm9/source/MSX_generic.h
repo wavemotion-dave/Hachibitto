@@ -212,7 +212,7 @@ extern u8 Unmapped_Memory[0x2000];
 #define KOEI_SRAM_Memory (RAM_Memory + (MAX_RAM_SIZE_KB*1024) - (32*1024))
 
 extern const unsigned char MSXBios_MSX2P[0x8000];
-extern const unsigned char MSXBios_EXT2P[0x4000];
+extern const unsigned char MSXBios_SUB2P[0x4000];
 extern const unsigned char MSXBios_MSX1[0x8000];
 extern const unsigned char MSXBios_DISK[0x4000];
 extern const unsigned char MSXBios_FMPAC[0x4000];
@@ -220,7 +220,7 @@ extern const unsigned char MSXBios_KANJI[0x8000];
 extern const unsigned char MSXBios_MSX2[0x8000];
 extern const unsigned char MSXBios_EXT2[0x4000];
 
-extern u8  cold_or_warm_boot;
+extern u8 system_status_f4;
 extern u32 KanjiAdr[2];
 
 typedef struct

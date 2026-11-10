@@ -155,10 +155,10 @@ void msxSaveState(void)
                 Offsets[i].type = TYPE_BIOS1;
                 Offsets[i].offset = shifted_offset - MSXBios_MSX1;
             }
-            else if ((shifted_offset >= MSXBios_EXT2P) && (shifted_offset < MSXBios_EXT2P+(sizeof(MSXBios_EXT2P))))
+            else if ((shifted_offset >= MSXBios_SUB2P) && (shifted_offset < MSXBios_SUB2P+(sizeof(MSXBios_SUB2P))))
             {
                 Offsets[i].type = TYPE_EXT2P;
-                Offsets[i].offset = shifted_offset - MSXBios_EXT2P;
+                Offsets[i].offset = shifted_offset - MSXBios_SUB2P;
             }
             else if ((shifted_offset >= MSXBios_EXT2) && (shifted_offset < MSXBios_EXT2+(sizeof(MSXBios_EXT2))))
             {
@@ -325,7 +325,7 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
         if (retVal) retVal = fwrite(&myPaddle,              sizeof(myPaddle),               1, handle);
         if (retVal) retVal = fwrite(&render_blended,        sizeof(render_blended),         1, handle);
-        if (retVal) retVal = fwrite(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
+        if (retVal) retVal = fwrite(&system_status_f4,      sizeof(system_status_f4),       1, handle);
         if (retVal) retVal = fwrite(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
         if (retVal) retVal = fwrite(&vdp_type,              sizeof(vdp_type),               1, handle);
         if (retVal) retVal = fwrite(NEO8_bank,              sizeof(NEO8_bank),              1, handle);
@@ -466,7 +466,7 @@ void msxLoadState(void)
                 }
                 else if (Offsets[i].type == TYPE_EXT2P)
                 {
-                    MemoryMap[i] = (u8 *) (MSXBios_EXT2P + Offsets[i].offset) - (0x2000 * i);
+                    MemoryMap[i] = (u8 *) (MSXBios_SUB2P + Offsets[i].offset) - (0x2000 * i);
                 }
                 else if (Offsets[i].type == TYPE_EXT2)
                 {
@@ -618,7 +618,7 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&msx_kana_lock,         sizeof(msx_kana_lock),          1, handle);
             if (retVal) retVal = fread(&myPaddle,              sizeof(myPaddle),               1, handle);
             if (retVal) retVal = fread(&render_blended,        sizeof(render_blended),         1, handle);
-            if (retVal) retVal = fread(&cold_or_warm_boot,     sizeof(cold_or_warm_boot),      1, handle);
+            if (retVal) retVal = fread(&system_status_f4,      sizeof(system_status_f4),       1, handle);
             if (retVal) retVal = fread(KanjiAdr,               sizeof(KanjiAdr),               1, handle);
             if (retVal) retVal = fread(&vdp_type,              sizeof(vdp_type),               1, handle);
             if (retVal) retVal = fread(NEO8_bank,              sizeof(NEO8_bank),              1, handle);

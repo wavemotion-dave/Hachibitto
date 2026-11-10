@@ -58,7 +58,7 @@ u16 msx_init            = 0x4000;
 u16 msx_basic           = 0x0000;
 
 u8 mirror_ram_bank[4]   = {3,2,1,0}; // For port readback mostly... though not all MSX2 machines report it back.
-u8 cold_or_warm_boot    = 0x00;      // After boot, this will be 0x80 so system can warm-boot
+u8 system_status_f4     = 0x00;      // After boot, this will be 0x80 so system can warm-boot
 u32 KanjiAdr[2]         = {0,0};     // [0]=level 1, [1]=level 2 (17-bit byte offset)
 
 u8 Unmapped_Memory[0x2000];          // Full of 0xFF values. We point all memory segments here that are not mapped to some other device.
@@ -767,7 +767,7 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   }
   else if (Port == 0xF4) // Boot register... force cold boot
   {
-      return cold_or_warm_boot;
+      return system_status_f4;
   }
   else if (Port == 0xF5)
   {
@@ -967,8 +967,8 @@ void msx_slot_map_msx2(unsigned char Value)
             {
                 if (myConfig.machineType == MACHINE_MSX2P)
                 {
-                    MemoryMap[0] = (u8 *)MSXBios_EXT2P+0x0000 - 0x0000;
-                    MemoryMap[1] = (u8 *)MSXBios_EXT2P+0x2000 - 0x2000;
+                    MemoryMap[0] = (u8 *)MSXBios_SUB2P+0x0000 - 0x0000;
+                    MemoryMap[1] = (u8 *)MSXBios_SUB2P+0x2000 - 0x2000;
                 }
                 else
                 {
@@ -1247,7 +1247,7 @@ ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
     }
     else if (Port == 0xF4) // System boot status
     {
-        cold_or_warm_boot = Value;
+        system_status_f4 = Value;
     }
     else // Unhandled port write...
     {
@@ -2154,7 +2154,7 @@ void msx_reset(void)
 {
     msx_init = 0x4000;
     msx_basic = 0x0000;
-    cold_or_warm_boot = 0x00;
+    system_status_f4 = 0x00;
 
     MSX_InitialMemoryLayout();
 
