@@ -29,7 +29,7 @@
 #pragma GCC optimize ("Os")
 // All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
 
-#define MSX_SAVE_VER   0x0016  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0017  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -335,7 +335,11 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
         if (retVal) retVal = fwrite(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);
         if (retVal) retVal = fwrite(sccFlashCommandState,   sizeof(sccFlashCommandState),   1, handle);
-
+        if (retVal) retVal = fwrite(XPal16,                 sizeof(XPal16),                 1, handle);
+        if (retVal) retVal = fwrite(&XPalReal0_16,          sizeof(XPalReal0_16),           1, handle);
+        if (retVal) retVal = fwrite(&vdp15_pending,         sizeof(vdp15_pending),          1, handle);
+        if (retVal) retVal = fwrite(&Pal15Epoch,            sizeof(Pal15Epoch),             1, handle);
+        
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
@@ -628,6 +632,10 @@ void msxLoadState(void)
             if (retVal) retVal = fread(ascii16xCfiBackup,      sizeof(ascii16xCfiBackup),      1, handle);
             if (retVal) retVal = fread(flashDirtyBlocks,       sizeof(flashDirtyBlocks),       1, handle);
             if (retVal) retVal = fread(sccFlashCommandState,   sizeof(sccFlashCommandState),   1, handle);
+            if (retVal) retVal = fread(XPal16,                 sizeof(XPal16),                 1, handle);
+            if (retVal) retVal = fread(&XPalReal0_16,          sizeof(XPalReal0_16),           1, handle);
+            if (retVal) retVal = fread(&vdp15_pending,         sizeof(vdp15_pending),          1, handle);
+            if (retVal) retVal = fread(&Pal15Epoch,            sizeof(Pal15Epoch),             1, handle);
 
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);

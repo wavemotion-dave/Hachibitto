@@ -712,6 +712,7 @@ void ResetMSX(void)
     msx_kana_lock = 0; // MSX KANA lock off
 
     zoom_screen = 0; // Assume no zoom to start
+    screenPanX = 0;  // And no offset applied
     
     old_blended = 99; // Ensure we clear VRAM_B
 
@@ -2412,6 +2413,8 @@ void useVRAM(void)
 void setup_emulation_RGB15(void)
 {
     swiWaitForVBlank();
+    
+    memset(XBuf, 0x00, sizeof(XBuf));
 
     // Bank A: 128K at 0x06000000 holds exactly one RGB15 bitmap (256x256x2) - BG2
     // Bank B: 128K at 0x06020000 holds exactly one RGB15 bitmap (256x256x2) - BG3
@@ -2453,6 +2456,8 @@ void setup_emulation_RGB15(void)
 void setup_emulation_BP8(void)
 {
     swiWaitForVBlank();
+    
+    memset(XBuf, 0x00, sizeof(XBuf));
 
     // -----------------------------------------------------------------
     // Change graphic mode to initiate emulation.

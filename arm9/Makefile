@@ -174,7 +174,7 @@ pdev_tbg0.s pdev_tbg0.h : pdev_tbg0.png
 instructions.s instructions.h : instructions.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
   
-loading.s loadingnstructions.h : loading.png
+loading.s loading.h : loading.png
 	grit $^ -o $@  -gt -mrt -mR8 -mLs -gzl -mzl
 
 -include $(DEPENDS)

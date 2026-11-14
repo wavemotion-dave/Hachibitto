@@ -1284,6 +1284,9 @@ void ApplyDatabaseTweaks(void)
         dix_patch = 1;
     }
 
+    // ----------------------------------------------------------
+    // A few overscan games...
+    // ----------------------------------------------------------
     if (strstr(filename, "FIX") && strstr(filename, "FELIX"))
     {
         myConfig.overscan = 1;
@@ -1300,6 +1303,9 @@ void ApplyDatabaseTweaks(void)
         myConfig.overscan = 1;
     }
 
+    // ----------------------------------------------------------
+    // And some odd-balls... At least for the games tested...
+    // ----------------------------------------------------------
     if (strstr(filename, "MAIDEN") && strstr(filename, "FIST"))
     {
         myConfig.cpuBoost = 1;      // For some reason Maiden's Fist homebrew needs a bit more speed to detect right
@@ -1310,6 +1316,11 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.cpuBoost = 1;      // For a bit more speed!
         myConfig.splitRefresh = 1;  // And adjust the split refresh to be safe
+    }
+    
+    if (strstr(filename, "MEGADOOM"))
+    {
+        myConfig.yjkTrueColor = 0;  // MEGADOOM does some crazy stuff with the screen that causes problems with 8-bit vs 16-bit color switches... so just stay 8-bit
     }
 }
 
@@ -1399,7 +1410,7 @@ void SetDefaultGameConfig(void)
     myConfig.frameSkip = (isDSiMode() ? 0 : 1); // Frame Skip is disabled on DSi and above
     myConfig.ymScale = YM_BAL_MAX;              // Normal YM is scaled to be the loudest
     myConfig.overscan = 0;                      // VDP Overscan disabled until specifically enabled
-    myConfig.yjkTrueColor = 0;                  // Turn on to enable 32K color depth
+    myConfig.yjkTrueColor = 1;                  // 1=Enable 32K color depth, 0=256 color decimation (faster)
     myConfig.reserved2 = 0;
     myConfig.reserved3 = 0;
     myConfig.reserved4 = 0;
