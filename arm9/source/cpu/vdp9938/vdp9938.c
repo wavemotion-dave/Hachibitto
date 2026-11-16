@@ -2970,10 +2970,9 @@ void Screen12_Line_ToRGB15(const u32 *p, u16 *out) { YjkLineToRgb15(p, out, 0); 
 static u16 YjkShift15[256] ALIGN(4);    // converted YJK line waiting to be shifted by R#18
 static u16 YjkLine15[512]  ALIGN(4);    // one converted (unscrolled) YJK line, up to 512 pixels with SP2
 
-// Row cache. For each XBuf16 buffer and row: a signature of the exact source data and VDP state that produced
-// the row (0 = unknown/dirty, e.g. sprites were drawn over it). Static pictures then cost a signature pass
-// instead of a full conversion, and the double buffering is handled by copying the row from the other buffer.
-static u32 Yjk15Sig[2][256];
+// Row cache. For each XBuf16 row: a signature of the exact source data and VDP state that produced the row is kept.
+// (0 = unknown/dirty, e.g. sprites were drawn over it). Static pictures cost a signature pass instead of a full conversion.
+static u32 Yjk15Sig[256];
 
 // Background cache for rows that get sprites drawn over them. Sprites leave a dirty span in the row, but the rest
 // of it is still pristine background. If the background signature is unchanged, only that span (in 8-pixel
@@ -3042,9 +3041,8 @@ static void RefreshLine8_HScroll15(u32 sourceAddress, u16 *dst16)
 /*************************************************************/
 void RefreshLine8_15(u8 uY)
 {
-    const u32 buf = drawn_frame_number & 1;
     u16 *dstRow = XBuf16 + ((u16)uY << 8);
-    u32 *sigp = &Yjk15Sig[buf][uY];
+    u32 *sigp = &Yjk15Sig[uY];
 
     if (!ScreenON)
     {
@@ -3060,7 +3058,6 @@ void RefreshLine8_15(u8 uY)
         {
             // Same 50% frameskip for Screen 10/11/12 as the 8-bit path.
             skip_render = 1;
-            *sigp = Yjk15Sig[buf ^ 1][uY];
             return;
         }
     }
@@ -3113,15 +3110,6 @@ void RefreshLine8_15(u8 uY)
                 if (!yjkShift) { Yjk15BgSig[uY] = sig; Yjk15DirtyL[uY] = Yjk15DirtyR[uY] = 0; }
                 return;
             }
-
-            if (Yjk15Sig[buf ^ 1][uY] == sig)                        // The other buffer has it: just copy
-            {
-                memcpy(dstRow, XBuf16 + ((u16)uY << 8), 512);
-                *sigp = sig;
-                if (!yjkShift) { Yjk15BgSig[uY] = sig; Yjk15DirtyL[uY] = Yjk15DirtyR[uY] = 0; }
-                if (uY > FLUSH_ROW_START) DC_FlushRange(dstRow, 512);
-                return;
-            }
         }
 
         if (!yjkShift && Yjk15BgSig[uY] == bgsig)
@@ -3167,14 +3155,13 @@ void RefreshLine8_15(u8 uY)
 
         if (Spr15MinX < Spr15MaxX) { dl = Spr15MinX >> 3; dr = (Spr15MaxX + 7) >> 3; }   // dirty span in 8-pixel words
         sig = 0;                                    // Never reusable as a finished row...
-        Yjk15Sig[buf ^ 1][uY] = 0;                  // ...in either buffer (XBuf16 is really one buffer)
     }
 
     Yjk15BgSig[uY] = bgOut;
     Yjk15DirtyL[uY] = dl;
     Yjk15DirtyR[uY] = dr;
 
-    *sigp = sig;                // 0 (dirty) for sprite and scrolled lines
+    *sigp = sig;                    // 0 (dirty) for sprite and scrolled lines
     if (uY > FLUSH_ROW_START) DC_FlushRange(dstRow, 512);
 }
 

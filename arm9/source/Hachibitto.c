@@ -694,6 +694,20 @@ void dsInstallSoundEmuFIFO(void)
     bStartSoundEngine = true; // Volume will 'unpause' after 1 frame in the main loop.
 }
 
+
+//*****************************************************************************
+// Clear all of the thigns that can show something on the Keyboard overlay.
+//*****************************************************************************
+void ClearDisplayStatus(void)
+{
+    sram_show_status = 0;
+    flash_show_status = 0;
+    io_show_status = 0;
+    msx_scc_capable_game = 0;
+    msx_music_capable_game = 0;
+}
+
+
 //*****************************************************************************
 // Reset the MSX - mostly CPU and memory plus some timer vars for housekeeping.
 //*****************************************************************************
@@ -742,9 +756,8 @@ void ResetMSX(void)
     TIMER2_CR = TIMER_ENABLE | TIMER_DIV_1024;
     timingFrames = 0;
     skip_render = 0;
-    io_show_status = 0;
-    sram_show_status = 0;
-    flash_show_status = 0;
+    
+    ClearDisplayStatus();
     render_blended = 0;
 }
 
@@ -2772,6 +2785,7 @@ void HachibittoInitCPU(void)
     // -----------------------------------------------
     // Init bottom screen do display correct overlay
     // -----------------------------------------------
+    ClearDisplayStatus();
     BottomScreenKeypad();
 
     // -----------------------------------------------------
@@ -3182,12 +3196,10 @@ void msxUpdateScreen(void)
 
         if (VDP15_Active()) // Draw form the one 16-bit buffer
         {
-            debug[10]++;
             dmaCopyWordsAsynch(2, (u32 *)XBuf16, DS_LCD_VRAM, (myConfig.overscan ? (256 * 224) : (256 * 212)) * 2);
         }
         else // Draw from the normal ping-pong output buffer
         {
-            debug[11]++;
             dmaCopyWordsAsynch(2, (u32 *)XBuf[(drawn_frame_number + 1) & 1], DS_LCD_VRAM, (myConfig.overscan ? (256 * 224) : (256 * 212)));
         }
     }

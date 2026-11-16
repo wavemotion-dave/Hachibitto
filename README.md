@@ -139,6 +139,11 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 2.0 - 17-Nov-2026 by wavemotion-dave
+* New YJK (Screen 10-12) "true-color" mode added. We use the DS 15-bit RGB to get very close to the real colors now.
+* AY driver reworked to bias silence at 0 to provide improved mixing with YM (MSX-MUSIC) and SCC. Sound quality overall better.
+* Small fixes and improvements as time permitted.
+
 Version 1.9 - 05-Nov-2026 by wavemotion-dave
 * Three separate MSX machines now emulated. MSX2+, MSX2 and MSX.
 * Maiden's Extreme Fist now shows English text properly.

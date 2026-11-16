@@ -1122,7 +1122,7 @@ static const GameTweak gameTweaks[] =
     {"BUSHOUHUUNROKU",  NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"CRIMSON",         NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"DEAD",            "BRAIN",             EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
-    {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
+    {"DIX",             NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         YM_BAL_HIGH},
     {"EMERALD",         "DRAGON",            EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"EUROPE",          "WAR",               EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
     {"EXTERLIEN",       NULL,                EXP_FM_PAC,  TWEAK_NONE,     TWEAK_NONE, TWEAK_NONE,    TWEAK_NONE,         TWEAK_NONE},
