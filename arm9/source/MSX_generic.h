@@ -286,6 +286,7 @@ extern u8 ascii16xFlashCmdState[3];
 extern u8 ascii16xFlashReadMode[3];
 extern u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
 extern u8 sccFlashCommandState[2];
+extern u8 last_emulation_mode;
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need

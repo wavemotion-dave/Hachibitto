@@ -2774,7 +2774,7 @@ void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
     if ((VDP[25] & 0x08) && uY > FLUSH_ROW_START) DC_FlushRange(P, 256);
 }
 
-ITCM_CODE void RefreshLine8(u8 uY)
+ void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
 
@@ -2802,6 +2802,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
                 return;
             }
         }
+        
 
         u8 HasSprites = DoesScreen8LineHaveSprites(uY); // Sprite rendering on Screen 8 is expensive...
         if (HAdjust) HasSprites = 1;                    // Any horizontal adjust and we must do the expensive processing
@@ -2809,7 +2810,7 @@ ITCM_CODE void RefreshLine8(u8 uY)
         uint8_t *P;
         if (!HasSprites) P = (u8 *)(XBuf[drawn_frame_number&1] + ((u16)uY << 8));
         else P = RefreshBorder(uY);
-
+        
         u32 sourceAddress = (u32)(ChrTab - VDP_Memory) + (((u32)(uY + VScroll) << 8) & ChrTabM & 0xFFFF);
         if (FlipEvenOdd && OddPage && sourceAddress >= 0x10000)
             sourceAddress -= 0x10000;
@@ -3478,22 +3479,17 @@ void CheckNewMode(void)
     default:   newMode=ScrMode;break;
   }
 
-  if ((ScrMode != 8) && (newMode == 8))
-  {
-      if (myConfig.yjkTrueColor)
-      {
-          setup_emulation_RGB15();
-      }
-  }
-  if ((ScrMode == 8) && (newMode != 8))
-  {
-      if (myConfig.yjkTrueColor)
-      {
-          setup_emulation_BP8();
-      }
-  }
-
   ScrMode=newMode;
+  
+  // See if we should be using 15-bit color (for YJK modes) or 8-bit color
+  if (VDP15_Active())
+  {
+      setup_emulation_RGB15();
+  }
+  else
+  {
+      setup_emulation_BP8();
+  }  
 
   RefreshLine = SCR[ScrMode].Refresh;
   OH = SprHeights[VDP[1]&0x03];
@@ -3600,7 +3596,7 @@ ITCM_CODE void Write9938(u8 iReg, u8 value)
   // ---------------------------------------------------------------------------------------
   // If any of the base registers change... check for new mode and recompute VRAM pointers.
   // ---------------------------------------------------------------------------------------
-  if (iReg <= 11) CheckNewMode();
+  if (iReg <= 11 || iReg == 25) CheckNewMode();
 }
 
 

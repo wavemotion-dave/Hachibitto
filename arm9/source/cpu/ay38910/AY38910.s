@@ -5,6 +5,8 @@
 ;@  Created by Fredrik Ahlström on 2006-03-07.
 ;@  Copyright © 2006-2026 Fredrik Ahlström. All rights reserved.
 ;@
+;@  wavemotion-dave switched from -32K=Silence to 0=Silence to better mix with SCC and MSX-MUSIC
+;@
 #ifdef __arm__
 
 #include "AY38910.i"
@@ -115,8 +117,7 @@ innerMixLoop:
 	adds r0,r0,#0x100000000>>USHIFT
 	bcc innerMixLoop
 #endif
-	mov lr,r10,lsr#AYFILTER+USHIFT
-	eor lr,lr,#0x8000
+	mov lr,r10,lsr#AYFILTER+USHIFT+1
 	subs r0,r0,#1
 	strhpl lr,[r1],#2
 	bhi mixLoop

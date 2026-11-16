@@ -1079,7 +1079,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
         chip->outputFilterState = sample;
 
         /* Mix one synthesized sample into the existing output buffer. */
-        s32 mixed = ((s32)dest[i] + 32768) + sample;
+        s32 mixed = ((s32)dest[i]) + sample;
 
         // Clamp final mixed result...
         if (mixed > 32767) mixed = 32767;

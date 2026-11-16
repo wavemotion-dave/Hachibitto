@@ -681,6 +681,7 @@ void msxLoadState(void)
 
     // Recalculate a few things on the VDP side...
     VPAGE=VDP_Memory+((int)VDP[14]<<14);
+    last_emulation_mode = 99;
     CheckNewMode();     // This will rebuild any lookup tables as needed
     RebuildPalLUT();    // And the screen 5 table needs a rebuild
 
