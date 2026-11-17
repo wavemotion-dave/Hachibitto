@@ -782,6 +782,32 @@ ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
   return(NORAM);
 }
 
+u8  SpecialPage[256] __attribute__((section(".dtcm"), aligned(4))) = {0};
+u32 specialKey = 0xFFFFFFFF;    // set to 0xFFFFFFFF on reset / game load to force a rebuild
+
+void UpdateSpecialPages(void)
+{
+    const u32 m = special_memory_access;
+
+    // Only the inputs that affect READS go into the key (SUPERLR is write-only)
+    u32 key = (m & (SPEC_MEM_SUBSLOT_ACTIVE | SPEC_MEM_SCC_ENABLED |
+                    SPEC_MEM_SCC_PLUS_ENABLED | SPEC_MEM_DISK_CONTROLLER))
+            | (bCartInPage[2] ? 0x100 : 0);
+    if (key == specialKey) return;
+    specialKey = key;
+
+    const u32 inPage2 = bCartInPage[2];
+    u32 scc     = ((m & SPEC_MEM_SCC_ENABLED)      && inPage2) ? 0x01010101 : 0;
+    u32 sccPlus = ((m & SPEC_MEM_SCC_PLUS_ENABLED) && inPage2) ? 0x01010101 : 0;
+
+    u32 *p = (u32*)SpecialPage;
+    p[0x98 >> 2] = scc;      p[(0x98 >> 2) + 1] = scc;        // 9800-9FFF
+    p[0xB8 >> 2] = sccPlus;  p[(0xB8 >> 2) + 1] = sccPlus;    // B800-BFFF
+
+    SpecialPage[0x7F] = (m & SPEC_MEM_DISK_CONTROLLER)  ? 1 : 0;   // 7F00-7FFF
+    SpecialPage[0xFF] = (m & SPEC_MEM_SUBSLOT_ACTIVE)   ? 1 : 0;   // FF00-FFFF
+}
+
 //------------------------------------------------------------------------------
 // Generic Japanese MSX1 with Cart in Slot 1 and 64K RAM in Slot 2
 //------------------------------------------------------------------------------
@@ -916,6 +942,8 @@ void msx_slot_map_msx1(unsigned char Value)
             MemoryMap[7] = (u8 *)(MSXCartPtr[MEDIA_CART2][7]) - 0xE000;
             break;
     }
+    
+    UpdateSpecialPages();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1131,6 +1159,8 @@ void msx_slot_map_msx2(unsigned char Value)
             }
             break;
     }
+    
+    UpdateSpecialPages();
 }
 
 

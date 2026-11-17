@@ -931,10 +931,12 @@ void __attribute__((noinline)) HandleKonamiSCC8(u8 media_id, u16 address, u8 val
                     msx_scc_capable_game = true;                 // SCC sound - set a flag so we process this special sound chip for this game
                     bClickRemoveNeeded = 1;
                 }
+                UpdateSpecialPages();
             }
             else
             {
                 special_memory_access &= ~SPEC_MEM_SCC_ENABLED; // SCC Registers are no longer "in view"
+                UpdateSpecialPages();
             }
 
             MSXCartPtr[media_id][4] = (u8*)src;  // Main ROM
@@ -988,10 +990,12 @@ void __attribute__((noinline)) HandleMegaSCC(u8 media_id, u16 address, u8 value)
                     msx_scc_capable_game = true;                // SCC sound - set a flag so we process this special sound chip for this game
                     bClickRemoveNeeded = 1;
                 }
+                UpdateSpecialPages();
             }
             else
             {
                 special_memory_access &= ~SPEC_MEM_SCC_ENABLED; // SCC Registers are no longer "in view"
+                UpdateSpecialPages();
             }
         }
     }
@@ -1176,10 +1180,12 @@ void __attribute__((noinline)) HandleSCCFlash(u8 media_id, u16 address, u8 value
                     msx_scc_capable_game = true;
                     bClickRemoveNeeded = 1;
                 }
+                UpdateSpecialPages();
             }
             else
             {
                 special_memory_access &= ~SPEC_MEM_SCC_ENABLED;
+                UpdateSpecialPages();
             }
 
             MSXCartPtr[media_id][4] = (u8*)src;
@@ -1646,11 +1652,13 @@ void __attribute__((noinline)) HandleSCCPlusModeRegister(u8 value)
     {
         special_memory_access &= ~SPEC_MEM_SCC_ENABLED;
         special_memory_access |= SPEC_MEM_SCC_PLUS_ENABLED;
+        UpdateSpecialPages();
     }
     else // Normal SCC
     {
         special_memory_access &= ~SPEC_MEM_SCC_PLUS_ENABLED;
         special_memory_access |= SPEC_MEM_SCC_ENABLED;
+        UpdateSpecialPages();
     }
 
     if (special_memory_access & (SPEC_MEM_SCC_ENABLED | SPEC_MEM_SCC_PLUS_ENABLED))

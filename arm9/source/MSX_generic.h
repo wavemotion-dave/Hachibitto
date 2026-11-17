@@ -338,5 +338,6 @@ extern void update_arkanoid_paddle_position(u8 clockwise, u8 speed);
 extern void ayPortBOutHandler(u8 value);
 extern void MsxSaveFlash(void);
 extern void MsxRestoreFlash(void);
+extern void UpdateSpecialPages();
 
 #endif

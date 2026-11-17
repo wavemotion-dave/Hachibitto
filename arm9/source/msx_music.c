@@ -911,10 +911,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             /* Bass Drum */
             if (bd->osc.gain != 0)
             {
-                YM_UpdateGain(
-                    &bd->osc,
-                    0,
-                    YM_PERCUSSION_RELEASE_STEP);
+                YM_UpdateGain(&bd->osc, 0, YM_PERCUSSION_RELEASE_STEP);
 
                 if (bd->osc.gain != 0)
                 {
@@ -933,10 +930,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
             /* Tom-Tom */
             if (tt->osc.gain != 0)
             {
-                YM_UpdateGain(
-                    &tt->osc,
-                    0,
-                    YM_PERCUSSION_RELEASE_STEP);
+                YM_UpdateGain( &tt->osc, 0, YM_PERCUSSION_RELEASE_STEP);
 
                 if (tt->osc.gain != 0)
                 {
@@ -988,10 +982,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Hi-Hat */
                 if (hs->osc.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &hs->osc,
-                        0,
-                        YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&hs->osc, 0, YM_PERCUSSION_RELEASE_STEP);
 
                     if (hs->osc.gain != 0)
                     {
@@ -1019,10 +1010,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Snare Drum: preserve existing tuning */
                 if (chip->rhythmSD.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &chip->rhythmSD,
-                        0,
-                        2000);
+                    YM_UpdateGain(&chip->rhythmSD, 0, YM_PERCUSSION_RELEASE_STEP);
 
                     if (chip->rhythmSD.gain != 0)
                     {
@@ -1050,10 +1038,7 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
                 /* Top Cymbal */
                 if (chip->rhythmTCY.gain != 0)
                 {
-                    YM_UpdateGain(
-                        &chip->rhythmTCY,
-                        0,
-                        YM_PERCUSSION_RELEASE_STEP);
+                    YM_UpdateGain(&chip->rhythmTCY, 0, YM_PERCUSSION_RELEASE_STEP);
 
                     if (chip->rhythmTCY.gain != 0)
                     {

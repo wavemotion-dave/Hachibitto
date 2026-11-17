@@ -142,6 +142,7 @@ Version History :
 Version 2.0 - 17-Nov-2026 by wavemotion-dave
 * New YJK (Screen 10-12) "true-color" mode added. We use the DS 15-bit RGB to get very close to the real colors now.
 * AY driver reworked to bias silence at 0 to provide improved mixing with YM (MSX-MUSIC) and SCC. Sound quality overall better.
+* CPU read memory reworked to optimize for the most common read - provides an almost 8% speed boost across the board!
 * Small fixes and improvements as time permitted.
 
 Version 1.9 - 05-Nov-2026 by wavemotion-dave

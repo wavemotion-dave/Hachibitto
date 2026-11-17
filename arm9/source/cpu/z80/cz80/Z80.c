@@ -35,6 +35,7 @@ u32 halt_counter=0;
 extern u32 debug[];
 extern u32 DX, DY;
 extern u8 *MemoryMap[8];
+extern u8 SpecialPage[256];
 
 /** System-Dependent Stuff ***********************************/
 /** This is system-dependent code put here to speed things  **/
@@ -42,7 +43,13 @@ extern u8 *MemoryMap[8];
 /*************************************************************/
 
 inline byte OpZ80(u32 A)    {return (MemoryMap[A>>13][A]);}
-inline byte RdZ80(word A)   {if (!special_memory_access) return (MemoryMap[A>>13][A]); else return cpu_readmem16(A);}
+
+static inline byte RdZ80(word A)
+{
+    if (__builtin_expect(SpecialPage[A >> 8], 0)) return cpu_readmem16(A);
+    return MemoryMap[A >> 13][A];
+}
+
 #define     WrZ80(A,V)       cpu_writemem16(A,V)
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
