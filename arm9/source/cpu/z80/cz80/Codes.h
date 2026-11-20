@@ -228,11 +228,10 @@ case RET:  M_RET;break;
 case SCF:  S(C_FLAG);R(N_FLAG|H_FLAG);break;
 case CPL:  CPU.AF.B.h=~CPU.AF.B.h;S(N_FLAG|H_FLAG);break;
 case NOP:  break;
-case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I|(CPU.AF.W&0xFF00),CPU.AF.B.h);break;
-case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I|(CPU.AF.W&0xFF00));break;
+case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I,CPU.AF.B.h);break;
+case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I);break;
 
 case HALT:
-  halt_counter++;
   CPU.PC.W--;
   CPU.IFF|=IFF_HALT;
   CPU.IBackup=0;

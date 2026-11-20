@@ -1323,6 +1323,42 @@ void ApplyDatabaseTweaks(void)
     {
         myConfig.yjkTrueColor = 0;  // MEGADOOM does some crazy stuff with the screen that causes problems with 8-bit vs 16-bit color switches... so just stay 8-bit
     }
+
+    // ---------------------------------------------------------------------
+    // For the DS-Lite/Phat, we turn on MSX-MUSIC for a few select games...
+    // ---------------------------------------------------------------------
+    if (!isDSiMode())
+    {
+        // This one has no music without FM PAC so we ensure it's enabled
+        if (strstr(filename, "LILLY") && strstr(filename, "SAGA"))
+        {
+            myConfig.expansion = EXP_FM_PAC;
+            myConfig.frameSkip = FS_HEAVY;
+        }
+
+        // This one has no music without FM PAC so we ensure it's enabled
+        if (strstr(filename, "FAMICLE") && strstr(filename, "PARODIC"))
+        {
+            myConfig.expansion = EXP_FM_PAC;
+            myConfig.frameSkip = FS_HEAVY;
+        }
+
+        if (strstr(filename, "BLASTER") && strstr(filename, "BURN"))
+        {
+            myConfig.expansion = EXP_FM_PAC;
+            myConfig.frameSkip = FS_HEAVY;
+        }
+        
+        if (strstr(filename, "MONOGATARI"))
+        {
+            myConfig.expansion = EXP_FM_PAC;
+        }
+
+        if (strstr(filename, "XEVIOUS"))
+        {
+            myConfig.expansion = EXP_FM_PAC;
+        }
+    }
 }
 
 void MapPlayer1(void)

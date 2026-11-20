@@ -81,13 +81,13 @@ u16 screenPanX              __attribute__((section(".dtcm"))) = 0;   // Horizont
 u8 overscan_trick           __attribute__((section(".dtcm"))) = 0;   // Will be set to 1 if game tries to bypass the VSYNC
 u8 vdp_type                 __attribute__((section(".dtcm"))) = VDP_9958;
 
-u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
+static u8 frame_draw_mask[3][16]   __attribute__((section(".dtcm"))) = {
                             {1,1,1,1,1,1,1,1,   1,1,1,1,1,1,1,1},  // No frameskip: 100% (every frame drawn)
                             {1,1,0,0,1,1,0,0,   1,1,0,0,1,1,0,0},  // Light: 50% (we draw two consecutive and skip two consecutive)
                             {1,0,0,1,0,0,1,0,   0,1,0,0,1,0,0,1},  // Heavy: 37% frames drawn
                         };
 
-u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
+static u8 Screen8SpriteByteLUT[256] __attribute__((section(".dtcm"))) =
 {
       0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
       0,  1, 12, 13,192,193,204,205,157,  3, 28, 31,224,227,252,255,
@@ -1583,11 +1583,22 @@ static u8 NameRow[36]    ALIGN(4) __attribute__((section(".dtcm")));   // Screen
 // Called after sprites so the sprites are masked too.
 static __attribute__((noinline)) void ApplyLeftMask(void)
 {
+    // -----------------------------------------------------------------------------------------------------------
+    // The V9958 chip has a bit to tell us if we should mask pixels. However, since the DS doesn't really have
+    // a border to show, if the HAdjust is negative, we will crop half as many pixels. Not exact but good enough.
+    // -----------------------------------------------------------------------------------------------------------
     if (VDP[25] & 0x02)
     {
         u32 c = 0x10101010; // Index 16 is our 'almost black'. Should be border color but on DS we don't have a border.
         u32 *p32 = (u32*)(LineScratch + LS_BASE);
         p32[0] = c;
+
+        // If HAdjust is negative, we've already cropped some pixels off the screen...
+        // This keeps some games from having their score area pixel-eroded.
+        if (HAdjust > -2)
+        {
+            p32[1] = c;
+        }
         p32[1] = c;
     }
 
@@ -2774,7 +2785,7 @@ void RefreshLine8_HScroll(u8 uY, u8 *P, u32 sourceAddress)
     if ((VDP[25] & 0x08) && uY > FLUSH_ROW_START) DC_FlushRange(P, 256);
 }
 
- void RefreshLine8(u8 uY)
+ITCM_CODE void RefreshLine8(u8 uY)
 {
     DEBUG_REFRESH(8);
 

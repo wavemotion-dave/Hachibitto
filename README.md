@@ -123,7 +123,7 @@ If no artwork is found for a game, it shows the legacy loading screen with the p
 
 Known Issues and Limitations:
 -----------------------
-* V9958 horizontal 'smooth scrolling' is in 2 pixel increments so that the DS can use fast 16-bit VRAM operations. This isn't accurate but it should still look quite smooth to the naked eye.
+* V9958 horizontal 'smooth scrolling' is in 2 pixel increments so that the DS can use fast 16-bit VRAM operations. This isn't accurate but it should still look smooth enough to the naked eye.
 * MSX-MUSIC is complicated and consumes quite a bit of the DS CPU horsepower. As such, the Yamaha YM2413 / OPLL implementation is, by necessity, simplified. It only runs full-speed on the DSi or above with the 2X CPU. Do not judge MSX-MUSIC harshly based on this emulator's ability.
 * Manbow 2 has some minor glitching when using save/continue functionality. Cause unknown. Does not affect gameplay.
 
@@ -139,6 +139,15 @@ The Hachibitto HB-8 Fantasy Console :
 
 Version History :
 -----------------------
+Version 2.1 - 21-Nov-2026 by wavemotion-dave
+* DS-Lite/Phat now support games up to 1.2MB (Lilly's Saga and Brunilda now playable) along with lightweight MSX-MUSIC (enabled for a half-dozen games but you can experiment).
+* Added Z80 write-side special page caching for improved performance (2 frames).
+* Fixed Screen 7 blending - it would sometimes (very rarely) come out of blending mode incorrectly.
+* Slight improvement on V9958 left screen masking when the screen is partially shifted outside of the normal DS LCD.
+* Refactored ITCM memory to try and buy back a few bytes for performance improvements elsewhere.
+* Added a few missing bits of new data that should have been in the save/restore state files. Had to invalidate older saves (sorry!).
+* Small improvements and commenting as time permitted.
+
 Version 2.0 - 17-Nov-2026 by wavemotion-dave
 * New YJK (Screen 10-12) "true-color" mode added. We use the DS 15-bit RGB to get very close to the real colors now.
 * AY driver reworked to bias silence at 0 to provide improved mixing with YM (MSX-MUSIC) and SCC. Sound quality overall better.

@@ -36,6 +36,9 @@ u8 ascii16xFlashReadMode[3] = {0};
 u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
 u16 NEO8_bank[6] = {0};
 u16 NEO16_bank[3] = {0};
+u8 matra_previous_blocks[4] = {0,0,0,0};
+u8 matra_comp_offset = 2;
+
 
 // -----------------------------------------------------------------------------------------------
 // All memory fetches run through this except OP codes which are read directly from memory
@@ -1349,62 +1352,59 @@ void __attribute__((noinline)) HandleGeneric8k(u8 media_id, u16 address, u8 valu
     }
 }
 
-u8 matra_previoius_blocks[4] = {0,0,0,0};
-u8 matra_compilation_offset = 2;
-
 void __attribute__((noinline)) HandleMatraCompilation(u8 media_id, u16 address, u8 value)
 {
     u32 block = (value & MyMedia[media_id].mapperMask);
     u8 offset_block = block;
 
-    if (matra_compilation_offset >= 2) offset_block += (matra_compilation_offset-2);
+    if (matra_comp_offset >= 2) offset_block += (matra_comp_offset-2);
     u32 msx_offset = offset_block * MyMedia[media_id].blockSize;
     u32 *src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
 
     if (address == 0x5000)
     {
-        if (matra_compilation_offset >= 2)
+        if (matra_comp_offset >= 2)
         {
             MSXCartPtr[media_id][2] = (u8*)src;
             MemoryMap[2] = (u8 *)(MSXCartPtr[media_id][2]) - 0x4000;
-            matra_previoius_blocks[0] = block;
+            matra_previous_blocks[0] = block;
         }
     }
     else if (address == 0x6000)
     {
-        if (matra_compilation_offset >= 2)
+        if (matra_comp_offset >= 2)
         {
             MSXCartPtr[media_id][3] = (u8*)src;
             MemoryMap[3] = (u8 *)(MSXCartPtr[media_id][3]) - 0x6000;
-            matra_previoius_blocks[1] = block;
+            matra_previous_blocks[1] = block;
         }
     }
     else if (address == 0x8000)
     {
-        if (matra_compilation_offset >= 2)
+        if (matra_comp_offset >= 2)
         {
             MSXCartPtr[media_id][4] = (u8*)src;
             MemoryMap[4] = (u8 *)(MSXCartPtr[media_id][4]) - 0x8000;
-            matra_previoius_blocks[2] = block;
+            matra_previous_blocks[2] = block;
         }
     }
     else if (address == 0xA000)
     {
-        if (matra_compilation_offset >= 2)
+        if (matra_comp_offset >= 2)
         {
             MSXCartPtr[media_id][5] = (u8*)src;
             MemoryMap[5] = (u8 *)(MSXCartPtr[media_id][5]) - 0xA000;
-            matra_previoius_blocks[3] = block;
+            matra_previous_blocks[3] = block;
         }
     }
     else if (address == 0xBA00) // Offset register
     {
-        matra_compilation_offset = value;
-        if (matra_compilation_offset >= 2)
+        matra_comp_offset = value;
+        if (matra_comp_offset >= 2)
         {
             for (int i=0; i<4; i++)
             {
-                offset_block = matra_previoius_blocks[i] + (matra_compilation_offset-2);
+                offset_block = matra_previous_blocks[i] + (matra_comp_offset-2);
                 msx_offset = offset_block * MyMedia[media_id].blockSize;
                 src = (u32*)((u8*)ROM_Memory + msx_offset + (media_id ? ((MAX_CART_SIZE_KB/2) * 1024) : 0));
                 MSXCartPtr[media_id][2+i] = (u8*)src;

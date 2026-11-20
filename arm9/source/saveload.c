@@ -29,7 +29,7 @@
 #pragma GCC optimize ("Os")
 // All functions written here will be optimized for size (-Os) - we need the space and this doesn't need to be fast
 
-#define MSX_SAVE_VER   0x0017  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
+#define MSX_SAVE_VER   0x0019  // Change this if the basic format of the .SAV file changes. Invalidates older .sav files.
 
 // -----------------------------------------------------------------------------------------------------
 // Since the main MemoryMap[] can point to differt things (RAM, ROM, BIOS, etc) and since we can't rely
@@ -339,6 +339,24 @@ void msxSaveState(void)
         if (retVal) retVal = fwrite(&XPalReal0_16,          sizeof(XPalReal0_16),           1, handle);
         if (retVal) retVal = fwrite(&vdp15_pending,         sizeof(vdp15_pending),          1, handle);
         if (retVal) retVal = fwrite(&Pal15Epoch,            sizeof(Pal15Epoch),             1, handle);
+        if (retVal) retVal = fwrite(Grb332ToRgb15,          sizeof(Grb332ToRgb15),          1, handle);
+        if (retVal) retVal = fwrite(matra_previous_blocks,  sizeof(matra_previous_blocks),  1, handle);
+        if (retVal) retVal = fwrite(&matra_comp_offset,     sizeof(matra_comp_offset),      1, handle);
+        if (retVal) retVal = fwrite(YM_FM,                  sizeof(YM_FM),                  1, handle);
+        if (retVal) retVal = fwrite(&YM_EnvDiv,             sizeof(YM_EnvDiv),              1, handle);
+        if (retVal) retVal = fwrite(&YM_HalfRatePhase,      sizeof(YM_HalfRatePhase),       1, handle);
+        if (retVal) retVal = fwrite(&YM_HeldMelodicSample,  sizeof(YM_HeldMelodicSample),   1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteEnvDiv,         sizeof(YM_LiteEnvDiv),          1, handle);
+        if (retVal) retVal = fwrite(&YM_LitePhase,          sizeof(YM_LitePhase),           1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteRhythmTick,     sizeof(YM_LiteRhythmTick),      1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteLast,           sizeof(YM_LiteLast),            1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteCur,            sizeof(YM_LiteCur),             1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteStep,           sizeof(YM_LiteStep),            1, handle);
+        if (retVal) retVal = fwrite(&YM_LiteRhythmHeld,     sizeof(YM_LiteRhythmHeld),      1, handle);
+        if (retVal) retVal = fwrite(&YM_VibNow,             sizeof(YM_VibNow),              1, handle);
+        if (retVal) retVal = fwrite(&YM_VibPos,             sizeof(YM_VibPos),              1, handle);
+        if (retVal) retVal = fwrite(&YM_VibCnt,             sizeof(YM_VibCnt),              1, handle);
+        if (retVal) retVal = fwrite(YM_VibTable,            sizeof(YM_VibTable),            1, handle);
         
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
         if (retVal) retVal = fwrite(&spare,                 sizeof(spare),                  1, handle);
@@ -636,6 +654,24 @@ void msxLoadState(void)
             if (retVal) retVal = fread(&XPalReal0_16,          sizeof(XPalReal0_16),           1, handle);
             if (retVal) retVal = fread(&vdp15_pending,         sizeof(vdp15_pending),          1, handle);
             if (retVal) retVal = fread(&Pal15Epoch,            sizeof(Pal15Epoch),             1, handle);
+            if (retVal) retVal = fread(Grb332ToRgb15,          sizeof(Grb332ToRgb15),          1, handle);
+            if (retVal) retVal = fread(&matra_previous_blocks, sizeof(matra_previous_blocks),  1, handle);
+            if (retVal) retVal = fread(&matra_comp_offset,     sizeof(matra_comp_offset),      1, handle);
+            if (retVal) retVal = fread(YM_FM,                  sizeof(YM_FM),                  1, handle);
+            if (retVal) retVal = fread(&YM_EnvDiv,             sizeof(YM_EnvDiv),              1, handle);
+            if (retVal) retVal = fread(&YM_HalfRatePhase,      sizeof(YM_HalfRatePhase),       1, handle);
+            if (retVal) retVal = fread(&YM_HeldMelodicSample,  sizeof(YM_HeldMelodicSample),   1, handle);
+            if (retVal) retVal = fread(&YM_LiteEnvDiv,         sizeof(YM_LiteEnvDiv),          1, handle);
+            if (retVal) retVal = fread(&YM_LitePhase,          sizeof(YM_LitePhase),           1, handle);
+            if (retVal) retVal = fread(&YM_LiteRhythmTick,     sizeof(YM_LiteRhythmTick),      1, handle);
+            if (retVal) retVal = fread(&YM_LiteLast,           sizeof(YM_LiteLast),            1, handle);
+            if (retVal) retVal = fread(&YM_LiteCur,            sizeof(YM_LiteCur),             1, handle);
+            if (retVal) retVal = fread(&YM_LiteStep,           sizeof(YM_LiteStep),            1, handle);
+            if (retVal) retVal = fread(&YM_LiteRhythmHeld,     sizeof(YM_LiteRhythmHeld),      1, handle);
+            if (retVal) retVal = fread(&YM_VibNow,             sizeof(YM_VibNow),              1, handle);
+            if (retVal) retVal = fread(&YM_VibPos,             sizeof(YM_VibPos),              1, handle);
+            if (retVal) retVal = fread(&YM_VibCnt,             sizeof(YM_VibCnt),              1, handle);
+            if (retVal) retVal = fread(YM_VibTable,            sizeof(YM_VibTable),            1, handle);
 
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);
             if (retVal) retVal = fread(&spare,                 sizeof(spare),                  1, handle);

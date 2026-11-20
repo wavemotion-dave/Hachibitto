@@ -201,6 +201,8 @@ extern u32 MAX_RAM_SIZE_KB;
 extern u32 MAX_CART_SIZE_KB;        // This one is variable in size
 #define    MAX_DISK_SIZE_KB 720     // This one is fixed in size
 
+#define MAX_CART_DS_LITE_KB 1024    // No more than 1024K normally, but we cheat and steal a bit of DISK space on the DS-Lite
+
 extern u8 *ROM_Memory;
 extern u8 *DISK_Memory;
 extern u8 *RAM_Memory;
@@ -287,6 +289,9 @@ extern u8 ascii16xFlashReadMode[3];
 extern u8 ascii16xCfiBackup[3][ASCII16X_CFI_SIZE];
 extern u8 sccFlashCommandState[2];
 extern u8 last_emulation_mode;
+extern u8 matra_previous_blocks[4];
+extern u8 matra_comp_offset;
+extern u32 msx_music_writes;
 
 // --------------------------------------------------
 // Some CPU and VDP and SGM stuff that we need

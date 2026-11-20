@@ -442,6 +442,15 @@ mm_word ClickRemoval(mm_word len, mm_addr dest)
     return len;
 }
 
+__attribute__((noinline)) void handle_sound_pause(mm_word len, mm_addr dest)
+{
+    s16 *p = (s16 *)dest;
+    for (int i = 0; i < len; i++)
+    {
+        *p++ = last_sample; // To prevent pops and clicks... just keep outputting the last sample
+    }
+}
+
 // -----------------------------------------------------------------------------------------------
 // This is our main sound mixer. It's called periodically by the maxmod handler when it needs
 // more samples in the buffer. We generally produce AY output but sometimes mix in SCC or beeper.
@@ -450,11 +459,7 @@ ITCM_CODE mm_word OurSoundMixer(mm_word len, mm_addr dest, mm_stream_formats for
 {
     if (soundEmuPause) // If paused, just "mix" in mute sound chip... all channels are OFF
     {
-        s16 *p = (s16 *)dest;
-        for (int i = 0; i < len; i++)
-        {
-            *p++ = last_sample; // To prevent pops and clicks... just keep outputting the last sample
-        }
+        handle_sound_pause(len, dest);
     }
     else
     {
@@ -511,11 +516,7 @@ ITCM_CODE mm_word OurSoundMixer_Lite(mm_word len, mm_addr dest, mm_stream_format
 {
     if (soundEmuPause) // If paused, just "mix" in mute sound chip... all channels are OFF
     {
-        s16 *p = (s16 *)dest;
-        for (int i = 0; i < len; i++)
-        {
-            *p++ = last_sample; // To prevent pops and clicks... just keep outputting the last sample
-        }
+        handle_sound_pause(len, dest);
     }
     else
     {
@@ -527,7 +528,7 @@ ITCM_CODE mm_word OurSoundMixer_Lite(mm_word len, mm_addr dest, mm_stream_format
         if (msx_music_capable_game) // If MSX-MUSIC is enabled, we mix AY with the FM channels
         {
             ay38910Mixer(len, dest, &myAY); // Get AY - we mix YM directly on top...
-            YMMixer(len, dest, &myYM);
+            YMMixer_Lite(len, dest, &myYM);
             last_sample = ((s16 *)dest)[len - 1];
         }
         else if (msx_scc_capable_game) // If SCC is enabled, we need to mix the AY with the SCC chips
@@ -837,8 +838,6 @@ void ShowDebugZ80(void)
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "Mapper %d [%02X]", MyMedia[MEDIA_CART1].mapperType, MyMedia[MEDIA_CART1].mapperMask);
     DSPrint(0, idx++, 7, tmpStr);
-    extern u32 halt_counter;
-    sprintf(tmpStr, "Halt C %d", halt_counter & 0x1FFFF);
     DSPrint(0, idx++, 7, tmpStr);
     sprintf(tmpStr, "%d Free", getMemFree());
     DSPrint(0, idx++, 7, tmpStr);
@@ -1750,6 +1749,7 @@ void HachibittoRunEmu(void)
                 TIMER2_DATA = 0;
                 TIMER2_CR = TIMER_ENABLE | TIMER_DIV_1024;
                 timingFrames = 0;
+                drawn_frame_number = 0;
                 DisplayStatusLine(); // Every half second
             }
             else if (timingFrames == 30) // Every half second
@@ -1777,7 +1777,7 @@ void HachibittoRunEmu(void)
             {
                 ShowDebugZ80();
             }
-
+            
             // Screen 7 is 512px wide and we have the ability to render it in Zoom mode
             if (ScrMode == 7)
             {
@@ -1789,6 +1789,7 @@ void HachibittoRunEmu(void)
             }
             else if (ScrMode == 9) // 80 Column Mode (480px)
             {
+                render_blended = (myConfig.scaleScreen) ? 1 : 0;
                 if (!zoom_screen)
                 {
                     zoom_screen = 2; // Go right to Zoom mode (can't read it otherwise)
@@ -1796,22 +1797,17 @@ void HachibittoRunEmu(void)
             }
             else
             {
+                render_blended = (myConfig.scaleScreen) ? 1 : 0;
                 zoom_screen = 0;
             }
-            
-            // ------------------------------------------------------------------------------------------------------------
-            // With a compressed screen, we use the A/B buffers to blur the display so compressed text is a bit cleaner...
-            // ------------------------------------------------------------------------------------------------------------
-            if (myConfig.scaleScreen)
-            {
-                render_blended = 1;
-            }
-            
+                        
             // If we've switched our blending... clear VRAM_B
             if (old_blended != render_blended)
             {
+                bMainMenuActive = 1;    // To prevent DS VSync ISR temporarily while we switch
                 old_blended = render_blended;
                 memset(DS_LCD_VRAM_2, 0x00, 128*1024);
+                bMainMenuActive = 0;
             }
 
             // ---------------------------------------------------------------------------------
@@ -2794,6 +2790,26 @@ void HachibittoInitCPU(void)
     msx_restore_bios();
 }
 
+// Doesn't need to be in fast memory...
+__attribute__((noinline)) void handle_temp_offset(void)
+{
+    if (slide_dampen == 0)
+    {
+        if (temp_offset > 0)
+        {
+            temp_offset--;
+        }
+        else
+        {
+            temp_offset++;
+        }
+    }
+    else
+    {
+        slide_dampen--;
+    }
+}
+
 // -----------------------------------------------------------------
 // This is where we handle our pan/scan up and down as well as
 // some basic vSYNC timing so that we lock the DS screen updates
@@ -2851,21 +2867,7 @@ ITCM_CODE void irqVBlank(void)
 
     if (temp_offset)
     {
-        if (slide_dampen == 0)
-        {
-            if (temp_offset > 0)
-            {
-                temp_offset--;
-            }
-            else
-            {
-                temp_offset++;
-            }
-        }
-        else
-        {
-            slide_dampen--;
-        }
+        handle_temp_offset();
     }
 }
 
@@ -2889,12 +2891,13 @@ int main(int argc, char **argv)
     // -----------------------------------------------------------------
     if (isDSiMode())
     {
-        MAX_CART_SIZE_KB = 8192;                // 8MB is the max MSX cart size we support on the DSi
+        MAX_CART_SIZE_KB = 8192;                        // 8MB is the max MSX cart size we support on the DSi
         ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
-        MAX_RAM_SIZE_KB = 512;                  // And RAM gets a boost to 512K
+        MAX_RAM_SIZE_KB = 512;                          // And RAM gets a boost to 512K
         RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
-        BoxArtBuffer = malloc(512 * 1024);      // Box ART gets a dedicated buffer
-        KanjiFontBuffer = malloc(256 * 1024);   // And we support the Kanji Font for DSi
+        BoxArtBuffer = malloc(512 * 1024);              // Box ART gets a dedicated buffer
+        KanjiFontBuffer = malloc(256 * 1024);           // And we support the Kanji Font for DSi
+        DISK_Memory = malloc(MAX_DISK_SIZE_KB * 1024);  // Disk buffer is 720K for the max disk supported
         
         // -------------------------------------------------------------
         // Try to load up the 256K Kanji Font data. Almost nothing uses
@@ -2920,8 +2923,12 @@ int main(int argc, char **argv)
     }
     else // For older DS units... 1MB max cart, 256K RAM, No Kanji Font
     {
-        MAX_CART_SIZE_KB = 1024;
-        ROM_Memory = malloc(MAX_CART_SIZE_KB * 1024);
+        // Clever trick... we pack DISK buffer on the back end so we can support larger ROMs
+        MAX_CART_SIZE_KB = 1250;
+        ROM_Memory = malloc((MAX_CART_DS_LITE_KB+MAX_DISK_SIZE_KB) * 1024);
+        DISK_Memory = ROM_Memory + (MAX_CART_DS_LITE_KB * 1024);
+
+        // RAM on the DS-Lite limited to 256K
         MAX_RAM_SIZE_KB = 256;
         RAM_Memory = malloc(MAX_RAM_SIZE_KB * 1024);
     }
@@ -2931,12 +2938,6 @@ int main(int argc, char **argv)
     // rather than allocating 64K, we just peel 64K off the back end of RAM.
     // ------------------------------------------------------------------------
     SCC_Memory = (RAM_Memory + (MAX_RAM_SIZE_KB*1024)) - (64*1024);
-
-    // ------------------------------------------------------
-    // Both DS-Lite and DSi get a single Disk buffer of 720K
-    // ------------------------------------------------------
-    DISK_Memory = malloc(MAX_DISK_SIZE_KB * 1024);
-    memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
 
     // Make sure the DISK memory is reset...
     memset(DISK_Memory, 0xFF, (MAX_DISK_SIZE_KB * 1024));
@@ -3287,7 +3288,16 @@ void LoadGameIntoMedia(u8 media_id, char *filename)
     // Now open and read the file... grab file size and CRC32 as well...
     if (media_id == MEDIA_CART1)
     {
-        MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, ROM_Memory, (MAX_CART_SIZE_KB * 1024), 0, &MyMedia[media_id].filecrc);
+        u32 max_cart_load = MAX_CART_SIZE_KB * 1024;
+        if (!isDSiMode()) max_cart_load += (512 * 1024);
+        MyMedia[media_id].filesize = ReadFileCarefully(MyMedia[media_id].filename, ROM_Memory, max_cart_load, 0, &MyMedia[media_id].filecrc);
+        
+        // If we loaded a file that is bigger than the normal CART max size, we eject any disk...
+        if (!isDSiMode() && (MyMedia[media_id].filesize > (MAX_CART_DS_LITE_KB * 1024)))
+        {
+            memset(&MyMedia[MEDIA_CART2], 0x00, sizeof(MyMedia[MEDIA_CART2]));
+            memset(&MyMedia[MEDIA_DISK], 0x00, sizeof(MyMedia[MEDIA_DISK]));
+        }
     }
     else if (media_id == MEDIA_CART2)
     {

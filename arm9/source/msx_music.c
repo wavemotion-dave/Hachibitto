@@ -146,28 +146,20 @@ YM_Instrument YM_InstrumentROM[16] =
     /* 15 Elec Guitar   */ { 1,1, 0,0,  1,1, 1,0, 0,0, 2,0, 9,  0,0, 3, 15,1,15,0, 15,4,1,3 },
 };
 
-/* Hot FM parameters. Keep these in DTCM: they are touched for every active
-   melodic channel on every synthesized sample pair.  All instrument/block/
-   volume-derived values are calculated when the channel configuration changes. */
-typedef struct
-{
-    u8  arMod, arCar;       // attack: small per-sample step (<< 16 when applied)
-    u8  modAtten;           // TL-derived linear amplitude factor from YM_TLAtten[]
-    u16 fbDepth;            // YM_FM_FBDepth[FB] (phase units at full-scale feedback)
-    u8  vibMod, vibCar;     // VIB bits: apply the vibrato LFO to that operator
-    u8  modShift, fbShift;  // per-channel FM depth shifts (higher notes get less FM: less aliasing)
-    u8  volume;             // 15 - channel volume
-    u8  waveMod, waveCar;   // Custom waveform modes; 0=legacy/default, 1=sine, 2=half-sine
-    u32 drMod, rrMod;       // decay/release per-sample envelope steps (16.16 fixed)
-    u32 drCar, rrCar;       // Carrier decay/release per-sample envelope steps (16.16 fixed)
-    u32 slMod, slCar;       // sustain target levels, already << 16
-    u32 susMod, susCar;     // extra decay while key held: 0 = hold (EG-TYP=1), else RR step (EG-TYP=0)
-} YM_FMParams;
 
-static YM_FMParams YM_FM[YM_NUM_CHANNELS] __attribute__((section(".dtcm")));
-static u8 YM_EnvDiv __attribute__((section(".dtcm")));   // envelope clock divider counter
-static u8 YM_HalfRatePhase __attribute__((section(".dtcm")));
-static s32 YM_HeldMelodicSample __attribute__((section(".dtcm")));
+YM_FMParams YM_FM[YM_NUM_CHANNELS] __attribute__((section(".dtcm")));
+u8 YM_EnvDiv __attribute__((section(".dtcm")));   // envelope clock divider counter
+u8 YM_HalfRatePhase __attribute__((section(".dtcm")));
+s32 YM_HeldMelodicSample __attribute__((section(".dtcm")));
+
+// YMMixer_Lite() state (see the Lite section at the end of the file)
+u8  YM_LiteEnvDiv      __attribute__((section(".dtcm")));
+u8  YM_LitePhase       __attribute__((section(".dtcm")));   // 0..3 position within a render block
+u8  YM_LiteRhythmTick  __attribute__((section(".dtcm")));
+s32 YM_LiteLast        __attribute__((section(".dtcm")));   // last rendered melodic sample
+s32 YM_LiteCur         __attribute__((section(".dtcm")));   // interpolator output
+s32 YM_LiteStep        __attribute__((section(".dtcm")));   // interpolator slope
+s32 YM_LiteRhythmHeld  __attribute__((section(".dtcm")));
 
 /* Modulator depth. The real chip swings the carrier phase by about +/-4pi at
    TL=0. 14 = real chip, 15 = half (default), 16 = quarter. If FM sounds gritty
@@ -185,10 +177,10 @@ static s32 YM_HeldMelodicSample __attribute__((section(".dtcm")));
    -2..+2): 9 = about +/-7 cents, 10 = about +/-3.5 cents. */
 #define YM_VIB_SHIFT   9
 #define YM_VIB_PERIOD  303   // render samples per LFO step (8 steps per cycle)
-static s8  YM_VibTable[8] __attribute__((section(".dtcm"))) = { 0, 1, 2, 1, 0, -1, -2, -1 };
-static s8  YM_VibNow  __attribute__((section(".dtcm")));
-static u8  YM_VibPos  __attribute__((section(".dtcm")));
-static u16 YM_VibCnt  __attribute__((section(".dtcm")));
+s8  YM_VibTable[8] __attribute__((section(".dtcm"))) = { 0, 1, 2, 1, 0, -1, -2, -1 };
+s8  YM_VibNow  __attribute__((section(".dtcm")));
+u8  YM_VibPos  __attribute__((section(".dtcm")));
+u16 YM_VibCnt  __attribute__((section(".dtcm")));
 
 // This should be roughly 0.75dB per step... approx.
 static u8 YM_TLAtten[64] __attribute__((section(".dtcm"))) = {
@@ -317,6 +309,13 @@ void YMReset(YM *chip)
     YM_VibNow = 0;
     YM_VibPos = 0;
     YM_VibCnt = 0;
+    YM_LiteEnvDiv = 0;
+    YM_LitePhase = 0;
+    YM_LiteRhythmTick = 0;
+    YM_LiteLast = 0;
+    YM_LiteCur = 0;
+    YM_LiteStep = 0;
+    YM_LiteRhythmHeld = 0;
     int ch;
     for (ch = 0; ch < YM_NUM_CHANNELS; ch++)
     {
@@ -339,8 +338,26 @@ static void YM_RhythmRetrigger(YM_Oscillator *osc, int resetPhase)
     }
 }
 
+
+// --------------------------------------------------------------
+// Happens only once per game so put into a non-ITCM function...
+// --------------------------------------------------------------
+void CheckEnableFM_PAC(void)
+{
+    if ((myConfig.expansion == EXP_FM_PAC) || (myConfig.expansion == EXP_MEGARAM))
+    {
+        msx_music_capable_game = 1;
+        bClickRemoveNeeded = 1;
+    }
+}
+
 void YMWrite(u8 value, u8 address, YM *chip)
 {
+    if (++msx_music_writes == 10)
+    {
+        CheckEnableFM_PAC();
+    }
+    
     if (address <= 0x07)
     {
         YM_Instrument *ci = &chip->customInstrument;
@@ -1072,6 +1089,326 @@ ITCM_CODE void YMMixer(int len, s16 *dest, YM *chip)
 
         dest[i] = (s16)mixed;
     }
+}
+
+//@----------------------------------------------------------------------------
+//@ YMMixer_Lite() - for the DS-Lite (ARM9 @ 67MHz). Roughly half the work of
+//@ YMMixer(), at some cost in sound quality. YMMixer() is untouched, so the
+//@ DSi path costs exactly what it did before. Pick one per call:
+//@     if (isDSiMode()) YMMixer(len, dest, chip); else YMMixer_Lite(len, dest, chip);
+//@
+//@ What is cheaper:
+//@  - Melodic FM renders at 1/4 of the output rate (was 1/2) and is linearly
+//@    interpolated across the 4 output samples.
+//@  - Envelopes tick every (1 << YM_LITE_ENV_K) renders (was every 2nd);
+//@    rate steps are scaled up so decay/release/attack times are unchanged.
+//@  - No vibrato LFO.
+//@  - Rhythm is computed every 2nd output sample and held (own non-ITCM
+//@    helper, so it costs no ITCM).
+//@ FM renders at ~7.75kHz so sidebands alias more: modulator depth gets
+//@ YM_LITE_MOD_EXTRA extra shifts.
+//@----------------------------------------------------------------------------
+#define YM_LITE_ENV_K      1   // envelope tick every 2^K renders. 1 = 3.9kHz. Max 3. Raise for more speed.
+#define YM_LITE_MOD_EXTRA  1   // extra modulator-depth shift (less aliasing). 0 = same depth as normal.
+#define YM_LITE_FEEDBACK   0   // 0 = skip modulator feedback (saves ~10 cycles per channel render)
+
+
+// Same as YM_EnvStep() but the envelope is ticked 2^YM_LITE_ENV_K times less
+// often, so every step is scaled up to match. Main RAM, like YM_EnvStep().
+static __attribute__((noinline)) void YM_EnvStepLite(
+    u32 *env, u8 *state, u8 keyOn, u8 keyEdge,
+    u8 arStep, u32 drInc, u32 slTarget, u32 susInc, u32 rrInc)
+{
+    if (keyEdge)
+    {
+        *env = YM_ENV_SILENT;
+        *state = YM_FM_ENV_ATTACK;
+    }
+    else if (!keyOn)
+    {
+        *state = YM_FM_ENV_RELEASE;
+    }
+
+    u8 st = *state;
+
+    if (st == YM_FM_ENV_SUSTAIN)
+    {
+        if (susInc)
+        {
+            u32 e = *env + (susInc << YM_LITE_ENV_K);
+            *env = (e > YM_ENV_SILENT) ? YM_ENV_SILENT : e;
+        }
+    }
+    else if (st == YM_FM_ENV_RELEASE)
+    {
+        u32 e = *env + (rrInc << YM_LITE_ENV_K);
+        *env = (e > YM_ENV_SILENT) ? YM_ENV_SILENT : e;
+    }
+    else if (st == YM_FM_ENV_DECAY)
+    {
+        u32 e = *env + (drInc << YM_LITE_ENV_K);
+        if (e >= slTarget)
+        {
+            e = slTarget;
+            *state = YM_FM_ENV_SUSTAIN;
+        }
+        *env = e;
+    }
+    else // YM_FM_ENV_ATTACK
+    {
+        u32 e = *env;
+        u32 delta = ((u32)arStep << (16 + YM_ENV_DIV_SHIFT + YM_LITE_ENV_K)) +
+                    ((YM_ENV_SILENT - e) >> (5 - YM_ENV_DIV_SHIFT - YM_LITE_ENV_K));
+        if (delta >= e)
+        {
+            e = 0;
+            *state = YM_FM_ENV_DECAY;
+        }
+        else
+        {
+            e -= delta;
+        }
+        *env = e;
+    }
+}
+
+// One melodic channel, one render (= 4 output samples of phase advance).
+static __attribute__((noinline)) s32 YM_RenderChannel2FM_Lite(YM_Oscillator *osc, u8 keyOn, int ch, u8 doEnv)
+{
+    YM_FMParams *p = &YM_FM[ch];
+    u8 keyEdge = (keyOn && !osc->previousKeyOn);
+
+    if (keyEdge)
+    {
+        osc->phase = 0;
+        osc->modPhase = 0;
+        osc->feedback = 0;
+    }
+
+    if (doEnv | keyEdge)
+    {
+        if (keyEdge || !keyOn ||
+            osc->modState != YM_FM_ENV_SUSTAIN || p->susMod)
+        {
+            YM_EnvStepLite(&osc->modEnv, &osc->modState, keyOn, keyEdge,
+                           p->arMod, p->drMod, p->slMod, p->susMod, p->rrMod);
+        }
+
+        if (keyEdge || !keyOn ||
+            osc->carState != YM_FM_ENV_SUSTAIN || p->susCar)
+        {
+            YM_EnvStepLite(&osc->carEnv, &osc->carState, keyOn, keyEdge,
+                           p->arCar, p->drCar, p->slCar, p->susCar, p->rrCar);
+        }
+    }
+
+    osc->previousKeyOn = keyOn;
+
+    if (osc->carEnv >= YM_ENV_SILENT)
+    {
+        osc->gain = 0;
+        return 0;
+    }
+    osc->gain = 255;
+
+    // 4 output samples of phase per render. No vibrato.
+    osc->modPhase += osc->modPhaseIncrement << 2;
+    osc->phase    += osc->phaseIncrement << 2;
+
+    u32 modIdx = osc->modPhase >> YM_SIN_SHIFT;
+#if YM_LITE_FEEDBACK
+    if (p->fbDepth)
+    {
+        modIdx += (osc->feedback * (s32)p->fbDepth) >> p->fbShift;
+    }
+#endif
+    s32 mod = YM_CarrierSineTable[modIdx & 0xFF];
+    if (p->waveMod && mod < 0)
+    {
+        mod = 0;
+    }
+
+    s32 modFull = mod * ((255 - (s32)(osc->modEnv >> 16)) * p->modAtten);
+
+#if YM_LITE_FEEDBACK
+    osc->feedback = (s16)((osc->feedback + (modFull >> 16)) >> 1);
+#endif
+
+    s32 modIndex = modFull >> (p->modShift + YM_LITE_MOD_EXTRA);
+
+    u32 carrierIndex = ((osc->phase >> YM_SIN_SHIFT) + modIndex) & 0xFF;
+    s32 carrier;
+    if (p->waveCar == 0)
+    {
+        carrier = YM_SineTable[carrierIndex];
+    }
+    else
+    {
+        carrier = YM_CarrierSineTable[carrierIndex];
+        if (p->waveCar == 2 && carrier < 0)
+        {
+            carrier = 0;
+        }
+    }
+
+    carrier = carrier * (255 - (s32)(osc->carEnv >> 16)) * (s32)p->volume;
+
+    return carrier >> (12 - myConfig.ymScale);
+}
+
+// Rhythm section, called once per 2 output samples (so every step is doubled
+// to match the full-rate YMMixer()). Main RAM: only runs while rhythm is on.
+static __attribute__((noinline)) s32 YM_RhythmLite(YM *chip)
+{
+    s32 sample = 0;
+    YM_Channel *bd = &chip->channels[YM_CHANNEL_BD];
+    YM_Channel *hs = &chip->channels[YM_CHANNEL_HHSD];
+    YM_Channel *tt = &chip->channels[YM_CHANNEL_TOMTCY];
+
+    if (bd->osc.gain != 0)
+    {
+        YM_UpdateGain(&bd->osc, 0, YM_PERCUSSION_RELEASE_STEP << 1);
+        if (bd->osc.gain != 0)
+        {
+            bd->osc.phase += bd->osc.phaseIncrement << 1;
+            s32 s = YM_SineTable[(bd->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+            sample += (s * (15 - chip->rhythmVolBD) * bd->osc.gain) >> YM_OUT_SHIFT;
+        }
+    }
+
+    if (tt->osc.gain != 0)
+    {
+        YM_UpdateGain(&tt->osc, 0, YM_PERCUSSION_RELEASE_STEP << 1);
+        if (tt->osc.gain != 0)
+        {
+            tt->osc.phase += tt->osc.phaseIncrement << 1;
+            s32 s = YM_SineTable[(tt->osc.phase >> YM_SIN_SHIFT) & 0xFF];
+            sample += (s * (15 - chip->rhythmVolTOM) * tt->osc.gain) >> YM_OUT_SHIFT;
+        }
+    }
+
+    if (hs->osc.gain != 0 || chip->rhythmSD.gain != 0 || chip->rhythmTCY.gain != 0)
+    {
+        if (chip->noiseLFSR & 1)
+        {
+            chip->noiseLFSR ^= 0x800200;
+        }
+        chip->noiseLFSR >>= 1;
+        chip->noiseLFSR &= 0x7FFFFF;
+
+        u32 noiseBit = chip->noiseLFSR & 1;
+        u32 hhPhase  = (hs->osc.phase >> 22) & 0x3FF;
+        u32 cymPhase = (tt->osc.phase >> 22) & 0x3FF;
+
+        u32 shortNoise =
+            (((hhPhase >> 2) & 1) ^ ((hhPhase >> 7) & 1)) |
+            (((hhPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1)) |
+            (((cymPhase >> 3) & 1) ^ ((cymPhase >> 5) & 1));
+
+#define YM_RHYTHM_WAVE_L(p) YM_SineTable[((p) >> 2) & 0xFF]
+
+        if (hs->osc.gain != 0)
+        {
+            YM_UpdateGain(&hs->osc, 0, YM_PERCUSSION_RELEASE_STEP << 1);
+            if (hs->osc.gain != 0)
+            {
+                u32 phase = shortNoise ? (noiseBit ? 0x2D0 : 0x234)
+                                       : (noiseBit ? 0x034 : 0x0D0);
+                s32 s = YM_RHYTHM_WAVE_L(phase);
+                sample += (s * (15 - chip->rhythmVolHH) * hs->osc.gain) >> YM_OUT_SHIFT;
+            }
+        }
+
+        if (chip->rhythmSD.gain != 0)
+        {
+            YM_UpdateGain(&chip->rhythmSD, 0, YM_PERCUSSION_RELEASE_STEP << 1);
+            if (chip->rhythmSD.gain != 0)
+            {
+                u32 phase = (hhPhase & 0x100) ? (noiseBit ? 0x300 : 0x200)
+                                              : (noiseBit ? 0x000 : 0x100);
+                s32 s = YM_RHYTHM_WAVE_L(phase);
+                sample += (s * (15 - chip->rhythmVolSD) * chip->rhythmSD.gain * 19) >> (YM_OUT_SHIFT + 4);
+            }
+        }
+
+        if (chip->rhythmTCY.gain != 0)
+        {
+            YM_UpdateGain(&chip->rhythmTCY, 0, YM_PERCUSSION_RELEASE_STEP << 1);
+            if (chip->rhythmTCY.gain != 0)
+            {
+                u32 phase = shortNoise ? 0x300 : 0x100;
+                s32 s = YM_RHYTHM_WAVE_L(phase);
+                sample += (s * (15 - chip->rhythmVolTCY) * chip->rhythmTCY.gain) >> YM_OUT_SHIFT;
+            }
+        }
+#undef YM_RHYTHM_WAVE_L
+    }
+    return sample;
+}
+
+void YMMixer_Lite(int len, s16 *dest, YM *chip)
+{
+    int rhythmOn = chip->rhythmReg & YM_RHYTHM_ENABLE_BIT;
+    int lastMelodic = rhythmOn ? YM_CHANNEL_BD : YM_NUM_CHANNELS;
+
+    u32 ph   = YM_LitePhase;
+    s32 cur  = YM_LiteCur;
+    s32 step = YM_LiteStep;
+
+    for (int i = 0; i < len; i++)
+    {
+        if (ph == 0)
+        {
+            s32 melodicSample = 0;
+            u8 doEnv = ((++YM_LiteEnvDiv) & ((1 << YM_LITE_ENV_K) - 1)) == 0;
+
+            for (int ch = 0; ch < lastMelodic; ch++)
+            {
+                YM_Channel *cc = &chip->channels[ch];
+
+                if (!cc->keyOn && cc->osc.gain == 0)
+                {
+                    continue;
+                }
+                melodicSample += YM_RenderChannel2FM_Lite(&cc->osc, cc->keyOn, ch, doEnv);
+            }
+
+            // Ramp from the previous render to this one over the next 4 outputs.
+            cur  = YM_LiteLast;
+            step = (melodicSample - cur) >> 2;
+            YM_LiteLast = melodicSample;
+        }
+        ph = (ph + 1) & 3;
+
+        cur += step;
+        s32 sample = cur;
+
+        if (rhythmOn)
+        {
+            YM_LiteRhythmTick ^= 1;
+            if (YM_LiteRhythmTick)
+            {
+                YM_LiteRhythmHeld = YM_RhythmLite(chip);
+            }
+            sample += YM_LiteRhythmHeld;
+        }
+        else
+        {
+            YM_LiteRhythmHeld = 0;
+        }
+
+        sample += (chip->outputFilterState - sample) >> 5;
+        chip->outputFilterState = sample;
+
+        s32 mixed = ((s32)dest[i]) + sample;
+        if (mixed > 32767) mixed = 32767;
+        else if (mixed < -32768) mixed = -32768;
+        dest[i] = (s16)mixed;
+    }
+
+    YM_LitePhase = ph;
+    YM_LiteCur   = cur;
+    YM_LiteStep  = step;
 }
 
 // End of file

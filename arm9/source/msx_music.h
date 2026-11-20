@@ -198,6 +198,25 @@ typedef struct
     s32 outputFilterState;              // one-pole output-smoothing state; included in save states
 } YM;
 
+
+/* Hot FM parameters. Keep these in DTCM: they are touched for every active
+   melodic channel on every synthesized sample pair.  All instrument/block/
+   volume-derived values are calculated when the channel configuration changes. */
+typedef struct
+{
+    u8  arMod, arCar;       // attack: small per-sample step (<< 16 when applied)
+    u8  modAtten;           // TL-derived linear amplitude factor from YM_TLAtten[]
+    u16 fbDepth;            // YM_FM_FBDepth[FB] (phase units at full-scale feedback)
+    u8  vibMod, vibCar;     // VIB bits: apply the vibrato LFO to that operator
+    u8  modShift, fbShift;  // per-channel FM depth shifts (higher notes get less FM: less aliasing)
+    u8  volume;             // 15 - channel volume
+    u8  waveMod, waveCar;   // Custom waveform modes; 0=legacy/default, 1=sine, 2=half-sine
+    u32 drMod, rrMod;       // decay/release per-sample envelope steps (16.16 fixed)
+    u32 drCar, rrCar;       // Carrier decay/release per-sample envelope steps (16.16 fixed)
+    u32 slMod, slCar;       // sustain target levels, already << 16
+    u32 susMod, susCar;     // extra decay while key held: 0 = hold (EG-TYP=1), else RR step (EG-TYP=0)
+} YM_FMParams;
+
 //@----------------------------------------------------------------------------
 //@ Register bit masks/shifts.
 //@----------------------------------------------------------------------------
@@ -238,11 +257,29 @@ typedef struct
 #define YM_CHANNEL_HHSD      7       // real-world "channel 8"
 #define YM_CHANNEL_TOMTCY    8       // real-world "channel 9"
 
+extern YM_FMParams YM_FM[YM_NUM_CHANNELS];
+extern u8  YM_EnvDiv;
+extern u8  YM_HalfRatePhase;
+extern s32 YM_HeldMelodicSample;
+extern u8  YM_LiteEnvDiv;
+extern u8  YM_LitePhase;
+extern u8  YM_LiteRhythmTick;
+extern s32 YM_LiteLast;
+extern s32 YM_LiteCur;
+extern s32 YM_LiteStep;
+extern s32 YM_LiteRhythmHeld;
+extern s8  YM_VibNow;
+extern u8  YM_VibPos;
+extern u16 YM_VibCnt;
+extern s8  YM_VibTable[8];
+
+
 //@----------------------------------------------------------------------------
 //@ Public interface - same shape as the SCC driver.
 //@----------------------------------------------------------------------------
 void YMReset(YM *chip);
 void YMWrite(u8 value, u8 address, YM *chip);     // address = resolved register 0x00-0x38, not a Z80 address
-void YMMixer(int len, s16 *dest, YM *chip);       // accumulates into dest - see msx_music.c
+void YMMixer(int len, s16 *dest, YM *chip);       // accumulates into dest - see msx_music.c (DSi version)
+void YMMixer_Lite(int len, s16 *dest, YM *chip);  // accumulates into dest - see msx_music.c (DS-Lite version)
 
 #endif // YM_H

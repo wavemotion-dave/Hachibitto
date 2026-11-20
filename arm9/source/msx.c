@@ -726,76 +726,80 @@ __attribute__((noinline)) void WritePort_KanjiDriver(uint8_t port, uint8_t value
 // MSX IO Port Read - The MSX has a lot of I/O mapped peripherals
 // including Joystick, PSG, SCC, RTC, keyboard, etc.
 // --------------------------------------------------------------------
-ITCM_CODE unsigned char cpu_readport_msx(register u8 Port)
+ITCM_CODE __attribute__((optimize("no-jump-tables")))
+unsigned char cpu_readport_msx(register u8 Port)
 {
-  //98h~9Bh   Access to the VDP I/O ports.
-  if      (Port == 0x98) return RdData9938();               // VDP Data
-  else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
-  else if (Port == 0xB5) {return read_port_RTC_data();}     // RTC Data
-  else if (Port == 0xA2)  // PSG Read... might be joypad data
-  {
-      return read_joypad_data();
-  }
-  else if (Port == 0x12)  // 2xPSG Read...
-  {
-      if (myConfig.expansion == EXP_2XPSG) return ay38910DataR(&myAY2);
-      else return NORAM;
-  }
-  else if (Port == 0xA8)  // Feedback on Slot mapping
-  {
-      return Port_PPI_A;
-  }
-  else if (Port == 0xA9)  // Keyboard read
-  {
-      return readport_keyboard();
-  }
-  else if (Port == 0xAA)  // Port C feedback
-  {
-      return Port_PPI_C;
-  }
-  else if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machine return this but we do.
-  {
-      return mirror_ram_bank[Port - 0xFC];
-  }
-  else if (Port == 0xBA) // Light Pen - normally 0xFF but need to clear bit 4 to let games like DIX boot (unsure why)
-  {
-      if (dix_patch) return 0x6F;
-  }
-  else if (Port >= 0xD8 && Port <= 0xDB) // Kanji Driver
-  {
-      return ReadPort_KanjiDriver(Port);
-  }
-  else if (Port == 0xF4) // Boot register... force cold boot
-  {
-      return system_status_f4;
-  }
-  else if (Port == 0xF5)
-  {
-      return (myConfig.machineType == MACHINE_MSX2) ? 0xDE : 0xFF; // Kanji installed on MSX2+
-  }
-  else // Unknown port read
-  {
-      //debug[DX++ & 0xF] = Port;
-  }
+    //98h~9Bh   Access to the VDP I/O ports is the most common...
+    if      (Port == 0x98) return RdData9938();               // VDP Data
+    else if (Port == 0x99) return RdCtrl9938();               // VDP Control (Status)
+    else switch (Port)
+    {
+        case 0xB5: // RTC Data
+            return read_port_RTC_data();
 
-  // No such port
-  return(NORAM);
+        case 0xA2: // PSG Read... might be joypad data
+            return read_joypad_data();
+
+        case 0x12: // 2xPSG Read
+            if (myConfig.expansion == EXP_2XPSG) return ay38910DataR(&myAY2);
+            else return NORAM;
+
+        case 0xA8: // Feedback on Slot mapping
+            return Port_PPI_A;
+
+        case 0xA9: // Keyboard read
+            return readport_keyboard();
+
+        case 0xAA: // Port C feedback
+            return Port_PPI_C;
+
+        case 0xBA: // Light Pen
+            // Normally 0xFF, but clear bit 4 to let games like DIX boot.
+            if (dix_patch) return 0x6F;
+            break;
+
+        case 0xD8:  // Kanji Driver IO block
+        case 0xD9:
+        case 0xDA:
+        case 0xDB:
+            return ReadPort_KanjiDriver(Port);
+
+        case 0xF4: // Boot register... force cold boot
+            return system_status_f4;
+
+        case 0xF5:
+            return (myConfig.machineType == MACHINE_MSX2) ? 0xDE : 0xFF;
+
+        default:
+            if (Port >= 0xFC) // Mirror of RAM select. Not all MSX2 machines return this but we do.
+            {
+                return mirror_ram_bank[Port - 0xFC];
+            }
+            break;
+    }
+
+    return NORAM;
 }
 
-u8  SpecialPage[256] __attribute__((section(".dtcm"), aligned(4))) = {0};
+
+u8  SpecialPage[256]    __attribute__((section(".dtcm"), aligned(4))) = {0};
+u8  SlowWrite[256]      __attribute__((section(".dtcm"), aligned(4))) = {0};
 u32 specialKey = 0xFFFFFFFF;    // set to 0xFFFFFFFF on reset / game load to force a rebuild
 
-void UpdateSpecialPages(void)
+__attribute__((noinline)) void UpdateSpecialPages(void)
 {
     const u32 m = special_memory_access;
 
-    // Only the inputs that affect READS go into the key (SUPERLR is write-only)
-    u32 key = (m & (SPEC_MEM_SUBSLOT_ACTIVE | SPEC_MEM_SCC_ENABLED |
-                    SPEC_MEM_SCC_PLUS_ENABLED | SPEC_MEM_DISK_CONTROLLER))
-            | (bCartInPage[2] ? 0x100 : 0);
+    // Everything that affects either table goes in the key
+    u32 key = (m & (SPEC_MEM_SUBSLOT_ACTIVE | SPEC_MEM_SCC_ENABLED | SPEC_MEM_SCC_PLUS_ENABLED |
+                    SPEC_MEM_SUPERLR_ACTIVE | SPEC_MEM_DISK_CONTROLLER))
+            | (bCartInPage[2] ? 0x100 : 0)
+            | (bRAMInPage[0] ? 0x200 : 0) | (bRAMInPage[1] ? 0x400 : 0)
+            | (bRAMInPage[2] ? 0x800 : 0) | (bRAMInPage[3] ? 0x1000 : 0);
     if (key == specialKey) return;
     specialKey = key;
 
+    // ---- Reads (unchanged) ----
     const u32 inPage2 = bCartInPage[2];
     u32 scc     = ((m & SPEC_MEM_SCC_ENABLED)      && inPage2) ? 0x01010101 : 0;
     u32 sccPlus = ((m & SPEC_MEM_SCC_PLUS_ENABLED) && inPage2) ? 0x01010101 : 0;
@@ -803,9 +807,18 @@ void UpdateSpecialPages(void)
     u32 *p = (u32*)SpecialPage;
     p[0x98 >> 2] = scc;      p[(0x98 >> 2) + 1] = scc;        // 9800-9FFF
     p[0xB8 >> 2] = sccPlus;  p[(0xB8 >> 2) + 1] = sccPlus;    // B800-BFFF
+    SpecialPage[0x7F] = (m & SPEC_MEM_DISK_CONTROLLER) ? 1 : 0;
+    SpecialPage[0xFF] = (m & SPEC_MEM_SUBSLOT_ACTIVE)  ? 1 : 0;
 
-    SpecialPage[0x7F] = (m & SPEC_MEM_DISK_CONTROLLER)  ? 1 : 0;   // 7F00-7FFF
-    SpecialPage[0xFF] = (m & SPEC_MEM_SUBSLOT_ACTIVE)   ? 1 : 0;   // FF00-FFFF
+    // ---- Writes: four 16K pages x 64 entries, word fills ----
+    u32 *w = (u32*)SlowWrite;
+    for (int pg = 0; pg < 4; pg++)
+    {
+        u32 v = bRAMInPage[pg] ? 0 : 0x01010101;
+        for (int i = 0; i < 16; i++) *w++ = v;
+    }
+    if (m & SPEC_MEM_SUPERLR_ACTIVE)   SlowWrite[0x00] = 1;   // 0000-00FF
+    if (m & SPEC_MEM_SUBSLOT_ACTIVE)   SlowWrite[0xFF] = 1;   // FFFF
 }
 
 //------------------------------------------------------------------------------
@@ -1164,127 +1177,143 @@ void msx_slot_map_msx2(unsigned char Value)
 }
 
 
-// --------------------------------------------------------------
-// Happens only once per game so put into a non-ITCM function...
-// --------------------------------------------------------------
-__attribute__((noinline)) void CheckEnableFM_PAC(void)
-{
-    if ((myConfig.expansion == EXP_FM_PAC) || (myConfig.expansion == EXP_MEGARAM))
-    {
-        msx_music_capable_game = 1;
-        bClickRemoveNeeded = 1;
-    }
-}
-
-
 // -----------------------------------------------------------------------------------------------
 // MSX IO Port Write - VDP and AY Sound Chip, Disk I/O, MSX2 Expanded Memory plus Slot Mapper $A8
 // -----------------------------------------------------------------------------------------------
-ITCM_CODE void cpu_writeport_msx(register u8 Port,register unsigned char Value)
+ITCM_CODE __attribute__((optimize("no-jump-tables")))
+void cpu_writeport_msx(register u8 Port,register unsigned char Value)
 {
     static u8 msx_music_register = 0;
 
     if      (Port == 0x98) {WrData9938(Value);}                 // VDP Data
     else if (Port == 0x99) {WrCtrl9938(Value);}                 // VDP Control
-    else if (Port == 0x9A) {write_port_palette(Value);}         // VDP Palette
-    else if (Port == 0x9B) {IndirectRegWrite9938(Value);}       // Indirect Register Area
-    else if (Port == 0xA0) {ay38910IndexW(Value&0xF, &myAY);}   // PSG Area
-    else if (Port == 0xA1) {ay38910DataW(Value, &myAY);}        // PSG Area
-    else if (Port == 0x10) {ay38910IndexW(Value&0xF, &myAY2);}  // PSG Area - 2nd PSG
-    else if (Port == 0x11) {ay38910DataW(Value, &myAY2);}       // PSG Area - 2nd PSG
-    else if (Port == 0xB4) {write_port_RTC_index(Value);}       // RTC Area (index register)
-    else if (Port == 0xB5) {write_port_RTC_data(Value);}        // RTC Area (data register)
-    else if (Port == 0xA8) // Slot system for MSX
+    else switch(Port)
     {
-        if (myConfig.machineType == MACHINE_MSX1) msx_slot_map_msx1(Value);
-        else msx_slot_map_msx2(Value);
+        case 0x9A: // VDP Palette
+            write_port_palette(Value);
+            break;
 
-        Port_PPI_A = Value;
-    }
-    else if (Port == 0xA9)  // PPI - Register B
-    {
-        Port_PPI_B = Value;
-    }
-    else if (Port == 0xAA)  // PPI - Register C
-    {
-        if (Value & 0x80)  // Beeper ON
-        {
-            if (((Port_PPI_C ^ Value) & 0x80) == 0) beeperFreq++; // Beeper toggle
-        }
-        Port_PPI_C = Value;
-        msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
-    }
-    else if (Port == 0xAB)  // PPI - Register C Fast Modify
-    {
-        if ((Value & 0x0E) == 0x0E) // Are we hitting the Beeper ON/OFF bit?
-        {
-            if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;   // Beeper toggle
-            else if (!(Value & 1) && ((Port_PPI_C & 0x80))) beeperFreq++;  // Beeper toggle
-        }
+        case 0x9B: // Indirect Register Area
+            IndirectRegWrite9938(Value);
+            break;
 
-        // Set or clear the proper bit in PORTC
-        u8 bit =  (Value & 0x0E) >> 1;
-        if (Value & 1) Port_PPI_C |= (1 << bit);
-        else Port_PPI_C &= ~(1 << bit);
+        case 0xA0: // PSG Area
+            ay38910IndexW(Value & 0xF, &myAY);
+            break;
 
-        msx_caps_lock = ((Port_PPI_C & 0x40) ? 0:1);
-    }
-    else if (Port >= 0xFC && Port <= 0xFF) // Expanded Memory...
-    {
-        // The MSX1 machine has only 64K emulated...
-        if (myConfig.machineType != MACHINE_MSX1)
-        {
-            u8 page = Port-0xFC;
-            u8 bank = Value & (isDSiMode() ? 0x1F:0xF); // 512K (DSi) or 256K (DS-Lite) in 16K banks
+        case 0xA1: // PSG Area
+            ay38910DataW(Value, &myAY);
+            break;
 
-            if (myConfig.expansion == EXP_MEGARAM) // If we have mapped in the MEGARAM 'cart'... expand to 512K
+        case 0x10: // PSG Area - 2nd PSG
+            ay38910IndexW(Value & 0xF, &myAY2);
+            break;
+
+        case 0x11: // PSG Area - 2nd PSG
+            ay38910DataW(Value, &myAY2);
+            break;
+
+        case 0xB4: // RTC Area (index register)
+            write_port_RTC_index(Value);
+            break;
+
+        case 0xB5: // RTC Area (data register)
+            write_port_RTC_data(Value);
+            break;
+
+        case 0xA8: // Slot system for MSX
+            if (myConfig.machineType == MACHINE_MSX1) msx_slot_map_msx1(Value);
+            else msx_slot_map_msx2(Value);
+            Port_PPI_A = Value;
+            break;
+
+        case 0xA9: // PPI - Register B
+            Port_PPI_B = Value;
+            break;
+
+        case 0xAA: // PPI - Register C
+            if (Value & 0x80)
             {
-                bank = Value & (isDSiMode() ? 0x3F : 0x1F); // 1MB (DSi) or 512K (DS-Lite in 16K Banks
+                if (((Port_PPI_C ^ Value) & 0x80) == 0) beeperFreq++;
             }
 
-            mirror_ram_bank[page] = bank; // For read-back
+            Port_PPI_C = Value;
+            msx_caps_lock = ((Port_PPI_C & 0x40) ? 0 : 1);
+            break;
 
-            u8 expanded_bank_start = (isDSiMode() ? 32:16);
-            if (bank >= expanded_bank_start) // Expanded banks for the MEGARAM 'cart' are stored in upper ROM memory
+        case 0xAB: // PPI - Register C Fast Modify
+            if ((Value & 0x0E) == 0x0E)
             {
-                MSXRamPtr[(page*2)+0] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-expanded_bank_start));
-                MSXRamPtr[(page*2)+1] = ROM_Memory + ((MAX_CART_SIZE_KB/2) * 1024) + (0x4000 * (bank-expanded_bank_start)) + 0x2000;
-            }
-            else
-            {
-                MSXRamPtr[(page*2)+0] = RAM_Memory + (0x4000 * bank);
-                MSXRamPtr[(page*2)+1] = RAM_Memory + (0x4000 * bank) + 0x2000;
+                if ((Value & 1) && ((Port_PPI_C & 0x80) == 0)) beeperFreq++;
+                else if (!(Value & 1) && (Port_PPI_C & 0x80)) beeperFreq++;
             }
 
-            cpu_writeport_msx(0xA8, Port_PPI_A); // Enable the new map...
-        }
-    }
-    else if (Port == 0x7C)
-    {
-        msx_music_register = Value;
-    }
-    else if (Port == 0x7D)
-    {
-        if (++msx_music_writes == 10) // Arbitrary... if we hit it at least 10 times, we turn on MSX MUSIC output
-        {
-            CheckEnableFM_PAC();
-        }
-        YMWrite(Value, msx_music_register, &myYM);    // address = resolved register 0x00-0x38, not a Z80 address
-    }
-    else if (Port >= 0xD8 && Port <= 0xDB)
-    {
-        WritePort_KanjiDriver(Port, Value);
-    }
-    else if (Port == 0xF4) // System boot status
-    {
-        system_status_f4 = Value;
-    }
-    else // Unhandled port write...
-    {
-        //debug[DX++ & 0xF] = Port;
+            // Set or clear the proper bit in PORTC
+            u8 bit = (Value & 0x0E) >> 1;
+            if (Value & 1) Port_PPI_C |= (1 << bit);
+            else Port_PPI_C &= ~(1 << bit);
+
+            msx_caps_lock = ((Port_PPI_C & 0x40) ? 0 : 1);
+            break;
+
+        case 0x7C:
+            msx_music_register = Value;
+            break;
+
+        case 0x7D:
+            YMWrite(Value, msx_music_register, &myYM);
+            break;
+            
+        case 0xD8:
+        case 0xD9:
+        case 0xDA:
+        case 0xDB:
+            WritePort_KanjiDriver(Port, Value);
+            break;
+
+        case 0xF4: // System boot status
+            system_status_f4 = Value;
+            break;
+        
+        case 0xFC:
+        case 0xFD:
+        case 0xFE:
+        case 0xFF:
+            // The MSX1 machine has only 64K emulated... so this is only for MSX2/2+
+            if (myConfig.machineType != MACHINE_MSX1)
+            {
+                u8 page = Port - 0xFC;
+                u8 bank = Value & (isDSiMode() ? 0x1F : 0xF);
+
+                if (myConfig.expansion == EXP_MEGARAM)
+                {
+                    bank = Value & (isDSiMode() ? 0x3F : 0x1F);
+                }
+
+                mirror_ram_bank[page] = bank;
+
+                u8 expanded_bank_start = (isDSiMode() ? 32 : 16);
+                if (bank >= expanded_bank_start)
+                {
+                    MSXRamPtr[(page * 2) + 0] = ROM_Memory + ((MAX_CART_SIZE_KB / 2) * 1024) + (0x4000 * (bank - expanded_bank_start));
+                    MSXRamPtr[(page * 2) + 1] = ROM_Memory + ((MAX_CART_SIZE_KB / 2) * 1024) + (0x4000 * (bank - expanded_bank_start)) + 0x2000;
+                }
+                else
+                {
+                    MSXRamPtr[(page * 2) + 0] = RAM_Memory + (0x4000 * bank);
+                    MSXRamPtr[(page * 2) + 1] = RAM_Memory + (0x4000 * bank) + 0x2000;
+                }
+
+                cpu_writeport_msx(0xA8, Port_PPI_A);
+            }
+            break;
+
+        default:
+            // Unhandled port write...
+            //debug[DX++ & 0xF] = Port;
+            break;
     }
 }
-
 // --------------------------------------------------------------------------
 // Try to guess the ROM type from the loaded binary... basically we are
 // counting the number of load addresses that would access a mapper hot-spot.
@@ -1850,15 +1879,12 @@ void MSX_CartSetup(u8 media_id)
         }
         else if (MyMedia[media_id].mapperType == MATRACOMP)
         {
-            extern u8 matra_previoius_blocks[4];
-            extern u8 matra_compilation_offset;
+            matra_previous_blocks[0] = 0;
+            matra_previous_blocks[1] = 1;
+            matra_previous_blocks[2] = 2;
+            matra_previous_blocks[3] = 3;
 
-            matra_previoius_blocks[0] = 0;
-            matra_previoius_blocks[1] = 1;
-            matra_previoius_blocks[2] = 2;
-            matra_previoius_blocks[3] = 3;
-
-            matra_compilation_offset = 2;
+            matra_comp_offset = 2;
 
             MSXCartPtr[media_id][0] = (u8*)Unmapped_Memory;           // Segment Unmapped
             MSXCartPtr[media_id][1] = (u8*)Unmapped_Memory;           // Segment Unmapped
@@ -2187,7 +2213,11 @@ void msx_reset(void)
     system_status_f4 = 0x00;
 
     MSX_InitialMemoryLayout();
-
+    
+    memset(SpecialPage, 0x00, sizeof(SpecialPage));
+    memset(SlowWrite, 0x00, sizeof(SlowWrite));    
+    specialKey = 0xFFFFFFFF;
+    
     // -------------------------------------------------
     // If a disk was part of the setup, load it now...
     // -------------------------------------------------

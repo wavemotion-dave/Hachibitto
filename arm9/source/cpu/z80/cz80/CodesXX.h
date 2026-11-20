@@ -191,8 +191,8 @@ case POP_AF:   M_POP(AF);break;
 case SCF:  S(C_FLAG);R(N_FLAG|H_FLAG);break;
 case CPL:  CPU.AF.B.h=~CPU.AF.B.h;S(N_FLAG|H_FLAG);break;
 case NOP:  break;
-case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I|(CPU.AF.W&0xFF00),CPU.AF.B.h);break;
-case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I|(CPU.AF.W&0xFF00));break;
+case OUTA: I=OpZ80(CPU.PC.W++);OutZ80(I,CPU.AF.B.h);break;
+case INA:  I=OpZ80(CPU.PC.W++);CPU.AF.B.h=InZ80(I);break;
 
 case EX_DE_HL: J.W=CPU.DE.W;CPU.DE.W=CPU.HL.W;CPU.HL.W=J.W;break;
 case EX_AF_AF: J.W=CPU.AF.W;CPU.AF.W=CPU.AF1.W;CPU.AF1.W=J.W;break;  

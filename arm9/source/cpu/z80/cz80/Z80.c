@@ -31,11 +31,11 @@
 
 extern Z80 CPU;
 extern void debug_printf(const char * str, ...);
-u32 halt_counter=0;
 extern u32 debug[];
 extern u32 DX, DY;
 extern u8 *MemoryMap[8];
 extern u8 SpecialPage[256];
+extern u8 SlowWrite[256];
 
 /** System-Dependent Stuff ***********************************/
 /** This is system-dependent code put here to speed things  **/
@@ -50,7 +50,11 @@ static inline byte RdZ80(word A)
     return MemoryMap[A >> 13][A];
 }
 
-#define     WrZ80(A,V)       cpu_writemem16(A,V)
+ITCM_CODE __attribute__((noinline)) void WrZ80(word A, byte V)
+{
+    if (SlowWrite[A >> 8]) { cpu_writemem16(A, V); return; }
+    MemoryMap[A >> 13][A] = V;
+}
 
 #define     OutZ80(P,V)      cpu_writeport_msx(P,V)
 #define     InZ80(P)         cpu_readport_msx(P)
@@ -105,6 +109,7 @@ static inline byte RdZ80(word A)
 
 #define M_POP(Rg)      \
   CPU.Rg.B.l=OpZ80(CPU.SP.W++);CPU.Rg.B.h=OpZ80(CPU.SP.W++)
+
 #define M_PUSH(Rg)     \
   WrZ80(--CPU.SP.W,CPU.Rg.B.h);WrZ80(--CPU.SP.W,CPU.Rg.B.l)
 
@@ -466,7 +471,7 @@ void ResetZ80(Z80 *R)
   CPU.NumInts           = 0;
   CPU.Trace             = 0;
   CPU.TrapBadOps        = 1;
-
+  
   JumpZ80(CPU.PC.W);
 }
 
@@ -489,7 +494,7 @@ ITCM_CODE int ExecZ80(register int RunCycles)
       /* Read opcode and count cycles */
       I=MM[CPU.PC.W>>13][CPU.PC.W]; CPU.PC.W++;
       CPU.ICount-=Cycles[I];
-      
+
       /* Interpret opcode */
       switch(I)
       {
